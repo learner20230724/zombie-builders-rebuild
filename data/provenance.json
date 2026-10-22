@@ -1,0 +1,356 @@
+{
+  "sourceSwfSha256": "8c518cfe4b0077bff3f1ed8f4c67627b63c4c5a8df6c3044f6ab019b234595a1",
+  "sourceAsSha256": "bcfb5a048718b4f7ccea8001950643d29fda8fd4fee2cfd0aca3fd59bd2ea3c6",
+  "source": "C:\\Users\\折纸人\\Documents\\ChatGPT\\随机处理的需要文件夹的任务\\zombie-builders-rebuild\\reference\\simplified\\scripts\\main.as",
+  "method": "bb_Init",
+  "variables": {
+    "bb_data_Hoedown": {
+      "line": 9246,
+      "sha256": "50284b8d9ca1b791dd4c56c48a754e3e7a1a7d937c99de51cf6300d089956ada",
+      "originalDeclarationLine": 9637,
+      "originalAssignmentLine": null
+    },
+    "bb_data_Hoedownfat": {
+      "line": 9249,
+      "sha256": "9141bd5a2eae930c11814c3e4b36f71e9c12187d57202a080f4bc5ce6e524183",
+      "originalDeclarationLine": 9639,
+      "originalAssignmentLine": 12777
+    },
+    "bb_data_goose": {
+      "line": 9252,
+      "sha256": "a17431221da1cc2724d5a89047626099d78b27d1c791585651530531fb5e0bfc",
+      "originalDeclarationLine": 9641,
+      "originalAssignmentLine": 13344
+    },
+    "bb_data_goosefat": {
+      "line": 9254,
+      "sha256": "97a2005b33bbf9f8589635b592837f57d050123b33a1c2e8b4fcbeeeed280a01",
+      "originalDeclarationLine": 9643,
+      "originalAssignmentLine": null
+    },
+    "bb_data_shovelsprites": {
+      "line": 9257,
+      "sha256": "1799356c14b147376ae09b7884c90ef38a42046797c405e8848122e2e96148b3",
+      "originalDeclarationLine": 9645,
+      "originalAssignmentLine": 14011
+    },
+    "bb_data_preachersprites": {
+      "line": 9258,
+      "sha256": "4b14a2d4464df23be45acd3a107facc9d7b0b4a5d6f269cb0a20c06de890b383",
+      "originalDeclarationLine": 9647,
+      "originalAssignmentLine": 14539
+    },
+    "bb_data_shotgunsprites": {
+      "line": 9260,
+      "sha256": "f2cb63f16231781422b6c07cd38b64e80df0c7f35b99f298b106bb8c0e13e020",
+      "originalDeclarationLine": 9649,
+      "originalAssignmentLine": 14856
+    },
+    "bb_data_trucksprites": {
+      "line": 9262,
+      "sha256": "2c42bc08ce30b7b5fb0c92c49728ad045a06272a873ded07625988f743fc8809",
+      "originalDeclarationLine": 9651,
+      "originalAssignmentLine": 14955
+    },
+    "bb_data_bombersprites": {
+      "line": 9263,
+      "sha256": "19cf5498b826e19443103730ffc3fb2ba95431d1baa87d47faf23a9f8dd4bed3",
+      "originalDeclarationLine": 9653,
+      "originalAssignmentLine": 15389
+    },
+    "bb_data_zombiesprites": {
+      "line": 9265,
+      "sha256": "059ff66da6e6535efa1d348046a29dcff68cad22fc485f53626d8d48f2cf20ba",
+      "originalDeclarationLine": 9655,
+      "originalAssignmentLine": 15842
+    },
+    "bb_data_ghoulsprites": {
+      "line": 9267,
+      "sha256": "6d59c09af96fd3ed2e57a939ea5470cedda85d01891ead9b48fd07098e3b4d9f",
+      "originalDeclarationLine": 9657,
+      "originalAssignmentLine": 16260
+    },
+    "bb_data_fastzombiesprites": {
+      "line": 9269,
+      "sha256": "f80b9603b2208a3a30c82882e1639224d208de7ae64d70105380798bd3396347",
+      "originalDeclarationLine": 9659,
+      "originalAssignmentLine": 16262
+    },
+    "bb_data_fatzombiesprites": {
+      "line": 9270,
+      "sha256": "2a3c9c0c5ac60f78a75affca51816b773885162075eebf5fd9d298a9a006f6ea",
+      "originalDeclarationLine": 9661,
+      "originalAssignmentLine": null
+    },
+    "bb_data_catapultsprites": {
+      "line": 9272,
+      "sha256": "30c81fe8ceffdcc141d71a7e3d6ded8c0dcf6f0c8b650102373818c1fd25aa4a",
+      "originalDeclarationLine": 9663,
+      "originalAssignmentLine": 17151
+    },
+    "bb_data_flingsprites": {
+      "line": 9275,
+      "sha256": "38cb7dd8758a31df8f7ea3c058f519f0b2e6f9c0374cf8322f040c8b79013b19",
+      "originalDeclarationLine": 9665,
+      "originalAssignmentLine": 17160
+    },
+    "bb_data_zombieparts": {
+      "line": 9276,
+      "sha256": "dfaa274065d172752c184657d5bad5dd6ecd7a6be0bdfbf51c0acd9bd5b0078f",
+      "originalDeclarationLine": 9667,
+      "originalAssignmentLine": null
+    },
+    "bb_data_ghoulparts": {
+      "line": 9277,
+      "sha256": "44c4d49309da5c37f994daadb74e650c4e0e1c0d1934e6a484dcedd71af5f971",
+      "originalDeclarationLine": 9669,
+      "originalAssignmentLine": null
+    },
+    "bb_data_fastzombieparts": {
+      "line": 9278,
+      "sha256": "26c2fb738c3e5915db575c7f52c51cb6d90f7061a93cfe188275c97de9478546",
+      "originalDeclarationLine": 9671,
+      "originalAssignmentLine": null
+    },
+    "bb_data_fatzombieparts": {
+      "line": 9279,
+      "sha256": "705b539f1cbf63a34952e009e1fef05786115301aedd81710cddff53bbca8a78",
+      "originalDeclarationLine": 9673,
+      "originalAssignmentLine": 17328
+    },
+    "bb_data_jetsprites": {
+      "line": 9280,
+      "sha256": "5fba9c90bb92b89bd557acfc05f100c10732a24e1c66ed78a882f417cf15cbe9",
+      "originalDeclarationLine": 9675,
+      "originalAssignmentLine": 17455
+    },
+    "bb_data_harvestsprites": {
+      "line": 9281,
+      "sha256": "73034911d8ccb0518cb3d593dcc81218c051e517b656395f5c497c7290ac8e0f",
+      "originalDeclarationLine": 9677,
+      "originalAssignmentLine": 17456
+    },
+    "bb_data_clocksprites": {
+      "line": 9282,
+      "sha256": "6a8ca53520a807a04defeee1e6841cb6fa26a6e8b728fc9fac0fa69ace4b7d0b",
+      "originalDeclarationLine": 9679,
+      "originalAssignmentLine": 17661
+    },
+    "bb_data_basesprites": {
+      "line": 9283,
+      "sha256": "1501824fd4f0004a1ba04093386ec371d853f378a711bbcc1e90a92b4301d7f2",
+      "originalDeclarationLine": 9681,
+      "originalAssignmentLine": 17662
+    },
+    "bb_data_bitsprites": {
+      "line": 9284,
+      "sha256": "4a24b8e77cd5668de23a040dfeedded7f77bbb97a85ecfb871327b1e22eb8251",
+      "originalDeclarationLine": 9683,
+      "originalAssignmentLine": 17663
+    },
+    "bb_data_bloodsprites": {
+      "line": 9285,
+      "sha256": "bd86d7f9c3b766ee1e0612e18b1b3f477d6cf6b9c4289a769c43475f3afe6965",
+      "originalDeclarationLine": 9685,
+      "originalAssignmentLine": 17762
+    },
+    "bb_data_bigbloodsprites": {
+      "line": 9286,
+      "sha256": "8e889d3a241560ef30e450325b45fe8134f4e13c1d8ec628758f8824f150e94d",
+      "originalDeclarationLine": 9687,
+      "originalAssignmentLine": 17810
+    },
+    "bb_data_explosionsprites": {
+      "line": 9287,
+      "sha256": "49bcef3c4da23a48ff07a56f83aa4b71771b46300cb4e1cdb34c5cdc3a116a4d",
+      "originalDeclarationLine": 9689,
+      "originalAssignmentLine": 17900
+    },
+    "bb_data_ignitionsprites": {
+      "line": 9288,
+      "sha256": "3006a690ea289aa62196b32dd5c8f43ae710f0379959f706314c54f52355d67a",
+      "originalDeclarationLine": 9691,
+      "originalAssignmentLine": 17940
+    },
+    "bb_data_shoveldeath": {
+      "line": 9289,
+      "sha256": "d57a8ca93393b480555e550afa2afd2a17efe98e8a177e79ec56a3582b543316",
+      "originalDeclarationLine": 9693,
+      "originalAssignmentLine": 17941
+    },
+    "bb_data_shotgundeath": {
+      "line": 9290,
+      "sha256": "5144f0854fb8a7974939b1a5a7bfe561f1f3a4a7d33e13a3478643f47896c0b9",
+      "originalDeclarationLine": 9695,
+      "originalAssignmentLine": null
+    },
+    "bb_data_bomberhead": {
+      "line": 9291,
+      "sha256": "c0ab3d154e2fe1f25f2124e91d76ec3109c0535577ed1f076fbdd352a3848b34",
+      "originalDeclarationLine": 9697,
+      "originalAssignmentLine": 17991
+    },
+    "bb_data_preacherdeath": {
+      "line": 9292,
+      "sha256": "befce823b6c7a60b5a5f304e6898deb985463e1991b69bb10568872ddf10adaf",
+      "originalDeclarationLine": 9699,
+      "originalAssignmentLine": null
+    },
+    "bb_data_extrablood": {
+      "line": 9293,
+      "sha256": "24efefcefff8c963958ee7b4fa56049a964f116327e4cb29f06e3821ede5f55d",
+      "originalDeclarationLine": 9701,
+      "originalAssignmentLine": 18136
+    },
+    "bb_data_harvestblood": {
+      "line": 9294,
+      "sha256": "99e1b0ffedb8b2c5271c27caff778210c71abac0bceab5944a008b9e009e351b",
+      "originalDeclarationLine": 9703,
+      "originalAssignmentLine": 18185
+    },
+    "bb_data_unitname": {
+      "line": 9295,
+      "sha256": "98ca9c0a1793e44d797a4fe9b8a019f86e1996c2b505657c8488c718548a37c7",
+      "originalDeclarationLine": 9705,
+      "originalAssignmentLine": 18186
+    },
+    "bb_data_unitdata": {
+      "line": 9296,
+      "sha256": "7feb143888c25b2c18386bb9db7fe7fb52bc9dc8b565913e97c59cfcad8d4898",
+      "originalDeclarationLine": 9707,
+      "originalAssignmentLine": null
+    },
+    "bb_data_zombiename": {
+      "line": 9297,
+      "sha256": "739ce6cadcab2b29557e08a8933760f4f48dd216df02d7179251ba14cc9026ac",
+      "originalDeclarationLine": 9709,
+      "originalAssignmentLine": 18213
+    },
+    "bb_data_zombiedata": {
+      "line": 9298,
+      "sha256": "78f6f9925c346b1d1da4ccf87ddc24670b78b018fa86c366008bbf0868016917",
+      "originalDeclarationLine": 9711,
+      "originalAssignmentLine": 18214
+    },
+    "bb_data_buildingname": {
+      "line": 9299,
+      "sha256": "b2abdc1c44a7bd65b15853b5e809c74027f89bb4f44978d7811adedbc0ef3a58",
+      "originalDeclarationLine": 9713,
+      "originalAssignmentLine": null
+    },
+    "bb_data_buildingdata": {
+      "line": 9300,
+      "sha256": "57d580f11ac193e7e693a8af3cdf8f1dc1e01e8d12019ee6938ed6ce9e05418e",
+      "originalDeclarationLine": 9715,
+      "originalAssignmentLine": 18221
+    },
+    "bb_data_wmdxp": {
+      "line": 9301,
+      "sha256": "d97079e8c3bf6231ef66658e1acfff374a391cdf8c8a657ba24879bdb6237625",
+      "originalDeclarationLine": 9717,
+      "originalAssignmentLine": 18222
+    },
+    "bb_data_wmdcooldown": {
+      "line": 9302,
+      "sha256": "dce0641cbbd3bc67965d25e346f544cb5594bf867b69d7574757b1032e02f7ce",
+      "originalDeclarationLine": 9719,
+      "originalAssignmentLine": 18223
+    },
+    "bb_leveldata_level1": {
+      "line": 9310,
+      "sha256": "7142b19b05973f098e3d9b51085563f128e45dafd5b5b42bcfb2f02468b68e19",
+      "originalDeclarationLine": 9723,
+      "originalAssignmentLine": 18262
+    },
+    "bb_leveldata_level2": {
+      "line": 9312,
+      "sha256": "4d5b037431fca915725979701a8befcaa1cc1445bafb055a15dfbed3fd88aa2c",
+      "originalDeclarationLine": 9725,
+      "originalAssignmentLine": 18453
+    },
+    "bb_leveldata_level3": {
+      "line": 9313,
+      "sha256": "6ecf97413fd6aa6fad3f07d1b4bb4758f502fc89a91db3711540802b0d834f5f",
+      "originalDeclarationLine": 9727,
+      "originalAssignmentLine": 18509
+    },
+    "bb_leveldata_level4": {
+      "line": 9314,
+      "sha256": "2d5ae0794097a6559a3513b24ee9478da7ea5c4bc355bcc4f51c69433eab84c5",
+      "originalDeclarationLine": 9729,
+      "originalAssignmentLine": 18683
+    },
+    "bb_data_difficultyname": {
+      "line": 9316,
+      "sha256": "4b3679c333a270f3370cea36b4e5be45a74420db3a17155141c33b53349dddcd",
+      "originalDeclarationLine": 9731,
+      "originalAssignmentLine": null
+    },
+    "bb_data_difficultytitle": {
+      "line": 9317,
+      "sha256": "4fc7c4b65a0de720fa9fab687a4d35f305b9135cb79ab8de874ed2d9ca8a7fee",
+      "originalDeclarationLine": 9733,
+      "originalAssignmentLine": 18691
+    },
+    "bb_data_junkpos": {
+      "line": 9318,
+      "sha256": "a4fec2c1b9a125a65b4a1697f3569e3694835a585b2fa96b9fcab59cea283b95",
+      "originalDeclarationLine": 9735,
+      "originalAssignmentLine": 18714
+    },
+    "bb_data_trailerpos": {
+      "line": 9319,
+      "sha256": "ca1a4fc5de3df148f519257921ac1f7d5a2405a047366eaf649eb709bbefc0ff",
+      "originalDeclarationLine": 9737,
+      "originalAssignmentLine": 18715
+    },
+    "bb_data_unitabout": {
+      "line": 9320,
+      "sha256": "8763e75b67b7517427bbabede3970aa741074edd6cd045eabe00b31492d40304",
+      "originalDeclarationLine": 9739,
+      "originalAssignmentLine": 18725
+    },
+    "bb_data_buildingabout": {
+      "line": 9321,
+      "sha256": "e234be0a0e1251c4bca81c7eb1365e69f00ce375a6b579d05b6634c7c5a2a195",
+      "originalDeclarationLine": 9741,
+      "originalAssignmentLine": 18726
+    },
+    "bb_data_wmdabout": {
+      "line": 9322,
+      "sha256": "babe0a36b85c82fa48ad913298b967c41da4a3ec4ffae4a9578e06e8752cc105",
+      "originalDeclarationLine": 9743,
+      "originalAssignmentLine": 18727
+    },
+    "bb_data_wmdname": {
+      "line": 9323,
+      "sha256": "01b9898061893f491a52996289f7e7afc7c53cdb45881be30ed53655897e0649",
+      "originalDeclarationLine": 9745,
+      "originalAssignmentLine": 18729
+    },
+    "bb_data_WinMessage": {
+      "line": 9324,
+      "sha256": "538c1a5aa8ad345cf013113c3319592d262fb3ac2ea61d60ce18ef60840c6aea",
+      "originalDeclarationLine": 9747,
+      "originalAssignmentLine": 18730
+    },
+    "bb_data_LoseMessage": {
+      "line": 9325,
+      "sha256": "b53b2de324687883ad609d1e77a72a7531252e045364e62fb733920c6e592cab",
+      "originalDeclarationLine": 9749,
+      "originalAssignmentLine": 18736
+    }
+  },
+  "counts": {
+    "rawVariables": 56,
+    "units": 6,
+    "zombies": 6,
+    "buildings": 6,
+    "powers": 3,
+    "levels": 4,
+    "spritesheets": 30,
+    "fonts": 5,
+    "frames": 760,
+    "glyphs": 447
+  }
+}

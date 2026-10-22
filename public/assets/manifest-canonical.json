@@ -1,0 +1,1202 @@
+{
+  "profile": "ztp-0.33-source-premultiplied-and-ruffle-0.7.1-jpeg-v1",
+  "scope": "Decoded source assets, never captured rendered screens. Original assets and manifest.json remain unchanged.",
+  "sourceSWFSha256": "8c518cfe4b0077bff3f1ed8f4c67627b63c4c5a8df6c3044f6ab019b234595a1",
+  "reference": {
+    "package": "@ruffle-rs/ruffle",
+    "version": "0.7.1",
+    "jpegDependency": "https://github.com/ruffle-rs/ruffle/blob/v0.7.1/render/Cargo.toml#L45-L47",
+    "decoder": "https://github.com/image-rs/jpeg-decoder/tree/v0.3.2"
+  },
+  "limitations": [
+    "Matching the Ruffle decoding profile is not proof of matching proprietary Adobe Flash JPEG decoding.",
+    "Source premultiplied bytes are exact; subsequent Canvas alpha blending, bilinear filtering and geometric coverage can still differ from the reference.",
+    "This file supplies candidate image overrides only. It does not modify the active game manifest."
+  ],
+  "images": {
+    "bg_alpha.png": {
+      "src": "/public/assets/images-canonical/bg_alpha.png",
+      "sha256": "4df3d01dcbacb8a2ac0eab70205de4f2b50c8e87316399f8bcc688bbbdbf625c",
+      "bytes": 70,
+      "width": 1,
+      "height": 1,
+      "type": "image/png",
+      "characterId": 100,
+      "originalSrc": "/public/assets/images/bg_alpha.png",
+      "originalSha256": "ac74b28630f3ed22a7482dc3e8ee8da1b4df3eeeebbeef3428adfa4b9c3a4a1d",
+      "sourcePremultipliedARGBSha256": "97d9e77242b7286d9cd95210158d544b3ceefc01c7238788d5fd55550041d035",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "sky3.jpg": {
+      "src": "/public/assets/images-canonical/sky3.png",
+      "sha256": "22b6f366ea3925f49c865b72a241e93636ebe985cdb24c330b9b401f69667709",
+      "bytes": 213200,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 101,
+      "originalSrc": "/public/assets/images/sky3.jpg",
+      "originalSha256": "ad91203acc335a72398d0339daebcf2c8de365829964b5824817215373930550",
+      "sourcePremultipliedARGBSha256": null,
+      "normalization": "jpeg-decoder=0.3.2, default-features=false; RGB24 output to PNG",
+      "validation": {
+        "decodedRGBSha256": "3506a20650f0bbe8cbf6abaf642a1fd9d94b40f393158fd109895743117b3c8e"
+      }
+    },
+    "Hoedown.png": {
+      "src": "/public/assets/images-canonical/Hoedown.png",
+      "sha256": "2dd7f15867075f2d37a64ad2bd154f9f06738fbe485f53c0b760ab5dcc8074b6",
+      "bytes": 33316,
+      "width": 512,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 102,
+      "originalSrc": "/public/assets/images/Hoedown.png",
+      "originalSha256": "b1000a9dc88b86f5eb07e83151b38c850546da36471866eda8c08558eec64043",
+      "sourcePremultipliedARGBSha256": "3523f5250e7b0b0573000f66f897be503f5af9617095eb20c860bb072c502f32",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "ghoulparts.png": {
+      "src": "/public/assets/images-canonical/ghoulparts.png",
+      "sha256": "8f38f7f3429252ade9e0d584402130328c0b7a27ccee0a8d13c2a06412adf657",
+      "bytes": 3275,
+      "width": 256,
+      "height": 128,
+      "type": "image/png",
+      "characterId": 103,
+      "originalSrc": "/public/assets/images/ghoulparts.png",
+      "originalSha256": "71944a5928305d2ce93ab18e171d2bb02b7ae5b865570c6e0aef94b5502cc2c5",
+      "sourcePremultipliedARGBSha256": "2870f7fe3edcc31911dafeff057e5bb1246105b3809e4ca69ecbaaae62d7e07c",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "clocksprites.png": {
+      "src": "/public/assets/images-canonical/clocksprites.png",
+      "sha256": "795f3d229c29aad8e0635bd12ff24360b819663f2f04e638f143913a9e8d67a4",
+      "bytes": 3507,
+      "width": 256,
+      "height": 256,
+      "type": "image/png",
+      "characterId": 104,
+      "originalSrc": "/public/assets/images/clocksprites.png",
+      "originalSha256": "5e911921127c357635f84e4da6742b7d88094eca2802d999d4f9af511af4123b",
+      "sourcePremultipliedARGBSha256": "b325bcebd835d2b4911b739663f655bf0dd8ca11ca92414e4c383f2646e3703a",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "trucksprites.png": {
+      "src": "/public/assets/images-canonical/trucksprites.png",
+      "sha256": "9cd52fc6f1d6d376570c0fc06770d09575bfe88d052e0d01ee808e0d6799098d",
+      "bytes": 92061,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 105,
+      "originalSrc": "/public/assets/images/trucksprites.png",
+      "originalSha256": "9259d290b606deed62839615aae442d18940a4b59aa9e0aeb046f39650f539d3",
+      "sourcePremultipliedARGBSha256": "8534daf85fd57daf92cc8a48f4a33ae8d2fff128aca47cf050dedc6bcd59c2a2",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "yeehaw.png": {
+      "src": "/public/assets/images-canonical/yeehaw.png",
+      "sha256": "394eee3ca38ca1daceb27cebad1bf958f3a3cff46fcebce7b39ff9cda16abf17",
+      "bytes": 1484,
+      "width": 38,
+      "height": 27,
+      "type": "image/png",
+      "characterId": 106,
+      "originalSrc": "/public/assets/images/yeehaw.png",
+      "originalSha256": "851ba0936485094c5dd954640c83953c7e3e2229910e5dd4bf1c468dc907b18c",
+      "sourcePremultipliedARGBSha256": "3befb8b274f35348a9d88e3013518f4e360a50a4f39c4ff9a21ecd81b590a212",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "harvestersprites.png": {
+      "src": "/public/assets/images-canonical/harvestersprites.png",
+      "sha256": "2db743c6313401478bb6f74bdfbd04e61ed04313e400ea7370ad9ad4e428611a",
+      "bytes": 68295,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 107,
+      "originalSrc": "/public/assets/images/harvestersprites.png",
+      "originalSha256": "cf22ebb825b334f1d978a9bdc6cea7eed32159beaa2753f818547de15dcb8882",
+      "sourcePremultipliedARGBSha256": "b975b226e8ab0ef6a3ac0255a77c6c8edaa1c98ff798f34bbd200e3b2bc1f415",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "winscreen.png": {
+      "src": "/public/assets/images-canonical/winscreen.png",
+      "sha256": "7741b07ea709b92c85f795f889d8b97653880e82e4bb939d6ca2012f17da8bed",
+      "bytes": 93547,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 32,
+      "originalSrc": "/public/assets/images/winscreen.png",
+      "originalSha256": "f5922f128eb51db803be15a3e463e2ff0bb4924357ab8b23b4e83305902c96f5",
+      "sourcePremultipliedARGBSha256": "1aacafafde65236509a51287001256193fa140e2f445df52df2d766a40252263",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "Garage.png": {
+      "src": "/public/assets/images-canonical/Garage.png",
+      "sha256": "dde43ccba8cc2ee0708955502412700da1d3ce641529959f6557a29183f55449",
+      "bytes": 24423,
+      "width": 300,
+      "height": 160,
+      "type": "image/png",
+      "characterId": 33,
+      "originalSrc": "/public/assets/images/Garage.png",
+      "originalSha256": "018c12fec3c3793f0efc180fda59feee419a5f7b0a7f21622129b1762ac8d3af",
+      "sourcePremultipliedARGBSha256": "bdde9bf44579472a058c96f0a12e00e4c136298d20ecf9c40a092d04289daa0d",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "BG.png": {
+      "src": "/public/assets/images-canonical/BG.png",
+      "sha256": "d790a8d71049b0fb1454a9c968d3f31c5690bce2bad6e73e6488ffe177a2dd90",
+      "bytes": 383383,
+      "width": 1420,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 34,
+      "originalSrc": "/public/assets/images/BG.png",
+      "originalSha256": "21557c9ceb9243f81ccf3745e7687f7c5657630bc183f48eec67064640c8d332",
+      "sourcePremultipliedARGBSha256": "d8ec292076f8a652beb6c9ded88fb7fb81f262bec7ae8e1d52479d9fdeef5489",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "goosefat.png": {
+      "src": "/public/assets/images-canonical/goosefat.png",
+      "sha256": "959c3021d2df00ddf6fd4881c310b2295636c3bccbe0c8cccb122df21c9cd6c0",
+      "bytes": 57518,
+      "width": 512,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 35,
+      "originalSrc": "/public/assets/images/goosefat.png",
+      "originalSha256": "be5b4db6dc4fbb82e6f67795f0aff588d975cedeafb06be4e50771c93194dcc3",
+      "sourcePremultipliedARGBSha256": "7fea25238487f781a98dc9cdb385cfbbcc193064c38f1e2aae0145de6c95ebaf",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "zombiesprites.png": {
+      "src": "/public/assets/images-canonical/zombiesprites.png",
+      "sha256": "e917eda4fc38a3f33be5c9f44a8a0d488b5610d06a3b346848a671a02ac14364",
+      "bytes": 95059,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 36,
+      "originalSrc": "/public/assets/images/zombiesprites.png",
+      "originalSha256": "16562b0d37d75b66a57b83af421dab664d5983e8920cd66c54341675f25963bf",
+      "sourcePremultipliedARGBSha256": "5257668a4499dc2d1f5abb976844e8cf69bbc72cc268c4a733a0f3ba8c2328df",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "Hoedownfatblack.png": {
+      "src": "/public/assets/images-canonical/Hoedownfatblack.png",
+      "sha256": "48ccb3f3a3a71c82eaa4374830d344d3fb2e73422d4f56aac1463523e9b98acf",
+      "bytes": 41455,
+      "width": 512,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 37,
+      "originalSrc": "/public/assets/images/Hoedownfatblack.png",
+      "originalSha256": "d1c1aa7979c3ab85a889b06ecf73dac38c7553d26e273914f36466ad216a5e2e",
+      "sourcePremultipliedARGBSha256": "a0862af984e34831a6f383ae597d3cd50c2ddebb0b999373fb262bdecd226bb4",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "goose.png": {
+      "src": "/public/assets/images-canonical/goose.png",
+      "sha256": "59cd65e500f51984d0f6e04cc9a0062c90e62caddde413d0ab3a3e5f8435abe6",
+      "bytes": 29705,
+      "width": 512,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 38,
+      "originalSrc": "/public/assets/images/goose.png",
+      "originalSha256": "960bf3f004f8042c53c9f87ad19d6f37251662be064b627bfb45997de4fe994e",
+      "sourcePremultipliedARGBSha256": "253804c79bbbe06705185da9c63dce1bb909c4100d53cfcc1a639e19a7693aeb",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "junkyard.png": {
+      "src": "/public/assets/images-canonical/junkyard.png",
+      "sha256": "7502a843c761ad1caddf33da6e2481d0f1fa707834d1870c0e9c7f16fdf445c0",
+      "bytes": 16743,
+      "width": 260,
+      "height": 140,
+      "type": "image/png",
+      "characterId": 39,
+      "originalSrc": "/public/assets/images/junkyard.png",
+      "originalSha256": "e12bc4a03a3fe8499d49b8176ebb9fe73246cd74afe058f93c75fbfe26a2c9f2",
+      "sourcePremultipliedARGBSha256": "644dba18d47b749a4629f68f8410d040779c4ffb013f335c664a890b588f1d64",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "title.png": {
+      "src": "/public/assets/images-canonical/title.png",
+      "sha256": "e5d9310eacce4d14712f6c3bb4893984c42bce0e62de3416eb2774039f3fff09",
+      "bytes": 144829,
+      "width": 800,
+      "height": 800,
+      "type": "image/png",
+      "characterId": 40,
+      "originalSrc": "/public/assets/images/title.png",
+      "originalSha256": "5146e4c673d3915480bc7faaf25060017d0c4917d13830e5c8ac81d58fc2a4dc",
+      "sourcePremultipliedARGBSha256": "4cdd142cba21a16d2f15ba489c9ad05f8667c9916439a0d11775f56715f753b3",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "farm_house.png": {
+      "src": "/public/assets/images-canonical/farm_house.png",
+      "sha256": "4eac7a1e5f0168643a3f60313fdc54d277c0465d2ec42e3d745d8ddb48fd3dbf",
+      "bytes": 25790,
+      "width": 360,
+      "height": 220,
+      "type": "image/png",
+      "characterId": 41,
+      "originalSrc": "/public/assets/images/farm_house.png",
+      "originalSha256": "e3d1e835abf93a4e81ffc1c4b085c19c8f93eb27940007372dccec69a1cc8ce8",
+      "sourcePremultipliedARGBSha256": "f005e88b1fdae61a26e59169a9739129d4cfc6480e3732ff442d45d50f265eba",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "Still.png": {
+      "src": "/public/assets/images-canonical/Still.png",
+      "sha256": "2d917cf42293e328589a0923acd37d35fd70b4b03131cabc8cfbba918e5edb8e",
+      "bytes": 18905,
+      "width": 220,
+      "height": 160,
+      "type": "image/png",
+      "characterId": 42,
+      "originalSrc": "/public/assets/images/Still.png",
+      "originalSha256": "ded1745e4482da2c03b055ca7bb903bed60d2aadfdb91a008bb13ec1dbe204af",
+      "sourcePremultipliedARGBSha256": "68563db31ef522dc651b49570df37c578f848fc28db08cb5db0ab35fbdc14575",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "explosionsprites.png": {
+      "src": "/public/assets/images-canonical/explosionsprites.png",
+      "sha256": "ab64fbeac6f05991db600d75251bae44f65b7cfef4cd5ac2dbada0894fd78e0e",
+      "bytes": 47569,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 43,
+      "originalSrc": "/public/assets/images/explosionsprites.png",
+      "originalSha256": "56c20d64e076c278ef4353d3ce51058a03a410e2c5b749fae802d8a6842b673c",
+      "sourcePremultipliedARGBSha256": "26aaf79d82d0d72134897e95fbcb2275ecba2a2b650814f6bcd795ecf31dba7d",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "preacherdeath.png": {
+      "src": "/public/assets/images-canonical/preacherdeath.png",
+      "sha256": "25c020158ac23516eb62522e4ebe511c319649051254c390025c10025091b2e5",
+      "bytes": 28859,
+      "width": 512,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 44,
+      "originalSrc": "/public/assets/images/preacherdeath.png",
+      "originalSha256": "8bce2737a3810bafeb369aeecd32fdeafc88bd42cbfaffb72a7cc1c99f592203",
+      "sourcePremultipliedARGBSha256": "f350db6de4c34af565af4c97ba9454b4e85bcba76b5f8a63b7e0c689d5cd9639",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "catapultsprites.png": {
+      "src": "/public/assets/images-canonical/catapultsprites.png",
+      "sha256": "9b4c2aaf574f1dfa1646067075bf128522aec3a532f6c85bedaacc6ec594b201",
+      "bytes": 238630,
+      "width": 2048,
+      "height": 640,
+      "type": "image/png",
+      "characterId": 45,
+      "originalSrc": "/public/assets/images/catapultsprites.png",
+      "originalSha256": "e0b23a56e13df0dd61a88da3a5b5b8d20e7632d5b2b945f7cb2e8b8b5b39a8c9",
+      "sourcePremultipliedARGBSha256": "bae272b4299eec3dbf35d6d08e5886f98d1b151804eded368e4439e5bf362850",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "progress2.png": {
+      "src": "/public/assets/images-canonical/progress2.png",
+      "sha256": "06e86fe37fb56d77c17ff17b6dbe0a6aa5d6bc12a80a6dee191c830424550fc7",
+      "bytes": 240,
+      "width": 64,
+      "height": 16,
+      "type": "image/png",
+      "characterId": 46,
+      "originalSrc": "/public/assets/images/progress2.png",
+      "originalSha256": "b182491ded861ac2f04a24d53d7ad287d5c80478e80ee3107dc76e86c2ed6cda",
+      "sourcePremultipliedARGBSha256": "f7dea9a50fda56f9b4dbc330258c8f84b75f18699a3e201606ff4dc94f418dc0",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "sound_icon.png": {
+      "src": "/public/assets/images-canonical/sound_icon.png",
+      "sha256": "b3b58caaba40ccd84a8191f82af4b76c5970e9b0afe76a5e50685fc65b596623",
+      "bytes": 510,
+      "width": 48,
+      "height": 47,
+      "type": "image/png",
+      "characterId": 47,
+      "originalSrc": "/public/assets/images/sound_icon.png",
+      "originalSha256": "62133a47408939f61001616db1d3a04f6376bed17d319d7136bb699aabffaaa9",
+      "sourcePremultipliedARGBSha256": "128572a41d788b226ec5d7fe83027fe95e21ea07b8540ceb4eefa16035e03aef",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "progress1.png": {
+      "src": "/public/assets/images-canonical/progress1.png",
+      "sha256": "f5129ae0155eba9fd4a9422c9aa0ccfd3b2808139b15703073ebd8f268e68561",
+      "bytes": 248,
+      "width": 64,
+      "height": 16,
+      "type": "image/png",
+      "characterId": 48,
+      "originalSrc": "/public/assets/images/progress1.png",
+      "originalSha256": "d810739afa7e5bc267fb0a783c504bb2c36f7fd9953990d22a0987bf9f80495b",
+      "sourcePremultipliedARGBSha256": "fe57af4f851769f6549bc7d291d0617b7862c2e9c1b59f2f52220e1df79a5793",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "survivalistsprites.png": {
+      "src": "/public/assets/images-canonical/survivalistsprites.png",
+      "sha256": "69bcdb353fda0b3c23cda38c206d6d546be1270c556b55995457b1b74c967e30",
+      "bytes": 61934,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 49,
+      "originalSrc": "/public/assets/images/survivalistsprites.png",
+      "originalSha256": "68e28cca5c9dea179857cdb81c4522f66f2613bcb348b5f6cff9807a6b352e44",
+      "sourcePremultipliedARGBSha256": "b6ef624d9e902208c5f9947ed84d64b8dc64cf19a3a16fa7d8b760a60a94668d",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "arrow.png": {
+      "src": "/public/assets/images-canonical/arrow.png",
+      "sha256": "25a4cc06af284380accbb47722f05e3ded268c15d6c531ff9c2db00f0c7eab97",
+      "bytes": 1665,
+      "width": 43,
+      "height": 36,
+      "type": "image/png",
+      "characterId": 50,
+      "originalSrc": "/public/assets/images/arrow.png",
+      "originalSha256": "134c3fff5a9df38495d6fcabd3914f3d6bf208bd4a26665b62b78c0b00fe6dee",
+      "sourcePremultipliedARGBSha256": "b21b5b9e62127c07ee299f1345511e8cbaa7e0775dba10a4f04afecf01efcde6",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "basesprites.png": {
+      "src": "/public/assets/images-canonical/basesprites.png",
+      "sha256": "0971f056c172995923f6795ad4fa95c31a6af6844c011e5a0af4d0412fcffb8a",
+      "bytes": 114037,
+      "width": 1024,
+      "height": 1024,
+      "type": "image/png",
+      "characterId": 51,
+      "originalSrc": "/public/assets/images/basesprites.png",
+      "originalSha256": "30148defa57fb62bbe27a8845b83fb442a5644032982a40601f245514a141582",
+      "sourcePremultipliedARGBSha256": "3b25afe113f04eb0089f1d5c669fde8b8a1f32e23e2cbcab7bdfb717c9c22951",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "moonshinebottle.png": {
+      "src": "/public/assets/images-canonical/moonshinebottle.png",
+      "sha256": "9193df73fd9b50c51dd8e22b7ce720218c80afad734e855ee24d29ecef65fac3",
+      "bytes": 323,
+      "width": 20,
+      "height": 20,
+      "type": "image/png",
+      "characterId": 52,
+      "originalSrc": "/public/assets/images/moonshinebottle.png",
+      "originalSha256": "0eda061e3d09f1454b4f2fc6cac58506e109393e302cf39609c2207bc9e587db",
+      "sourcePremultipliedARGBSha256": "94c5df98bad893871659be8ba99fafc89e423fed1ff54d0a1f38e7819c7b4211",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "dude.png": {
+      "src": "/public/assets/images-canonical/dude.png",
+      "sha256": "020a0aad58c57ad953f92dc8ffd0339263cc20f22e722e8ae5ae34ccd2a60840",
+      "bytes": 946,
+      "width": 22,
+      "height": 23,
+      "type": "image/png",
+      "characterId": 53,
+      "originalSrc": "/public/assets/images/dude.png",
+      "originalSha256": "3d296afbd110438753ada40c79b5ba0947a30f511aa1da127b7c1906c4f66c77",
+      "sourcePremultipliedARGBSha256": "c7ad2635e97347d53d0a0fa25a80d02683a8d3ce36f8997fd0e71c8cd89f91a5",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "lock.png": {
+      "src": "/public/assets/images-canonical/lock.png",
+      "sha256": "ec35cccc9167f37f6b2bf826d3c74c90bef1c917891452e268eb9fe71a9907ba",
+      "bytes": 1403,
+      "width": 34,
+      "height": 50,
+      "type": "image/png",
+      "characterId": 54,
+      "originalSrc": "/public/assets/images/lock.png",
+      "originalSha256": "40245fa1a4d69de22e91bf287e5dc22589829cf67e16f70cb60933899b04f8a8",
+      "sourcePremultipliedARGBSha256": "528e8d5c2a577860f295b7f56275d0ed9775ff9924e44c6837c025afcb9644db",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "bloodsprites.png": {
+      "src": "/public/assets/images-canonical/bloodsprites.png",
+      "sha256": "6f2e7c117a7f8d4b304b98260158f2baf48fb1b6766e5912c2aa616cc2a5bee8",
+      "bytes": 6432,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 56,
+      "originalSrc": "/public/assets/images/bloodsprites.png",
+      "originalSha256": "71e2f72415b4d5d16e29711122347218219aca103a0443fe778947d856bd8b2d",
+      "sourcePremultipliedARGBSha256": "487805f06f0626008dddee668d68837d5f6057aaa090fdd674a05e980099d215",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "Game_UI.png": {
+      "src": "/public/assets/images-canonical/Game_UI.png",
+      "sha256": "71deca5b3d05fad6f8c1bf2fe695cad2aefe231e220a03d033bcf2b753b5602b",
+      "bytes": 109840,
+      "width": 800,
+      "height": 133,
+      "type": "image/png",
+      "characterId": 57,
+      "originalSrc": "/public/assets/images/Game_UI.png",
+      "originalSha256": "4f1e69d1c7f694334baae1e93d7589afba32cc378e2f096cfc1077a31081e8a7",
+      "sourcePremultipliedARGBSha256": "c1a52d9195b2108cc01942f7d6065f2ea97038201d16c254958c99bf0b90b9ae",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "wheel2.png": {
+      "src": "/public/assets/images-canonical/wheel2.png",
+      "sha256": "d143058acbb6e78aa2e5067a8d784cea5520df27b276e560fcb2828e85dd95e0",
+      "bytes": 7850,
+      "width": 103,
+      "height": 103,
+      "type": "image/png",
+      "characterId": 58,
+      "originalSrc": "/public/assets/images/wheel2.png",
+      "originalSha256": "f4626977d472c8e9daf9dd4a586f546615b3abd869310f0aed5d96f3b7c0c52e",
+      "sourcePremultipliedARGBSha256": "4e43ad96c4e42403215403df889ed7ae5006c0eca6d8661789ba6521fd3c6110",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "wheel1.png": {
+      "src": "/public/assets/images-canonical/wheel1.png",
+      "sha256": "9a8f562e3243ecb60337476038942ecbbf5535f758b1f0718527078690b785f1",
+      "bytes": 6059,
+      "width": 103,
+      "height": 103,
+      "type": "image/png",
+      "characterId": 59,
+      "originalSrc": "/public/assets/images/wheel1.png",
+      "originalSha256": "d9c1edc66f221bb1ddd4306c820844e5c5767f0bbc03c983760935884bccfebd",
+      "sourcePremultipliedARGBSha256": "770e5e7eb6a114bf517d9b6c6ba2b9aecbbe4bb041dcb45b02788f252ac56b07",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "harvestblood.png": {
+      "src": "/public/assets/images-canonical/harvestblood.png",
+      "sha256": "7ce7c23abc7cebff3315cec3df1a5bc4d9a53ef0026ddaec6507f4c2fea851cf",
+      "bytes": 22798,
+      "width": 512,
+      "height": 256,
+      "type": "image/png",
+      "characterId": 60,
+      "originalSrc": "/public/assets/images/harvestblood.png",
+      "originalSha256": "106513f599d1791cc342fe4e12295dc0d1be5e5a698d00b7513865dd54544d3a",
+      "sourcePremultipliedARGBSha256": "012eba6095e72942b79a6d1cd69b77daa48e001f7b73268a3b9e3488d6222094",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "extrablood.png": {
+      "src": "/public/assets/images-canonical/extrablood.png",
+      "sha256": "5f9f6c742c145a850378e535d2d93ff605efdaef6416bf19da1fbe52a49fda3c",
+      "bytes": 8389,
+      "width": 256,
+      "height": 256,
+      "type": "image/png",
+      "characterId": 61,
+      "originalSrc": "/public/assets/images/extrablood.png",
+      "originalSha256": "fffe62150fed257e0c63089a0183771ac7abf53ee2f3a7b6df047653ef1b4027",
+      "sourcePremultipliedARGBSha256": "babd9c6291c7232a846d9fc36b13a8c65d5bf89f4cfc005898a833e94eb45a6f",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "catapultzombie.png": {
+      "src": "/public/assets/images-canonical/catapultzombie.png",
+      "sha256": "191f118beef5f11872a92df5bbf991f8c2a11ddaec0abdc73ba07243b2aa4cde",
+      "bytes": 19389,
+      "width": 256,
+      "height": 256,
+      "type": "image/png",
+      "characterId": 62,
+      "originalSrc": "/public/assets/images/catapultzombie.png",
+      "originalSha256": "e04bb3fad57077fc94bc129fc0254037d010d417bededd40f84f407e0cb5cd32",
+      "sourcePremultipliedARGBSha256": "c1047d70677c75d3efa617458d077d123cdc1fcde85e6b65efc685e3d538c575",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "bitsprites.png": {
+      "src": "/public/assets/images-canonical/bitsprites.png",
+      "sha256": "21f6ea07eceda30a07ca40b9935c1b73e28148484bea3cd9be35bc1ad654e63d",
+      "bytes": 832,
+      "width": 128,
+      "height": 64,
+      "type": "image/png",
+      "characterId": 63,
+      "originalSrc": "/public/assets/images/bitsprites.png",
+      "originalSha256": "68cc19ea5ede4484e55e07a6b03a6ec9e076c243682922ee905ea8372ee8af45",
+      "sourcePremultipliedARGBSha256": "b586051afcbdede594743149a7be7ca84f1ca0db0e90881e60010ba61eb9a96c",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "fastzombieparts.png": {
+      "src": "/public/assets/images-canonical/fastzombieparts.png",
+      "sha256": "acb583f3d8d27be5a26663cf20253c6d7b8c71b9eae759501f24bd1057ec327b",
+      "bytes": 4115,
+      "width": 256,
+      "height": 128,
+      "type": "image/png",
+      "characterId": 64,
+      "originalSrc": "/public/assets/images/fastzombieparts.png",
+      "originalSha256": "d69c8962770bb1c5aff8766e8f581a47358d2b9b29533a0132c50bc4ecd1bef2",
+      "sourcePremultipliedARGBSha256": "46109e879cfedd2ff12cef0a09c23ee002f98af05289c1030806e498a2dc043e",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "fatzombiesprites.png": {
+      "src": "/public/assets/images-canonical/fatzombiesprites.png",
+      "sha256": "e882b8070190eede9607ca40b9a5b0ced5f379e83d3ba2d0a352926566a46ac9",
+      "bytes": 556638,
+      "width": 2048,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 65,
+      "originalSrc": "/public/assets/images/fatzombiesprites.png",
+      "originalSha256": "a8ee629fa27391a52deafd21f812143017321db7ed32707ec4e046d4fdf056e9",
+      "sourcePremultipliedARGBSha256": "5992369ffc20634d11b531b22855fee566ddd758e120f1f312c53e29db147d79",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "zombie_base.png": {
+      "src": "/public/assets/images-canonical/zombie_base.png",
+      "sha256": "0b858e266a700c5a24fcf613532130c6aed500f4ee08104840172ba2103f745e",
+      "bytes": 13704,
+      "width": 210,
+      "height": 170,
+      "type": "image/png",
+      "characterId": 66,
+      "originalSrc": "/public/assets/images/zombie_base.png",
+      "originalSha256": "af5c7597913939b074be125defa0e5cae4159022f45f7b80507abb57167e29ff",
+      "sourcePremultipliedARGBSha256": "0e9b543b1216866f591962853775df574aff639b31c802acc2cbb3e2c9642816",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "chapel.png": {
+      "src": "/public/assets/images-canonical/chapel.png",
+      "sha256": "490be1c4c37b523f03d57f23c71c8a18cdc472f8c0868095a4386e4350431a20",
+      "bytes": 13259,
+      "width": 210,
+      "height": 270,
+      "type": "image/png",
+      "characterId": 67,
+      "originalSrc": "/public/assets/images/chapel.png",
+      "originalSha256": "7a0beed4c4efd66ce8f7c428a14fad099401881f33a6f6373494bc277b5a1dcf",
+      "sourcePremultipliedARGBSha256": "0ba1559fa2e58f3ce11f08ee718076fca739565cc9e0a4045496c531d7bf11fc",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "ghoulsprites.png": {
+      "src": "/public/assets/images-canonical/ghoulsprites.png",
+      "sha256": "bfc5c9f43d42d22b62dd9d8e581e739db9e4bc4ecefd01c19af793f83b095f4c",
+      "bytes": 87305,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 68,
+      "originalSrc": "/public/assets/images/ghoulsprites.png",
+      "originalSha256": "c7a8f7919a953bce6b20fe885fa56a6e5b90ab3636f1dba54d569ba56b0bc209",
+      "sourcePremultipliedARGBSha256": "5b14d925eaabf490db8ecdbc52137e93dbab6ce1ddf93a514a92e07e5ccc258c",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "shovelsprites.png": {
+      "src": "/public/assets/images-canonical/shovelsprites.png",
+      "sha256": "b096952962d202318895fa1adbbf23d067cc8581df567e1a018c8ab912c3e19f",
+      "bytes": 66480,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 69,
+      "originalSrc": "/public/assets/images/shovelsprites.png",
+      "originalSha256": "5530b3389ddd950d069b6e39a466418d72b6b9adbc1d25c17ca3b10bf6911965",
+      "sourcePremultipliedARGBSha256": "338c130c7152e49f4b831085628f6982c9065f59607ed8d6bb74d7f68419980d",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "bigbloodsprites.png": {
+      "src": "/public/assets/images-canonical/bigbloodsprites.png",
+      "sha256": "17638f5a83942bf779556ed9195807012a2dc0f76a2c66a5d64513c0789a0752",
+      "bytes": 12227,
+      "width": 256,
+      "height": 256,
+      "type": "image/png",
+      "characterId": 70,
+      "originalSrc": "/public/assets/images/bigbloodsprites.png",
+      "originalSha256": "d5b8ba86a187c31ce0cc8dc16def0f339b485b1dfcdb4da1c669c55142a5f2d3",
+      "sourcePremultipliedARGBSha256": "47917701c32e33db5c55316f7c53287bdc5f5dea5925bca52b3ca23263f776cf",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "sound_off.png": {
+      "src": "/public/assets/images-canonical/sound_off.png",
+      "sha256": "f89d5e20a3ab54a6e477598bb3de5229f85c2df9a9a1ee5f9b48addd99614cb1",
+      "bytes": 1349,
+      "width": 22,
+      "height": 21,
+      "type": "image/png",
+      "characterId": 71,
+      "originalSrc": "/public/assets/images/sound_off.png",
+      "originalSha256": "0f0867b46308e6a956070430c85469b3c079e5d5c9a84d572a49c3d4bf79bbee",
+      "sourcePremultipliedARGBSha256": "a23a07d0f858d6686efa744d8d2cb142022bebbd560d37efbac32a03b4c00942",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "submit_icons.png": {
+      "src": "/public/assets/images-canonical/submit_icons.png",
+      "sha256": "cac5e04f6237b2d0e7085af41cb7ee1e758b4c244c8ea0f28bf74e352c791b99",
+      "bytes": 5549,
+      "width": 100,
+      "height": 29,
+      "type": "image/png",
+      "characterId": 72,
+      "originalSrc": "/public/assets/images/submit_icons.png",
+      "originalSha256": "9c929fc183629ae2cda0a40946e7c6a36140b22cf367fdb9ed299f6067d0b221",
+      "sourcePremultipliedARGBSha256": "b2bf1579f16a483cb138a91eaa8b6b8b5443f6dcb2a8d8abe20b2721bd813e79",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "green_box.png": {
+      "src": "/public/assets/images-canonical/green_box.png",
+      "sha256": "6d296ec1d9aa3f1286d54c36f6f8c1ad1a8a0f3769c129343e87561ccb044b8f",
+      "bytes": 270,
+      "width": 32,
+      "height": 32,
+      "type": "image/png",
+      "characterId": 73,
+      "originalSrc": "/public/assets/images/green_box.png",
+      "originalSha256": "5c258779ecb92b9e081e67fa4cfded651cc54532e3441d3fe4bc60d239f5bd52",
+      "sourcePremultipliedARGBSha256": "2088d79655eaf41ba599361cf87f4fe00a0f91be7f1a8b51db31eff3dd32616b",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "tick.png": {
+      "src": "/public/assets/images-canonical/tick.png",
+      "sha256": "b48bbcee3c7e6951bbfc567e82092289731543ad370e1f5db33ffc6ac6ed2674",
+      "bytes": 2567,
+      "width": 47,
+      "height": 47,
+      "type": "image/png",
+      "characterId": 74,
+      "originalSrc": "/public/assets/images/tick.png",
+      "originalSha256": "09e952775b2c12aaae6a7a2fb153acc15729de97ce86e084ab1c9d1543d88c8f",
+      "sourcePremultipliedARGBSha256": "3ec1a1f6060c5213236150201390fe2a16f47db458487a11d8ec6a5ded3ad801",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "fastzombiesprites.png": {
+      "src": "/public/assets/images-canonical/fastzombiesprites.png",
+      "sha256": "b51d0d6b4aceabe13bd575ee688deed84d02d33a115a44a0f3690e9654f39251",
+      "bytes": 37297,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 75,
+      "originalSrc": "/public/assets/images/fastzombiesprites.png",
+      "originalSha256": "31506b2f8a416d8a1e0df141554b80847f0b435e12d58681d5ce187e503bd28e",
+      "sourcePremultipliedARGBSha256": "ef238e869045187ef951e2ce2c0787decb969ca99bf96f884452bfbe26ef8240",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "losescreen.png": {
+      "src": "/public/assets/images-canonical/losescreen.png",
+      "sha256": "1dbeb79f455e7ace7c7ccf99454ed3c12e1dcae040059f2ba4457507997c8077",
+      "bytes": 99403,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 77,
+      "originalSrc": "/public/assets/images/losescreen.png",
+      "originalSha256": "b9bd0319c98ec0b3afc1fced698e1d64dc9e3efc5ffc2275a16974128a1f05c0",
+      "sourcePremultipliedARGBSha256": "43485670aa8aa671adf90bab2834676aadb69bef72e20b3ab3e4917fa8c4568a",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "jetsprites.png": {
+      "src": "/public/assets/images-canonical/jetsprites.png",
+      "sha256": "c401182a4e1c2969c45cff6acdef611dab3381dbb589f8e829123c47287bd069",
+      "bytes": 23237,
+      "width": 512,
+      "height": 256,
+      "type": "image/png",
+      "characterId": 78,
+      "originalSrc": "/public/assets/images/jetsprites.png",
+      "originalSha256": "63f77fbf2bc3e62fd1c0931bd275de22b46502d4877f1ab0b4ade997a324a955",
+      "sourcePremultipliedARGBSha256": "0494fc88d7913cc4d00c3f5a10a6788627ccf0274e287c901c83b4aa9b31d6ed",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "preachersprites.png": {
+      "src": "/public/assets/images-canonical/preachersprites.png",
+      "sha256": "2eccaec4e6a6c02173a2c51ad5e3d183ae286fabdc25380114212487a9fdd642",
+      "bytes": 130403,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 79,
+      "originalSrc": "/public/assets/images/preachersprites.png",
+      "originalSha256": "c205579fd7cc3338cbe7ddf83fa270076eb8c31b8762cbf795d010d9ce888697",
+      "sourcePremultipliedARGBSha256": "ba6269f42c9d27777f11844edc917e79282c29c8c4cc8d3a0fe07c5851f44517",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "zombieparts.png": {
+      "src": "/public/assets/images-canonical/zombieparts.png",
+      "sha256": "cd606c5c74dd3df0b7ee577759e56c4ede66915c3e0a5f4c5840922380d18c52",
+      "bytes": 3079,
+      "width": 256,
+      "height": 64,
+      "type": "image/png",
+      "characterId": 80,
+      "originalSrc": "/public/assets/images/zombieparts.png",
+      "originalSha256": "b336c34c28bf773fc7f2b6fac9eb021b38c67fab66cd77a5c021fa577dea010e",
+      "sourcePremultipliedARGBSha256": "07edeca25276a866e208365937ffb88dcd6325fcaa0f837453f05c0e9e83d912",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "bombersprites.png": {
+      "src": "/public/assets/images-canonical/bombersprites.png",
+      "sha256": "03c1d4b3d228f39d3a299f9e16aa8128c52851db379964dc8644184286d2599d",
+      "bytes": 110477,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 81,
+      "originalSrc": "/public/assets/images/bombersprites.png",
+      "originalSha256": "176f29b73d62354b6d8ff5bf001d5d3946fe04b2017711bfdf2e3c649d60213b",
+      "sourcePremultipliedARGBSha256": "bfb454168f50405fea984351464170e13e8914952d31f1c030f018ec11d2bd6a",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "shotgundeath.png": {
+      "src": "/public/assets/images-canonical/shotgundeath.png",
+      "sha256": "dcf5900186a2f564559a3db847de2fdb1609adcff9def95d9e9f3913791f785b",
+      "bytes": 18742,
+      "width": 256,
+      "height": 256,
+      "type": "image/png",
+      "characterId": 82,
+      "originalSrc": "/public/assets/images/shotgundeath.png",
+      "originalSha256": "d503c52b22765558181cf0da9a7674c4d457151be393d9389d8854a66ebfa54b",
+      "sourcePremultipliedARGBSha256": "06072e22eb89001ff4d110b95e3149b23d34ce06c1e2c7b27db5c54bd715bf41",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "Hoedownfatorange.png": {
+      "src": "/public/assets/images-canonical/Hoedownfatorange.png",
+      "sha256": "f07cdc020179ff7a77768865eea6ce1990acf3b33fa1fc37484e294099eb7f85",
+      "bytes": 64981,
+      "width": 512,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 83,
+      "originalSrc": "/public/assets/images/Hoedownfatorange.png",
+      "originalSha256": "a5a1717f6b7ebea8739be2f39817fa88f3f98ace29d86c3214f3184f10e769b4",
+      "sourcePremultipliedARGBSha256": "63d6d411238d01becc0b75038a0a0347fd28e97265d9cd82c3225f9177e08686",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "fatzombieparts.png": {
+      "src": "/public/assets/images-canonical/fatzombieparts.png",
+      "sha256": "85232e0b3eae91e276e7d142591810a981ab47b060a916967ef7238155bdd688",
+      "bytes": 22843,
+      "width": 256,
+      "height": 256,
+      "type": "image/png",
+      "characterId": 84,
+      "originalSrc": "/public/assets/images/fatzombieparts.png",
+      "originalSha256": "81ffea9b1c1b5a99efaac2dc016d5387281a50be34a6dd53cecaa3aca67a5811",
+      "sourcePremultipliedARGBSha256": "d7baacfb0db2df6e7be8ff172a89eafccee06d22de842212bf421712393d9ed0",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "shoveldeath.png": {
+      "src": "/public/assets/images-canonical/shoveldeath.png",
+      "sha256": "928c4f99afa832a833dbf48d827731fa50418f451aa819cc97d3beb3ed1e6b77",
+      "bytes": 13410,
+      "width": 256,
+      "height": 256,
+      "type": "image/png",
+      "characterId": 85,
+      "originalSrc": "/public/assets/images/shoveldeath.png",
+      "originalSha256": "fb9b01b59472b1b5b554f080974d0cf43a1b957843a7f657f7c0746459890228",
+      "sourcePremultipliedARGBSha256": "2e68d93c2c258c760097660b66fbaa01ad408179934fa1af0dcd22417c986825",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "disabled.png": {
+      "src": "/public/assets/images-canonical/disabled.png",
+      "sha256": "0a9ba99bb4b2beb7be02a743a3462f82141bc8451510913e37da03d658605d34",
+      "bytes": 1757,
+      "width": 47,
+      "height": 47,
+      "type": "image/png",
+      "characterId": 86,
+      "originalSrc": "/public/assets/images/disabled.png",
+      "originalSha256": "e90ad3cd78f4db0de447f971f0ca0b6d5e25b8d2cff8113593bc6bb5d2518b88",
+      "sourcePremultipliedARGBSha256": "0b25fb5e5f7c3d4e5a03a85357ab447af26969fcd6a1f99cf0ddfb037fae6a76",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "ready.png": {
+      "src": "/public/assets/images-canonical/ready.png",
+      "sha256": "c56ec54eac2f4b01dcca8d7571d1f98f9cac6636e7a9584cbee23a245da3d903",
+      "bytes": 1202,
+      "width": 42,
+      "height": 41,
+      "type": "image/png",
+      "characterId": 87,
+      "originalSrc": "/public/assets/images/ready.png",
+      "originalSha256": "56399676750e5d9b5e2d63fd82fa1ba74829487934a001d6cfa4df1af025fae8",
+      "sourcePremultipliedARGBSha256": "d3793a75d3af06a7f81a0bbb6f48886820dfe0a2f71a59ec6dce796fd42cb115",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "trailer.png": {
+      "src": "/public/assets/images-canonical/trailer.png",
+      "sha256": "601f405f53b28db8798dbc70974e48305a4242a515abb910b100057c8f852568",
+      "bytes": 4111,
+      "width": 115,
+      "height": 70,
+      "type": "image/png",
+      "characterId": 88,
+      "originalSrc": "/public/assets/images/trailer.png",
+      "originalSha256": "7ae3a96d68e78abc25f3d7b8f97a1e4800e5ef039b51315720ae66d776f22cef",
+      "sourcePremultipliedARGBSha256": "51bb2f6b8a271cd01feb7b7b0888f537663cf027eea2bd5202f924f8e30af704",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "speed_triangle.png": {
+      "src": "/public/assets/images-canonical/speed_triangle.png",
+      "sha256": "de333ab9cbe23a410b185c94da3d380951c92dda3842d54b00e6fe93dade8869",
+      "bytes": 548,
+      "width": 12,
+      "height": 22,
+      "type": "image/png",
+      "characterId": 89,
+      "originalSrc": "/public/assets/images/speed_triangle.png",
+      "originalSha256": "68230397b20d7838d9504d2e44a4feb511d6b536c0ca998f16bc0b2a9335bac0",
+      "sourcePremultipliedARGBSha256": "ccdc48428184db136f6482ccddd6443f930e37836154367929ed9550974c4e44",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "selecta.png": {
+      "src": "/public/assets/images-canonical/selecta.png",
+      "sha256": "2a272b5598b72c6c5265ac210f76b1f05539ac3a45166ac645889123462ba269",
+      "bytes": 1260,
+      "width": 47,
+      "height": 47,
+      "type": "image/png",
+      "characterId": 90,
+      "originalSrc": "/public/assets/images/selecta.png",
+      "originalSha256": "9da79c0822d509a76ddb3c5bbe0923fb1d0eb2fa18bfe97d938c627658009f54",
+      "sourcePremultipliedARGBSha256": "3aad489eee07cb50bddcdbf22bdee8f53dfd64c44cb4e31fe445d6f1e8ec5036",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "ignitionsprites.png": {
+      "src": "/public/assets/images-canonical/ignitionsprites.png",
+      "sha256": "d3b77b8a7644ab11207bba61bfca9c68caf6149eb4277bef9b85fee9ee1f3f61",
+      "bytes": 52445,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 91,
+      "originalSrc": "/public/assets/images/ignitionsprites.png",
+      "originalSha256": "8ba149cf1fdf98d8742cb8244e97e467450a7d823eaa84be05caec3569834497",
+      "sourcePremultipliedARGBSha256": "ced21fe2227cd3721c2aa7abc1b955b477a801d1ae0c76d85acea1301d1a46fc",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "red_box.png": {
+      "src": "/public/assets/images-canonical/red_box.png",
+      "sha256": "5a75b3bfce2ce5458e37abb18d1661b53bf1ee3c5fef1bc618b9fd67e93bb753",
+      "bytes": 281,
+      "width": 32,
+      "height": 32,
+      "type": "image/png",
+      "characterId": 92,
+      "originalSrc": "/public/assets/images/red_box.png",
+      "originalSha256": "7bb0c6f7d03049cb1ccc0d5308230987e0172b487abf641a460431da856d5e99",
+      "sourcePremultipliedARGBSha256": "696309c8202b05214a98ba6af4c7eb0db7cae8c32ad06d7df574a398ca8bc9a4",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "logo.png": {
+      "src": "/public/assets/images-canonical/logo.png",
+      "sha256": "9d284c8dfd9008603b2790f91285df4f71ee9315edf053708bce00e2e45de2c0",
+      "bytes": 4782,
+      "width": 257,
+      "height": 70,
+      "type": "image/png",
+      "characterId": 93,
+      "originalSrc": "/public/assets/images/logo.png",
+      "originalSha256": "f179567c23485b19a0ec8d4c2019d1e0941ab139f328918dcda271e74ebbb6c6",
+      "sourcePremultipliedARGBSha256": "4b3c1b755656d53ac830fa8ac5e7786b0a956d8f46bce49e943f35c12f3f8b08",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "bomberhead.png": {
+      "src": "/public/assets/images-canonical/bomberhead.png",
+      "sha256": "641c6c65b75a43e13d1422cb76901871c91c17a18f5bbf8f330510882bce0442",
+      "bytes": 449,
+      "width": 32,
+      "height": 32,
+      "type": "image/png",
+      "characterId": 94,
+      "originalSrc": "/public/assets/images/bomberhead.png",
+      "originalSha256": "ea7efc0ddee86abb54b38e51173d504e90c6983a79e917d730032723b4ddfd87",
+      "sourcePremultipliedARGBSha256": "11da610a6b83e789a3132ed28331e35eec01b93e6a6eb15e1345338ee676080a",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "hover_blood.png": {
+      "src": "/public/assets/images-canonical/hover_blood.png",
+      "sha256": "90c3bb022da670c1fa0909f89f653f85f6ca315b97d7f1861ca4137f4b61c179",
+      "bytes": 5250,
+      "width": 500,
+      "height": 50,
+      "type": "image/png",
+      "characterId": 95,
+      "originalSrc": "/public/assets/images/hover_blood.png",
+      "originalSha256": "28dec266db9bab992ceb86a7d038965e71ff021a5334636e45071f42aab3c094",
+      "sourcePremultipliedARGBSha256": "91657f3cb1d50d27f9f516f6c351f7cba2fa0cfcd8ceedfa8db12c54781c180b",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "shotgunsprites.png": {
+      "src": "/public/assets/images-canonical/shotgunsprites.png",
+      "sha256": "6824eb216eb6fc04fb0956c58c2be023d7461e7ef32d2c551dd4f2c5971b6811",
+      "bytes": 92415,
+      "width": 1024,
+      "height": 512,
+      "type": "image/png",
+      "characterId": 96,
+      "originalSrc": "/public/assets/images/shotgunsprites.png",
+      "originalSha256": "d2eb865dac5a7c4fde86087a0a54c7f1db0ebac3184edbedd0e837422a1761e9",
+      "sourcePremultipliedARGBSha256": "5997d7099787b1bc9934a12cecacd8b65cc447d81fde6bbf7de73802e013be00",
+      "normalization": "SWF DefineBitsLossless2 format5: C=floor((255*P+floor(A/2))/A), C=0 at A=0",
+      "validation": {
+        "premultipliedRoundTripMismatchChannels": 0
+      }
+    },
+    "sky2.jpg": {
+      "src": "/public/assets/images-canonical/sky2.png",
+      "sha256": "f69ae22cd580480224bd195ac39e329e8377188bad1c535df7584bf4b990cbc5",
+      "bytes": 154777,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 97,
+      "originalSrc": "/public/assets/images/sky2.jpg",
+      "originalSha256": "ee9e0b85e2dda9ba38990d994481aa316726f389e9809029aef346aed2ee6c01",
+      "sourcePremultipliedARGBSha256": null,
+      "normalization": "jpeg-decoder=0.3.2, default-features=false; RGB24 output to PNG",
+      "validation": {
+        "decodedRGBSha256": "5ce5b354e2028d5e4118646da8ff26964ecb34f8b548cb3b247f790114e57a96"
+      }
+    },
+    "sky1.jpg": {
+      "src": "/public/assets/images-canonical/sky1.png",
+      "sha256": "66c8b2ee44d77a4f12369d0b353559ec44a8bcfb2fb1dd9fa87606fdfb6fc47c",
+      "bytes": 118492,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 98,
+      "originalSrc": "/public/assets/images/sky1.jpg",
+      "originalSha256": "5df6c7ffeb848b012ff5d6fe936aed1f96e2c455a00e538deb9b7ce596928bae",
+      "sourcePremultipliedARGBSha256": null,
+      "normalization": "jpeg-decoder=0.3.2, default-features=false; RGB24 output to PNG",
+      "validation": {
+        "decodedRGBSha256": "60a647770d3f86e4f1eeedaf8f9783575386e6f7462428f025c412fcd4a9852c"
+      }
+    },
+    "sky4.jpg": {
+      "src": "/public/assets/images-canonical/sky4.png",
+      "sha256": "4879320bcc88319bb83f8de1e5ad0145712d88e01f03488a4b7c2e8f56dcc4f2",
+      "bytes": 225401,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 99,
+      "originalSrc": "/public/assets/images/sky4.jpg",
+      "originalSha256": "f76fae5867c020f89b40a6ca1455eefa220daadfaf25109db090d32ba8a15c33",
+      "sourcePremultipliedARGBSha256": null,
+      "normalization": "jpeg-decoder=0.3.2, default-features=false; RGB24 output to PNG",
+      "validation": {
+        "decodedRGBSha256": "e89f445c998f59c8193074128cc7d17e080ee1b6ffc7a289be42a987080bed82"
+      }
+    }
+  }
+}

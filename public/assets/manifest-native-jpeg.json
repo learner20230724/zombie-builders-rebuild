@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "profile": "native-flash-34.0.0.384-jpeg-stage-1x-sampled-v1",
+  "profileVersion": 1,
+  "activation": "inactive override-only profile; active manifest is not modified by this script",
+  "sourceSWFSha256": "8c518cfe4b0077bff3f1ed8f4c67627b63c4c5a8df6c3044f6ab019b234595a1",
+  "nativePlayer": "WIN 34,0,0,384",
+  "quality": "High",
+  "DPI": 96,
+  "evidencePack": "reference/native-jpeg-34/pack.json",
+  "evidencePackSHA256": "137ce5284de844d6a50d431d554cf8ed733789b5398dbad3f72468d69c5fdc1e",
+  "images": {
+    "sky1.jpg": {
+      "src": "/public/assets/images-native-jpeg/sky1.png",
+      "sha256": "abe96f08202f40aafc714b97040a126e458cde63880349036c2802bcef72e85a",
+      "bytes": 116892,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 98,
+      "originalSrc": "/public/assets/images/sky1.jpg",
+      "originalSha256": "5df6c7ffeb848b012ff5d6fe936aed1f96e2c455a00e538deb9b7ce596928bae",
+      "originalCompleteJPEG2TagSHA256": "2367a3d40c0d5d3df383f016638bf06fd007328fadd8d857328550666edb97a6",
+      "sourcePremultipliedARGBSha256": null,
+      "decodedRGBSha256": "8b1460432cc81d9953ecff0da3184732bbfaafa8cfddb9dd96a5305dffd731bd",
+      "profile": "native-flash-34.0.0.384-jpeg-stage-1x-sampled-v1",
+      "profileVersion": 1,
+      "normalization": "Native Flash 34.0.0.384 HIGH JPEG2 decode; exact 1:1 opaque RGB source panel from audited script-free stage fixture; no resize/color correction/fitting.",
+      "validation": {
+        "decodedRGBSha256": "8b1460432cc81d9953ecff0da3184732bbfaafa8cfddb9dd96a5305dffd731bd",
+        "completeOriginalJPEG2TagByteIdentical": true,
+        "nativeMemoryARGBSamples": 1024,
+        "sampledARGBEqualToSourcePanel": true,
+        "fullNativeMemoryImageVerified": false,
+        "bridgePayloadCRC32": "985cd1ce"
+      },
+      "provenance": {
+        "evidencePack": "reference/native-jpeg-34/pack.json",
+        "evidencePackSHA256": "137ce5284de844d6a50d431d554cf8ed733789b5398dbad3f72468d69c5fdc1e",
+        "originalJPEG": "sources/sky1.jpg",
+        "originalCompleteTag": "sources/sky1.DefineBitsJPEG2.tag",
+        "stageCapture": "captures/probe-native-jpeg-stage.png",
+        "stageCaptureSHA256": "77d3666d3c2fa220ecb8f50bb816bf7a8c7d3ebe27c82f5179d9a05babc769d9",
+        "stagePanel": [
+          0,
+          0,
+          800,
+          600
+        ],
+        "memoryBridgeCapture": "captures/probe-jpeg-data-bridge-stage.png",
+        "memoryBridgeCaptureSHA256": "50892d2a091b5d19ee043dcad7cbc58561c234d1902c338cbc0a069c20fd6c55"
+      }
+    },
+    "sky2.jpg": {
+      "src": "/public/assets/images-native-jpeg/sky2.png",
+      "sha256": "cfda6b673ec402b5e2e3efa3e2b94be55abcb8ef063888da6297524d1dbdc753",
+      "bytes": 152868,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 97,
+      "originalSrc": "/public/assets/images/sky2.jpg",
+      "originalSha256": "ee9e0b85e2dda9ba38990d994481aa316726f389e9809029aef346aed2ee6c01",
+      "originalCompleteJPEG2TagSHA256": "b450e3dbbf68921298c8287f58a854ec7853778e6c5c0815a32376ee8d6a65b1",
+      "sourcePremultipliedARGBSha256": null,
+      "decodedRGBSha256": "407a62238f23f8f8651cc44c1cdfe61bb960117ca879b9fc954f3abc12d6c572",
+      "profile": "native-flash-34.0.0.384-jpeg-stage-1x-sampled-v1",
+      "profileVersion": 1,
+      "normalization": "Native Flash 34.0.0.384 HIGH JPEG2 decode; exact 1:1 opaque RGB source panel from audited script-free stage fixture; no resize/color correction/fitting.",
+      "validation": {
+        "decodedRGBSha256": "407a62238f23f8f8651cc44c1cdfe61bb960117ca879b9fc954f3abc12d6c572",
+        "completeOriginalJPEG2TagByteIdentical": true,
+        "nativeMemoryARGBSamples": 1024,
+        "sampledARGBEqualToSourcePanel": true,
+        "fullNativeMemoryImageVerified": false,
+        "bridgePayloadCRC32": "985cd1ce"
+      },
+      "provenance": {
+        "evidencePack": "reference/native-jpeg-34/pack.json",
+        "evidencePackSHA256": "137ce5284de844d6a50d431d554cf8ed733789b5398dbad3f72468d69c5fdc1e",
+        "originalJPEG": "sources/sky2.jpg",
+        "originalCompleteTag": "sources/sky2.DefineBitsJPEG2.tag",
+        "stageCapture": "captures/probe-native-jpeg-stage.png",
+        "stageCaptureSHA256": "77d3666d3c2fa220ecb8f50bb816bf7a8c7d3ebe27c82f5179d9a05babc769d9",
+        "stagePanel": [
+          800,
+          0,
+          800,
+          600
+        ],
+        "memoryBridgeCapture": "captures/probe-jpeg-data-bridge-stage.png",
+        "memoryBridgeCaptureSHA256": "50892d2a091b5d19ee043dcad7cbc58561c234d1902c338cbc0a069c20fd6c55"
+      }
+    },
+    "sky3.jpg": {
+      "src": "/public/assets/images-native-jpeg/sky3.png",
+      "sha256": "32ff7f415aff77775f233d1c99cc14d9125d62c8c9eb6147f8c66eba8130dce8",
+      "bytes": 212047,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 101,
+      "originalSrc": "/public/assets/images/sky3.jpg",
+      "originalSha256": "ad91203acc335a72398d0339daebcf2c8de365829964b5824817215373930550",
+      "originalCompleteJPEG2TagSHA256": "2fe5b9f50856084ba84f4b81797188f0f16b724429115388deccbeb49bd20fd1",
+      "sourcePremultipliedARGBSha256": null,
+      "decodedRGBSha256": "64132ca193321619f7b5527ce77ea264c7db0e7bf18904e5e383ebd22dbea7f9",
+      "profile": "native-flash-34.0.0.384-jpeg-stage-1x-sampled-v1",
+      "profileVersion": 1,
+      "normalization": "Native Flash 34.0.0.384 HIGH JPEG2 decode; exact 1:1 opaque RGB source panel from audited script-free stage fixture; no resize/color correction/fitting.",
+      "validation": {
+        "decodedRGBSha256": "64132ca193321619f7b5527ce77ea264c7db0e7bf18904e5e383ebd22dbea7f9",
+        "completeOriginalJPEG2TagByteIdentical": true,
+        "nativeMemoryARGBSamples": 1024,
+        "sampledARGBEqualToSourcePanel": true,
+        "fullNativeMemoryImageVerified": false,
+        "bridgePayloadCRC32": "985cd1ce"
+      },
+      "provenance": {
+        "evidencePack": "reference/native-jpeg-34/pack.json",
+        "evidencePackSHA256": "137ce5284de844d6a50d431d554cf8ed733789b5398dbad3f72468d69c5fdc1e",
+        "originalJPEG": "sources/sky3.jpg",
+        "originalCompleteTag": "sources/sky3.DefineBitsJPEG2.tag",
+        "stageCapture": "captures/probe-native-jpeg-stage.png",
+        "stageCaptureSHA256": "77d3666d3c2fa220ecb8f50bb816bf7a8c7d3ebe27c82f5179d9a05babc769d9",
+        "stagePanel": [
+          0,
+          600,
+          800,
+          600
+        ],
+        "memoryBridgeCapture": "captures/probe-jpeg-data-bridge-stage.png",
+        "memoryBridgeCaptureSHA256": "50892d2a091b5d19ee043dcad7cbc58561c234d1902c338cbc0a069c20fd6c55"
+      }
+    },
+    "sky4.jpg": {
+      "src": "/public/assets/images-native-jpeg/sky4.png",
+      "sha256": "13f1c68690d1460b4ee5916837a5d1234c8abdc5c0373b12bc310c7fb83b4852",
+      "bytes": 224317,
+      "width": 800,
+      "height": 600,
+      "type": "image/png",
+      "characterId": 99,
+      "originalSrc": "/public/assets/images/sky4.jpg",
+      "originalSha256": "f76fae5867c020f89b40a6ca1455eefa220daadfaf25109db090d32ba8a15c33",
+      "originalCompleteJPEG2TagSHA256": "13b393f7f2e85d9ec443d86f1055d21066f6e70f78463f228009d34a5119e5fb",
+      "sourcePremultipliedARGBSha256": null,
+      "decodedRGBSha256": "109d16987862497c10671ffed664ea02638f55c49f17b5deba2275ec6c0662f4",
+      "profile": "native-flash-34.0.0.384-jpeg-stage-1x-sampled-v1",
+      "profileVersion": 1,
+      "normalization": "Native Flash 34.0.0.384 HIGH JPEG2 decode; exact 1:1 opaque RGB source panel from audited script-free stage fixture; no resize/color correction/fitting.",
+      "validation": {
+        "decodedRGBSha256": "109d16987862497c10671ffed664ea02638f55c49f17b5deba2275ec6c0662f4",
+        "completeOriginalJPEG2TagByteIdentical": true,
+        "nativeMemoryARGBSamples": 1024,
+        "sampledARGBEqualToSourcePanel": true,
+        "fullNativeMemoryImageVerified": false,
+        "bridgePayloadCRC32": "985cd1ce"
+      },
+      "provenance": {
+        "evidencePack": "reference/native-jpeg-34/pack.json",
+        "evidencePackSHA256": "137ce5284de844d6a50d431d554cf8ed733789b5398dbad3f72468d69c5fdc1e",
+        "originalJPEG": "sources/sky4.jpg",
+        "originalCompleteTag": "sources/sky4.DefineBitsJPEG2.tag",
+        "stageCapture": "captures/probe-native-jpeg-stage.png",
+        "stageCaptureSHA256": "77d3666d3c2fa220ecb8f50bb816bf7a8c7d3ebe27c82f5179d9a05babc769d9",
+        "stagePanel": [
+          800,
+          600,
+          800,
+          600
+        ],
+        "memoryBridgeCapture": "captures/probe-jpeg-data-bridge-stage.png",
+        "memoryBridgeCaptureSHA256": "50892d2a091b5d19ee043dcad7cbc58561c234d1902c338cbc0a069c20fd6c55"
+      }
+    }
+  },
+  "validation": {
+    "packetWords": 4128,
+    "payloadWords": 4112,
+    "dataWords": 4096,
+    "caseCount": 4,
+    "strictlyVerifiedBitCells": 132096,
+    "strictlyVerifiedCellPixels": 528384,
+    "calibrationPixels": 5120,
+    "orientationMarkers": 4,
+    "sanityWords": 4,
+    "payloadCRC32": "985cd1ce",
+    "payloadSHA256": "d6d0142fc59afe3bb8b0452ccebed0c87b56dc3bd831008c4e71f410c105a0c7",
+    "zeroTolerance": true,
+    "samplesPerJPEG": 1024,
+    "totalNativeMemorySamples": 4096,
+    "all4096SampledARGBEqualToStage": true,
+    "sampleCoordinatesSHA256": "7c5ce4f15e4ea758b520268d227a1dd8f3dfa4b48b01c0fb969a821e14cb6958",
+    "rawRGBEqualsPNG": true,
+    "completeSourceJPEG2TagsByteIdentical": true,
+    "fullMemoryPixelsPerJPEGVerified": false,
+    "originalGameCodeIncluded": false
+  },
+  "limitations": [
+    "Native Windows Flash 34.0.0.384, High, 96 DPI evidence; not historical Flash10 implementation equivalence.",
+    "1024 fixed getVector samples per JPEG (4096 total) equal the stage pixels; not proof of all 480000 native memory pixels per image.",
+    "Only four complete original sky JPEG decode outputs; no UI/actors/gameplay frames, fitted pixels, resizing or color correction.",
+    "This inactive override profile does not establish arbitrary drawing or whole-game fidelity."
+  ],
+  "rights": "User-provided source assets, local reconstruction/comparison only; original rights retained."
+}

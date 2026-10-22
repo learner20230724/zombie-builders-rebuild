@@ -1,0 +1,1972 @@
+{
+  "version": 1,
+  "width": 542.55,
+  "height": 406.15,
+  "scale": 1.478,
+  "offsetX": -0.7,
+  "offsetY": 0,
+  "imageWidth": 802,
+  "imageHeight": 601,
+  "frameRate": 30,
+  "sourceFrameRate": 120,
+  "sourceFrameCount": 247,
+  "duration": 8233.333333333334,
+  "finishAt": 8200.0,
+  "frames": [
+    {
+      "src": "/assets/splash/frame-001.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        1,
+        1
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-002.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        2,
+        2
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-003.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        3,
+        3
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-004.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        4,
+        4
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-005.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        5,
+        5
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-006.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        6,
+        6
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-007.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        7,
+        7
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-008.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        8,
+        8
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-009.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        9,
+        9
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-010.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        10,
+        10
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-011.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        11,
+        11
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-012.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        12,
+        12
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-013.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        13,
+        13
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-014.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        14,
+        14
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-015.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        15,
+        15
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-016.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        16,
+        16
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-017.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        17,
+        17
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-018.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        18,
+        18
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-019.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        19,
+        19
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-020.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-021.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        21,
+        21
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-022.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        22,
+        22
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-023.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        23,
+        23
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-024.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-025.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        25,
+        25
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-026.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        26,
+        26
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-027.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        27,
+        27
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-028.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        28,
+        28
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-029.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        29,
+        29
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-030.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        30,
+        30
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-031.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        31,
+        31
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-032.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        32,
+        32
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-033.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        33,
+        33
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-034.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        34,
+        34
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-035.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        35,
+        35
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-036.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        36,
+        36
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-037.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        37,
+        37
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-038.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        38,
+        38
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-039.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        39,
+        39
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-040.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        40,
+        40
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-041.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        41,
+        41
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-042.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        42,
+        42
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-043.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        43,
+        43
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-044.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        44,
+        44
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-045.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        45,
+        45
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-046.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        46,
+        46
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-047.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        47,
+        47
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-048.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        48,
+        48
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-049.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        49,
+        49
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-050.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        50,
+        50
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-049.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        51,
+        51
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-048.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        52,
+        52
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-047.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        53,
+        53
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-046.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        54,
+        54
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-045.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        55,
+        55
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-056.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        56,
+        56
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-057.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        57,
+        57
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-058.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        58,
+        58
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-059.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        59,
+        59
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-060.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        60,
+        60
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-061.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        61,
+        61
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-062.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        62,
+        62
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-063.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        63,
+        63
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-064.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        64,
+        64
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-065.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        65,
+        65
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-066.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        66,
+        66
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-067.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        67,
+        67
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-068.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        68,
+        68
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-069.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        69,
+        69
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-070.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        70,
+        70
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-071.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        71,
+        71
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-072.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        72,
+        72
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-073.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        73,
+        73
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-074.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        74,
+        74
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-075.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        75,
+        75
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-076.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        76,
+        76
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-077.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        77,
+        77
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-078.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        78,
+        78
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-079.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        79,
+        79
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-080.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        80,
+        80
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-081.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        81,
+        81
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-082.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        82,
+        82
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-083.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        83,
+        83
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-084.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        84,
+        84
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-085.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        85,
+        85
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-086.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        86,
+        86
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-087.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        87,
+        87
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-088.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        88,
+        88
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-089.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        89,
+        89
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-090.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        90,
+        90
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-091.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        91,
+        91
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-092.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        92,
+        92
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-093.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        93,
+        93
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-094.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        94,
+        94
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-095.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        95,
+        95
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-096.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        96,
+        96
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-097.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        97,
+        97
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-098.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        98,
+        98
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-099.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        99,
+        99
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-100.png",
+      "duration": 66.66666666666667,
+      "sourceFrames": [
+        100,
+        101
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-099.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        102,
+        102
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-098.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        103,
+        103
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-097.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        104,
+        104
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-096.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        105,
+        105
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-095.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        106,
+        106
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-094.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        107,
+        107
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-108.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        108,
+        108
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-109.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        109,
+        109
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-110.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        110,
+        110
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-111.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        111,
+        111
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-112.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        112,
+        112
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-113.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        113,
+        113
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-114.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        114,
+        114
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-115.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        115,
+        115
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-116.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        116,
+        116
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-117.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        117,
+        117
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-118.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        118,
+        118
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-119.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        119,
+        119
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-120.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        120,
+        120
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-121.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        121,
+        121
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-122.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        122,
+        122
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-123.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        123,
+        123
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-124.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        124,
+        124
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-125.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        125,
+        125
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-126.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        126,
+        126
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-127.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        127,
+        127
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-128.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        128,
+        128
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-129.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        129,
+        129
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-130.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        130,
+        130
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-131.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        131,
+        131
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-132.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        132,
+        132
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-133.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        133,
+        133
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-134.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        134,
+        134
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-135.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        135,
+        135
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-136.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        136,
+        136
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-137.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        137,
+        137
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-138.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        138,
+        138
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-139.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        139,
+        139
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-140.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        140,
+        140
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-141.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        141,
+        141
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-142.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        142,
+        142
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-143.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        143,
+        143
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-144.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        144,
+        144
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-145.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        145,
+        145
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-146.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        146,
+        146
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-147.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        147,
+        147
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-148.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        148,
+        148
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-149.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        149,
+        149
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-150.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        150,
+        150
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-151.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        151,
+        151
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-148.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        152,
+        152
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-153.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        153,
+        153
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-146.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        154,
+        154
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-155.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        155,
+        155
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-156.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        156,
+        156
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-157.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        157,
+        157
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-158.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        158,
+        158
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-159.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        159,
+        159
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-160.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        160,
+        160
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-161.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        161,
+        161
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-162.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        162,
+        162
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-163.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        163,
+        163
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-164.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        164,
+        164
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-165.png",
+      "duration": 100.0,
+      "sourceFrames": [
+        165,
+        167
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-168.png",
+      "duration": 66.66666666666667,
+      "sourceFrames": [
+        168,
+        169
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-170.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        170,
+        170
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-171.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        171,
+        171
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-172.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        172,
+        172
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-173.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        173,
+        173
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-174.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        174,
+        174
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-175.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        175,
+        175
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-176.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        176,
+        176
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-177.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        177,
+        177
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-178.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        178,
+        178
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-179.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        179,
+        179
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-180.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        180,
+        180
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-181.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        181,
+        181
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-182.png",
+      "duration": 666.6666666666667,
+      "sourceFrames": [
+        182,
+        201
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-202.png",
+      "duration": 66.66666666666667,
+      "sourceFrames": [
+        202,
+        203
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-204.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        204,
+        204
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-205.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        205,
+        205
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-206.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        206,
+        206
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-207.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        207,
+        207
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-208.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        208,
+        208
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-209.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        209,
+        209
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-210.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        210,
+        210
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-211.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        211,
+        211
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-212.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        212,
+        212
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-213.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        213,
+        213
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-214.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        214,
+        214
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-215.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        215,
+        215
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-216.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        216,
+        216
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-217.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        217,
+        217
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-218.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        218,
+        218
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-219.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        219,
+        219
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-220.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        220,
+        220
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-221.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        221,
+        221
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-222.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        222,
+        222
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-223.png",
+      "duration": 33.333333333333336,
+      "sourceFrames": [
+        223,
+        223
+      ]
+    },
+    {
+      "src": "/assets/splash/frame-202.png",
+      "duration": 800.0000000000002,
+      "sourceFrames": [
+        224,
+        247
+      ]
+    }
+  ],
+  "sounds": [
+    {
+      "src": "/assets/splash/sound-24.wav",
+      "startTime": 33.333333333333336,
+      "volume": 1,
+      "sourceFrame": 2,
+      "soundId": 24,
+      "sampleRate": 44100,
+      "samples": 324576,
+      "duration": 7360.0,
+      "seekSamplesApplied": 1633
+    },
+    {
+      "src": "/assets/splash/sound-91.wav",
+      "startTime": 2600.0,
+      "volume": 1,
+      "sourceFrame": 79,
+      "soundId": 91,
+      "sampleRate": 44100,
+      "samples": 13359,
+      "duration": 302.9251700680272,
+      "seekSamplesApplied": 1633
+    },
+    {
+      "src": "/assets/splash/sound-114.wav",
+      "startTime": 2633.3333333333335,
+      "volume": 1,
+      "sourceFrame": 80,
+      "soundId": 114,
+      "sampleRate": 44100,
+      "samples": 9896,
+      "duration": 224.39909297052154,
+      "seekSamplesApplied": 1633
+    },
+    {
+      "src": "/assets/splash/sound-137.wav",
+      "startTime": 3700.0,
+      "volume": 1,
+      "sourceFrame": 112,
+      "soundId": 137,
+      "sampleRate": 44100,
+      "samples": 13808,
+      "duration": 313.1065759637188,
+      "seekSamplesApplied": 1633
+    },
+    {
+      "src": "/assets/splash/sound-91.wav",
+      "startTime": 4033.3333333333335,
+      "volume": 1,
+      "sourceFrame": 122,
+      "soundId": 91,
+      "sampleRate": 44100,
+      "samples": 13359,
+      "duration": 302.9251700680272,
+      "seekSamplesApplied": 1633
+    },
+    {
+      "src": "/assets/splash/sound-114.wav",
+      "startTime": 4066.6666666666665,
+      "volume": 1,
+      "sourceFrame": 123,
+      "soundId": 114,
+      "sampleRate": 44100,
+      "samples": 9896,
+      "duration": 224.39909297052154,
+      "seekSamplesApplied": 1633
+    },
+    {
+      "src": "/assets/splash/sound-170.wav",
+      "startTime": 5400.0,
+      "volume": 1,
+      "sourceFrame": 163,
+      "soundId": 170,
+      "sampleRate": 44100,
+      "samples": 5595,
+      "duration": 126.87074829931973,
+      "seekSamplesApplied": 1633
+    },
+    {
+      "src": "/assets/splash/sound-183.wav",
+      "startTime": 6700.0,
+      "volume": 1,
+      "sourceFrame": 202,
+      "soundId": 183,
+      "sampleRate": 44100,
+      "samples": 47840,
+      "duration": 1084.8072562358277,
+      "seekSamplesApplied": 1633
+    }
+  ],
+  "clickURL": "http://www.ninjakiwi.com/",
+  "clickTarget": "_blank",
+  "skippable": false,
+  "releaseAfterPlay": true,
+  "source": {
+    "path": "reference/original/76_Assets_splash_dataClass.bin",
+    "sha256": "8943780166266d68a6bc545473581db4118e99895ea9dd6a38695ba733f6e695",
+    "movieSymbol": 184,
+    "stoppedNestedSymbol": 181,
+    "stoppedNestedFrame": 32
+  },
+  "verification": {
+    "renderedFrameCount": 247,
+    "uniqueImages": 186,
+    "audioEvents": 8,
+    "sourceFramePixelHashes": [
+      "06d75e4cf86ad5fd47ec3cb0462d7afe5eab9821c0888c8fc0c58d6cbb4310de",
+      "1b316c2ed3ad6e747ed44fd87a45db3c20ddfe4c0e8673a5123a30f82bbfee95",
+      "5e672923f8f74b82955db7e6671a349b7b9c6fee520ede35a4d5699fd571e897",
+      "862bcebd2a181d4123fa76904ac9c624c88afa3df9a879bfc0463808ceadc334",
+      "5c169668ebb0be6dd2f05cd0e3f859650b123e9a3f99fa491c4464b03db9c5d9",
+      "92d3b8b1f4e6529fddf051c26c59cfc0ba8b91f48955e191e38f54aed218ad42",
+      "5fb3b5c1c5b7a9b9480e7fc76def2b4fad0b86150f951f28b4052fe252f0fc42",
+      "1ce894f2967df74e28e89b2dcb0c669bfedd7dd37e18b18a03274890e16d8241",
+      "ca29bd443ba37891576d0f5576c9068522bba870706ea2f4803b58679a3624da",
+      "838daa2ba058f39dba8818387e0010a35aa71f8a6132ec015334982e4501e275",
+      "b0e67e61b4a58a750d415835cdd3aed4dc53b77b4ae5e9ee907de22f5c547f12",
+      "6e26e7264d33bd1eec45935aebe99383af8b108ddec019f27d5544bc11c23121",
+      "43a352a73dbcb59708fed95f1e03bf052eb68f703297f156a1ec646153600d95",
+      "fd85dc2ad054309c8243d97089f853c90638100025d637ce89a06822e50a7b94",
+      "c5ac8be7ea5cc3402563dd52a1d9f204b76faadee93ef2cceb8b1204b87f6708",
+      "8375fa14073eb370af3f815b0d061820469f0d792c6f47879495e0ec9d938014",
+      "707df202748859e532a8ec8592768cd160b5bd4d9a3d27d0e77896c3618f9952",
+      "5b26cda2517c9b5518bbe753659964861099fb7d5f61d00f0d69344450545ec5",
+      "be0524282a3b933151d3d42801d37ba12088a09f561a9b1c816b16ee68ff7a6b",
+      "28136979dcf70d9df33b3e6bde1c29c64e4887d4749f14aa1cece3d6402befb1",
+      "3223ca4f22f8e8326734647bf1e672ad4b37388c51d5e4c9499b08644bf401eb",
+      "00d6993ddcb2bd578bb3a73b79c70b6be006736c94ed565ff3e4d64b7d08f91e",
+      "28b55eb57ed26a21e7b822594a5f8b14d16af81c2b15f60e7832d78b84d98c7c",
+      "5fe03acecbeb6f96cbaade13619a4c278c99760d43c9d4907b1ef35e9d98e7d5",
+      "6e9f3ff5b20ba58fbce4f8ad8396f52b77910a13db52bf4c366dacc0b706c705",
+      "18835d4e2d65ce614c3a91bb9a8948652e5e4f0d9380e31a237cdd0e6ab51710",
+      "28a8e57e00f645cac3bb76a9070dad42993613bacf40d95abf70b4f3c877a2ff",
+      "3cc8d0acfec148077cc6bb537845b1ce14fe0c41a64cd6436725524e0a9b90ab",
+      "a42c776756106e0bbcb9180837453fe9b0412a9c3e8a7093c8aa7a9e9c275588",
+      "824af2b148d3ab994f3ad4bb8820a36ece634b766f247059d9819add25c3ac24",
+      "95bfd5285864308dd607575042ee7f1a4f463d4687788efcca6851cc37d05677",
+      "be4330c7168ddc11665b04f96f72eb74d45bd8875b681281a6a9eaa2acfe5722",
+      "83d1ca97023e9c950d1820f170c8051de07f86bf979fbd264178d03432a86900",
+      "e2f228ef4132f5e5cf72e70a5a334657aa0f852fb0d81d96558750132644227c",
+      "f2554a9a5bbfa3cf18eed4a48f6546b83fa92a4ea8db5b9cfd39f1fba5d56db7",
+      "e4c93be701cd9623c250c10c19cc81dd71cf6d138b31f31da20a29ea608f4587",
+      "26302d624b7ea88dfc83c2cf7b725cd0d47a408c29f81e488d93ddf23590a20a",
+      "2e496cceec35684acb3aa1a1aa23ae86f173f2f9611e478d015bc1bf4bc797bb",
+      "70583da1ba16c3665140ea61a37f05a18865313d67a5b653ff11eb492feda731",
+      "c062120ff5e00d54e57ed6085c02d61abdf6b2af76b87560974314db84940bc6",
+      "76320dbfcfa1b17d4b71951efcfdfc2229e54473b1f6246ff384cf7a6d095ff6",
+      "b226b53537f21899be19f81eb13dcb52188a4f10e4b5dc242b64a8c109d5fb15",
+      "6b000dd1af58ea68aa379e364a8c1fded27ed832179b2494a146a186b2931734",
+      "1f4e7ac5a66a3ac29e8252c1e440d7de49e5d55ec65857ebc3ab9e5af6749b5e",
+      "91a7749fedde6cd748f324f9c2999f943c2d26ddf6d265da6bfc2e083865e90a",
+      "312c66b3c7fe8e4ed92f4fb4bfed6b4ac0f7f171835e64b04e78d3b48fba3f28",
+      "02802550baeff9a8f70bedd4b45562de8de3c4f5303acbd8f117a91a0498d3ac",
+      "8c735f62007ef987f9ae7fa6b230cb2466d3595e07ede3e6bed1deda3fa67714",
+      "3270926ca473ad8b8e07579baa99b195323a8db6e23221c1724a1d0cca10df9e",
+      "29ceacee8fa8ec84a081c08dabfa9ca2211c0171cb6b6e057d5ee1b8ab303d27",
+      "3270926ca473ad8b8e07579baa99b195323a8db6e23221c1724a1d0cca10df9e",
+      "8c735f62007ef987f9ae7fa6b230cb2466d3595e07ede3e6bed1deda3fa67714",
+      "02802550baeff9a8f70bedd4b45562de8de3c4f5303acbd8f117a91a0498d3ac",
+      "312c66b3c7fe8e4ed92f4fb4bfed6b4ac0f7f171835e64b04e78d3b48fba3f28",
+      "91a7749fedde6cd748f324f9c2999f943c2d26ddf6d265da6bfc2e083865e90a",
+      "1588af456b753a56d0694f67bcbfcfca73463fa56ee5ce1ffe56504d61b3a0ec",
+      "f60e769c99178fdd7bd70dfe391c44507f916a787f78ac764a6ab106adc7300a",
+      "b6ef49414f6adb13487c194ca60f330ec02f3d62f83f24877c6a3f81da1905b5",
+      "27de712dc3d7f8ec306588f00226432aa5717df26fc077c5efe5d3407072d935",
+      "e060a2e25d08e8bd73bed96d7d1b4f78e4a167bd5cfbca59bc8d3fc848f3f557",
+      "689ebbdc3a1c3628d7e477d1b23a69a4b91b7f2b67df3e324ed481bb9851b88f",
+      "1b0c1c55df54b43d7e21ba0f56fd9cfcc9f2c527d79f475c7eaeaa59574d26c6",
+      "b6e4d40e8f217f725fa944a60f585c52f74bb3ed2852ee9e04fcdd690248f6b7",
+      "0731729f78f0fc8456bec1b967406955d26c34e5e93355babaa0ba31fd787561",
+      "78f058502aa1cba6a71abf14293498eced602b2fe7cde0cf4455f41aac49785d",
+      "1c661c107e005cb82e06e1f9410e29734bc7589489dc03154467e4896ecb5653",
+      "4a3d2d1399329543eec61f761c8fef94eec237f3ae98bff83cd96ccd9b1d96ea",
+      "894d4ba56e0d471edbb11ca39fa84299e645542da16c6b0aab6b8a4860da98a3",
+      "1d76aac269cbf18d5ea2b324bd225948f518cc60f22e11134021dac85080fdda",
+      "bde13452894ddbfd8c3a5b83d5dcbe3474cb4120183a91c0e47ff75211aa486d",
+      "99196dc510ca5a1f2085a81c3de92f924cee8d8bb352687cacdb8dee24829bce",
+      "e2f64f9b66d844d08a5632e2613439832686eb48b7c168c533cdb5ad8b5ee5bf",
+      "02e3418576716ea8470958fae3270df3811b05194217215f2e05a641fcb09120",
+      "b1df122119cc77ebb75a928b817c510716869f7877ba2064d84a91ba2edd64e7",
+      "bd4c27cb74e58afb826dc4c940ea14da119b0b2f411ff9352826ad2b7010e826",
+      "66e5dc3854208eb644cab9709679b648b775c4521c16d9b2fef9ce42243b5506",
+      "5c566f0ce7e73ddebe90033e55225b7ca92cfc07052606640b44639d99e3883c",
+      "92ac672d1012c90300da823c4d4c8e92e3d1209cb038d72c300fef5224fdb216",
+      "9f7a9c5be9f9250ad787e9d813fcf5901370b9ca12ee1ba072118a8df45c7987",
+      "d68229e2d9c21d658b6e1ccba6ebb2ac2cd69fd8ed65c601d13aff096cb23fb5",
+      "ba75564a14a028168c577966c069192adf2e2bd8ac230be78edf77435e5ec8b3",
+      "b47dce56e8e6f4cae731711e4a5a8e4a20392727a093138973d7d80e02d4f656",
+      "8816b22fecbaec796a829ac672f7583c3fca75e83088fe95904facd8a059e71d",
+      "1de58f0d235a7b97072c83ec585e59846251f60b422c23c6b73e94db6c6c96d4",
+      "5c79fa73c40072009ba984cae34568af28fc76534ff404fc3c463402d1457093",
+      "f31e654f1fb464964b1f5578a7d348859831775efa068a6525ea8b166b4ce5e0",
+      "3e9e72c0547d565058b7e2a282f99b8a599943ab48f5572cc22e39594f068224",
+      "03e7d32b842b8472f3912ffa3b8e9f01cc1cd62a04836c3e1b70f1426fbb48ae",
+      "a3ab5d4e8fb194f3405b23a7317f9afc504ddc918855e5331a21c7e1c3ffe9df",
+      "4e7490be168874eb5dcb9b18cf11efa542ef5a773edbf492be2e0859fdb08ebd",
+      "61bbd8079e6804ed16b8e56ac3c3344fbded43f0af23adcacd3b648a249984e9",
+      "4ae10885691e28582d144957fe73f647c1b91e9226f56e433a7401a8f7529bc8",
+      "e32c70645439444fc175a107a07915d81e47119d9076fa58cd77c3712c1e5042",
+      "a54b89d89bbda981570eb913812e3eaab03f1e751fdac0247affc090a543a734",
+      "99282fc79bd1cbf37947425434f7011069ce9b9adc0baceccdda454fe3a7c34b",
+      "a4d0844bce425dbb4e8ae66820164e7ff646c2e91028c75d03118b6dd9482175",
+      "50bfab1dfec6307f74bd4c61cdb78bb0d89cdda74164aaf087fa973abc8f22b2",
+      "64c362e4857dc8af40ae0de97688d4c5f2313369f104a9225bd8fa208d85dc7a",
+      "88b554d29d6c297a1bc7965d3c735d53b1b017df9a9a5b1f71ce4db2e4731c6f",
+      "95a3f6d3ba293aa953bd3c6281151f49643c113641db37fa0a69beb16de70f73",
+      "95a3f6d3ba293aa953bd3c6281151f49643c113641db37fa0a69beb16de70f73",
+      "88b554d29d6c297a1bc7965d3c735d53b1b017df9a9a5b1f71ce4db2e4731c6f",
+      "64c362e4857dc8af40ae0de97688d4c5f2313369f104a9225bd8fa208d85dc7a",
+      "50bfab1dfec6307f74bd4c61cdb78bb0d89cdda74164aaf087fa973abc8f22b2",
+      "a4d0844bce425dbb4e8ae66820164e7ff646c2e91028c75d03118b6dd9482175",
+      "99282fc79bd1cbf37947425434f7011069ce9b9adc0baceccdda454fe3a7c34b",
+      "a54b89d89bbda981570eb913812e3eaab03f1e751fdac0247affc090a543a734",
+      "be8fe047cd6eb28f823a110b03313b379385f57d50f20cb10b461613b199c68f",
+      "3069e12bfd4611b240214a5cb7886ddfde935b1a4c515caa1525275f41d899a6",
+      "ce38b131a4fe697ed6d5e7583714510fff35bbb887b8177759c13725dab0054d",
+      "84ac5d8fd9111cf8f1fb5710ce5543d8e8358dc83562011bc9ce0348ba22967f",
+      "26568d931d1f611a66c044bd308f4cbe5174049daf7bb087ff697f0eebd7f9fd",
+      "bbbd3deddeaeaf26ab01dc3676c4f7400c4839962c5c453b9847b5e3920f2aa3",
+      "3ca6c42bb6fe07f5538190e42772c13df013dfc28b6ae8cc41f56a1f9232db65",
+      "aebd456d31c9ba15974850fbfd8a7a83f59df9a3a3736a5dba3fc4fa9b7b2ee6",
+      "e16a283e11bb8b1bfb4a11b0b84e818f86d2e0152852ead9cdd37bcbe3a83f33",
+      "0626a36d21a75db959787ccb9a006218d8d566b92470e65fa73348c12abeac7e",
+      "ed8f28080b6542f0b4fc4eb122474a5c575dc0b30d1b09ebe9f441f248918234",
+      "42816360febb547dfb0428d200e008e2ea8f638502968da18624c5b2948a21c4",
+      "73ca38bd6fab54ec0305785524fa2f98273a64605053097cd8ef7c93a295984f",
+      "cda8860bb70c01854be33ac21dab955e7f82cddf262d1b7831bd057f94a089e1",
+      "8398bcd66505ab97a790df377bd493bf43dfd7e52e66dda06aec804c528a9092",
+      "9c329818ba57e1f13b42b2be60b66ab77fae8c53e41602e101ef9a8e5796e308",
+      "25db10efa47d94680766c4230a5e59797cc8966df6d91ade3fc4b1c269dad774",
+      "c5df3d7c47bc7616d795245d40eff4db371c66d35cc9e5466c93800af1e0dd4c",
+      "a4cc26d751334a7771f570e9f412365e6fbe3bd1f1f2e21dcb229fadfc28e00e",
+      "054baf021e74711485a94022a39cde77dd8c14640d308b335b6f02df33a19dc6",
+      "f819360dbe972169e666dcbfe642ce897655f8790b34f8df5437b666190aa1cc",
+      "3d52516c88ac4889fb04f8ccb5048b44d39bc1935c3e730f0b0afa089f3199e8",
+      "06a7dd62cff16c07cc056f9a9eaf3c4664bf98350ed23a20357a07c6b1a79f63",
+      "de2a0894f41ca22d765b1edcff7b366c5bc3a18d79286ae93b102c06d8e4acee",
+      "bb9fbbf7db0088841203de55de1dd988d5b61e977f1eb267d0de120de496e491",
+      "dca50ab2c7117311dfa62fa6441b7aafd6cf664099f6f6b983dade77b84b46fe",
+      "e3014f12aeb9e60fd8c335a2b338462803e0620a3c1d51816de90ca21256956c",
+      "c90a2c94b1041bb038c70ad5d0964a093fac2d6d75673e4c43d9fd8dc16ca511",
+      "6fae63a19c0e9abaa5ebe74d28ac2e9de42a7fc04ecdb2d03b06eb25f19087b1",
+      "493929c4e60082d8a047c4198f5578e94516e1d084323b992fb4ffb1a1ef15f7",
+      "1977e98adfb041f5e4dfedbef8de963817667be02376b9f554512c399d8792a6",
+      "6ae0aa8743313313eaef1ff8b202bd434cc7038333f7f9504e284eba908ee02a",
+      "70f715699185ce50665d8c63e8af26d9583db5c60bbc8384e5a89c3acc7bb3d5",
+      "74ff363485b52379d73bfd2166a5dc2a48719288a2f66452e25bfc6240d4d3d4",
+      "c8e35cc7a63d492cb4dde02257dda986ce399ed274aea73823c0e432330d61eb",
+      "bcfc674c5dc569c5b11b3c48d4b1f9033bbc0bb6e3ac959777172b52ef45ed80",
+      "f7ab030c4607d344b26dffeaa89cd24393be09a095502f3ca43adabcd95aa823",
+      "08ebad838dfa8e209964664481334109a677aaa15d2af45b6784a136df0b475f",
+      "8df0cd60f27bccc93689b76038e2e81d1baa38735c65db820715ba2740a82e9e",
+      "cc95fbb279622b4b98bf889c9d1f735727ad8a735e7e76c5783dcead7bcc1c33",
+      "604322fcfbe58e26245717f6cd553ee66ed5c7916292a739effc3b79708119c5",
+      "2a78c9f5af7c8b96f66125ce5eaf5c5be84ae1178877ad90bcd5ff5790e83b38",
+      "1fdd65c3d29aa49cd0d9bee32e572c994d813cb0edba80ee1b351ee994f321c3",
+      "dcaf8f8cd03a1a809fa57e2c1cbf6dffdf2bb904cb5ec172b7527c9caf338c82",
+      "604322fcfbe58e26245717f6cd553ee66ed5c7916292a739effc3b79708119c5",
+      "daed16b81dc7e554143f5da2d308c008ad7eb3170ede1be5bb083905e3f1a1dc",
+      "8df0cd60f27bccc93689b76038e2e81d1baa38735c65db820715ba2740a82e9e",
+      "c9330f1e89a79784eab6542224296629d1e43ea8e9df0941d08134626984b93e",
+      "a71b6d70683e953b9d4cb58174fbe70bb9244ebcac524c8f44c10f8aff512cc3",
+      "183a4aa971a9305eef7cfc92ec7f998dcf9c3024d42745ff378c855322f7efe9",
+      "483c94f1dbd6975c7b0aea3b75cdcd5d03303168b2cd20b256bc9a30e072d561",
+      "9d942251e9ea76a655bae23ad4e3909c9bfe31caff2864615d37b75601ad6c08",
+      "90741b55fbda2d81ca70cd49687fc10921d27c2b2dbfd18e5571545b671ef9b3",
+      "7fe7af8ca98ff5b1d5b915153beda3feca62ccc74fb80ced6e36b51c91c8cbce",
+      "850af8e76a36560a3d92b5906ad58ba498c46d7a1e3dddc0d6bbc1ec53626664",
+      "b88cbf394e003e5f1e2cbef34b3ee8cbaf1818cc12a014bb55c30701db17f432",
+      "bf95db8029f7a62ddc31f3e9598e5b37ca64ff52c508f953f27cff63a926543c",
+      "c5f632671872926e610b331acc341148288c44b4f2220cd6e0939abf3bff7f3d",
+      "c5f632671872926e610b331acc341148288c44b4f2220cd6e0939abf3bff7f3d",
+      "c5f632671872926e610b331acc341148288c44b4f2220cd6e0939abf3bff7f3d",
+      "217da860d4890292751f3412ae929dc437315bfa871ef55ded8d0da38d525849",
+      "217da860d4890292751f3412ae929dc437315bfa871ef55ded8d0da38d525849",
+      "03129ba388baeece57831d033ba37cb208848ba113c1d738cb1d8c56f4bb6dac",
+      "cb3447a709626a1482e82b5be3c0e68f4cd87cc1ac809b9158c88edf36dfcf50",
+      "b0dfcab43638ac536cb2b736bd07b1333ce696c39b86a5304eee03b26d01e1ee",
+      "0ddd81f37a8e0865ced33fda962e85d995a6a37d8cf360b390f2b9977524ec5f",
+      "4de06c7c5ea3f37de58b186e566c47f0a2c2d8abd4380fa8f5f7bffb33e4c0da",
+      "fe823ec1812b198b26de3fd7b5fe28ec1d7cb6c5632ba6edeb7d3804d0a649ee",
+      "68377bda60f9ab0f6b873ff1fc76bce028d74e5ca95a11de6f1c077c5d3871b0",
+      "6e9a27da0a57c7df25c2e783a7f4d7dbc72d1542880940b5493fb9a4b1ab105a",
+      "5d3c159036c09cdf008cbf2ddf23f1b7cd1a4fcb2578fa40a0eabf6353987d2c",
+      "1f2c0af65028297ba9ae619563926decb510098454d82dc4ad77260af52f3e03",
+      "7887f422f160d6fec5fcdf9dbb3c04f3aaaf1081b5c80bba47752bc89c5e6744",
+      "4f30ff8fdf0da88af1c91c8c350f51ef938f135563d68e4f40614f00523601d9",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "61c781084b91b70077d404a75230e641aa1a06f78391ebe85efc021061f8c1af",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "f1f49b5314dc38f280cf706c89016bbca8129396bc81e1b7dcbd4c2cddc6ce23",
+      "293d0c66b6b96c9dece079375011784472613281cc5628d8cdedfd3dc70bd174",
+      "0f5eb4142ea9b57b16d43406abbf6bb85606e47a795d9c0979ecfa7a8ef77c06",
+      "0b97fe77b31ebbae6159f64f85d27b1a8f9bc178c9110355a05631527f233afa",
+      "e602276752ff050b4cd9b007f49fdc53b3d9104fa103ed4ad2e9d4a5f3f84034",
+      "a4a430f809efe8d8d0c22c359c6650cad475bf8dce302c31be72c69f567920d2",
+      "f8165ec596d690c13ac23360577370ed7dd7aae405448d465275cfb0590d6d33",
+      "b96654203f89722797758b2fc936861d52bf59803ab65e8a2427a1c37ecb3130",
+      "6b5b425f2650152c91299468068142f6490d0004cdc749cf70e46a0e396934ce",
+      "9fd9897a880f782097a63a2a17e488c4ddcdc3c7286ef4166052d3a5ce9abd61",
+      "fa3fa976afe16d8136451fdb40c474b12011de1c82e781448188c510e7b38ee9",
+      "911f2442a130db997524bfc76f7009bc2a89615c7a9ca9edbb0dd1b28520be7b",
+      "43b02802c516ece868034d3c2151cde10e3c8fb8a0c1cb36a2b711689b1cf02f",
+      "cda560c424ca19a61247cbd561534b7dd23ab4b14decc1a15f83e26548d027cd",
+      "6c179964a1b39b6ea3042897c34f621d2b87a46b4e8e786220fd020a7d517ec2",
+      "ce3bd95bd033627adf237491156b917158309fe697210ad1ba99c9cecc2f9286",
+      "68255dd0669bbedfa72cd82c7da5f5ccabdd0910a4df2450079688725626f957",
+      "c56c386901cf04970c508411a0784c1a5a921d808f847c2eb5ed3a12dc0c4c83",
+      "aaecdeab0c5a934ed826896bc3fb11fa8813391edac94d43253c02ae5634c1c4",
+      "09eda053582c348d417b72085bd54dfeb20739567d46fa2a11255bc3e26ad3f9",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3",
+      "d320eab85ee59f24b3d0e8255e49f2f6bdc8e17d5c9f2222f1cee5a6a2af39f3"
+    ]
+  }
+}

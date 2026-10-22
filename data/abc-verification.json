@@ -1,0 +1,19 @@
+{
+  "sourceSwfSha256": "8c518cfe4b0077bff3f1ed8f4c67627b63c4c5a8df6c3044f6ab019b234595a1",
+  "abcVersion": [
+    16,
+    46
+  ],
+  "verifiedVariables": 56,
+  "allValuesExact": true,
+  "method": 7,
+  "executedInstructions": 11168,
+  "literalArrays": 54,
+  "globalSlots": 63,
+  "stringAudit": {
+    "markerPoolIndex": 2616,
+    "markerUtf8Hex": "5f5f44656d6f5374725f3041",
+    "standaloneNewlinePoolEntry": false,
+    "winMessageNewlines": 2
+  }
+}

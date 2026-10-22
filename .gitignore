@@ -1,0 +1,17 @@
+node_modules/
+output/
+original/
+reference/
+tools/
+release/
+evidence/
+.local-browser-profile/
+.playwright-cli/
+.env
+.env.*
+*.log
+*.swf
+*.exe
+__pycache__/
+.DS_Store
+Thumbs.db

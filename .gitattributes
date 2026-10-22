@@ -1,0 +1,2 @@
+# Preserve supplied source and asset bytes without line-ending normalization.
+* -text

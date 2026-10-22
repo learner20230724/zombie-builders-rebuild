@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>建筑工大战僵尸 · Zombie Trailer Park 0.33 本地复刻</title>
+  <link rel="icon" href="data:,">
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#222;color:#ddd;font:14px system-ui,sans-serif}
+    main{width:min(800px,100vw);margin:20px auto}canvas{display:block;width:100%;height:auto;aspect-ratio:4/3;background:#000;outline:none;touch-action:none}
+    #status{padding:10px 0;min-height:40px;line-height:1.6}#status:empty{display:none}#status.error{color:#ffb4a9;white-space:pre-wrap}
+    .note{font-size:12px;color:#aaa;line-height:1.6}a{color:#aecbc7}
+    @media(max-height:660px)and(min-width:800px){main{width:min(800px,calc((100vh - 40px)*4/3));margin:0 auto}.note{display:none}}
+  </style>
+</head>
+<body>
+  <main>
+    <canvas id="game" width="800" height="600" tabindex="0" aria-label="建筑工大战僵尸游戏画面，使用鼠标选择关卡、招募单位、建造建筑和释放技能"></canvas>
+    <div id="status" role="status">正在加载本机游戏资源……</div>
+    <p class="note">JavaScript reconstruction · 原游戏权利归原权利人所有。No Flash or Ruffle required. Fidelity verification is ongoing.</p>
+  </main>
+  <script src="/public/vendor/box2dweb.js"></script>
+  <script src="/src/physics.js"></script>
+  <script src="/src/runtime.js"></script>
+  <script src="/src/generated-game.js"></script>
+  <script src="/src/boot.js"></script>
+</body>
+</html>
