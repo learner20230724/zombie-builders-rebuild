@@ -10,6 +10,7 @@ const ROOT = path.resolve(__dirname, '..');
 const UINT32_MAX = 0xffffffff;
 const FIXED_DOS_DATE = 0x21; // 1980-01-01, independent of source mtimes/time zone.
 const SOURCE_FILES = ['boot.js', 'data.js', 'game-config.js', 'generated-game.js', 'physics.js', 'runtime.js'];
+const CUSTOM_SOURCE_FILES = ['custom-rules.js', 'customization.js', 'settings-ui.js', 'settings-ui.css'];
 const CONFIG_FILES = ['units.json', 'zombies.json', 'buildings.json', 'powers.json', 'levels.json'];
 const ASSET_DIRECTORIES = ['images', 'images-canonical', 'images-native-jpeg', 'sounds', 'sounds-pcm', 'splash'];
 const CRC_TABLE = Array.from({length: 256}, (_, value) => {
@@ -258,6 +259,10 @@ function collectRuntimeFiles(projectRoot = ROOT) {
     if (fs.existsSync(path.join(root, name))) add(name);
   for (const name of ['config/README.md', 'docs/DEVELOPMENT.md', 'docs/DEVELOPMENT.zh-CN.md', 'licenses/Node.js-LICENSE.txt'])
     if (fs.existsSync(path.join(root, name))) add(name);
+  for (const name of CUSTOM_SOURCE_FILES.map(name => 'src/' + name))
+    if (fs.existsSync(path.join(root,name))) add(name);
+  for (const name of CONFIG_FILES.map(name => 'config/defaults/' + name))
+    if (fs.existsSync(path.join(root,name))) add(name);
   files.set('package.json', {name: 'package.json', data: runtimePackageMetadata(pkg)});
   files.set('Start-Game.cmd', {name: 'Start-Game.cmd', data: makeWindowsLauncher()});
 

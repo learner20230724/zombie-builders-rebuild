@@ -244,12 +244,17 @@ test('default reinforcements match original full queues, wave pops and markers a
       }
       assert.deepEqual(queue(configured),queue(baseline),'stage '+stage+', threshold '+threshold);
     }
-    for(const h of [baseline,configured]){
+    // A fresh match also verifies one hit crossing all three thresholds. HP
+    // restoration after already-fired thresholds is a custom-mode operation;
+    // its intentionally non-replaying behavior is covered by the live suite.
+    const combinedBaseline=fixture(),combinedConfigured=fixture(defaults());
+    for(const h of [combinedBaseline,combinedConfigured]){
+      h.game.bbPlayGame(stage);h.context.ZTPGamePort.setRandomSeed(321);
       h.game.bbzombiehealth=16000;h.game.bbzombiebase.bbhealth=4000;h.ticks();
     }
-    assert.deepEqual(queue(configured),queue(baseline),'stage '+stage+', simultaneous threshold crossing');
-    for(const h of [baseline,configured])h.ticks();
-    assert.deepEqual(queue(configured),queue(baseline),'stage '+stage+', no crossing');
+    assert.deepEqual(queue(combinedConfigured),queue(combinedBaseline),'stage '+stage+', simultaneous threshold crossing');
+    for(const h of [combinedBaseline,combinedConfigured])h.ticks();
+    assert.deepEqual(queue(combinedConfigured),queue(combinedBaseline),'stage '+stage+', no crossing');
   }
 });
 

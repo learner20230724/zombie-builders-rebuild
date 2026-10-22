@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "powers": [
+    {
+      "id": 0,
+      "key": "angry-mob",
+      "name": "Angry Mob",
+      "xp": 3000,
+      "buildTicks": 150,
+      "cooldownTicks": 5000,
+      "unlockAfterStage": 0,
+      "effect": {
+        "shovelCount": 12,
+        "shotgunCount": 4,
+        "angerSpeedMultiplier": 1.5
+      },
+      "description": "A charging mob with a bone to pick with the zombies."
+    },
+    {
+      "id": 1,
+      "key": "harvester",
+      "name": "Harvester",
+      "xp": 4000,
+      "buildTicks": 150,
+      "cooldownTicks": 10000,
+      "unlockAfterStage": 1,
+      "effect": {
+        "moveSpeed": 0.6
+      },
+      "description": "Strap a brick onto the gas pedal and off she goes!"
+    },
+    {
+      "id": 2,
+      "key": "air-strike",
+      "name": "Air Strike",
+      "xp": 5000,
+      "buildTicks": 150,
+      "cooldownTicks": 10000,
+      "unlockAfterStage": 2,
+      "effect": {
+        "jetCount": 3,
+        "moveSpeed": 6
+      },
+      "description": "Cousin Earl made it into the air force. He gets paid a lot more than you."
+    }
+  ]
+}

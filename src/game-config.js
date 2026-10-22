@@ -21,6 +21,7 @@
   ];
   const states = new WeakMap();
   const projectileKind = Symbol('GameConfig.projectileKind');
+  const maximumHealth = Symbol('GameConfig.maximumHealth');
   function fail(path, message) { throw new Error('GameConfig ' + path + ': ' + message); }
   function object(value, path, required, optional) {
     if (value === null || typeof value !== 'object' || Array.isArray(value) ||
@@ -63,7 +64,8 @@
     if (type !== undefined && item.type !== type) fail(path + '.type', 'fixed runtime type must be ' + type);
   }
   function wave(item, path, allowWait) {
-    object(item, path, ['type', 'count', 'delay']);
+    object(item, path, ['type', 'count', 'delay'], ['enabled']);
+    if ('enabled' in item && typeof item.enabled !== 'boolean') fail(path + '.enabled', 'expected a boolean');
     integer(item.type, path + '.type', allowWait ? 0 : 1, 5);
     integer(item.count, path + '.count', 1, 100000);
     // The original bbInit/bbSpawn convert this to int, intentionally including
@@ -141,7 +143,7 @@
       number(item.zombieDamageMultiplier, path + '.zombieDamageMultiplier', 0, 100, false);
       number(item.zombieHealthMultiplier, path + '.zombieHealthMultiplier', 1, 100, false);
       integer(item.startingCash, path + '.startingCash'); integer(item.startingXp, path + '.startingXp');
-      array(item.waves, path + '.waves', 1, 10000);
+      array(item.waves, path + '.waves', 0, 10000);
       item.waves.forEach((w,i) => wave(w, path + '.waves[' + i + ']', true));
       array(item.reinforcements, path + '.reinforcements', 0, 1000);
       const thresholds = new Set();
@@ -184,7 +186,10 @@
     return value;
   }
   function compile(input) {
-    const config = validate(input), raw = {};
+    return compileValidated(validate(input));
+  }
+  function compileValidated(config) {
+    const raw = {};
     for (const [kind, prefix, baseline] of [['units','unit',UNIT_ROWS], ['zombies','zombie',ZOMBIE_ROWS]]) {
       raw['bb_data_' + prefix + 'name'] = config[kind].map(item => item.name);
       raw['bb_data_' + prefix + 'data'] = config[kind].flatMap(item => {
@@ -205,8 +210,9 @@
     raw.bb_data_wmdcooldown = config.powers.map(item => item.cooldownTicks);
     raw.bb_data_difficultyname = config.levels.map(item => item.name);
     raw.bb_data_difficultytitle = config.levels.map(item => item.title);
-    for (const level of config.levels) raw['bb_leveldata_level' + level.id] = level.waves.flatMap(w => [w.type,w.count,w.delay]);
-    return freeze({config, raw, reinforcements: config.levels.map(level => level.reinforcements)});
+    for (const level of config.levels) raw['bb_leveldata_level' + level.id] = level.waves.filter(w => w.enabled !== false).flatMap(w => [w.type,w.count,w.delay]);
+    return freeze({config, raw, reinforcements: config.levels.map(level => level.reinforcements.map(entry =>
+      ({threshold:entry.threshold,calls:entry.calls.filter(w => w.enabled !== false)})))});
   }
   function portFor(target) {
     if (!target || !target.ZTPGamePort) throw new Error('GameConfig: generated-game.js must be loaded before installing configuration');
@@ -217,7 +223,7 @@
     const original = owner[name]; owner[name] = replacement(original);
   }
   function hooks(target, state) {
-    const port = portFor(target), config = () => state.compiled.config;
+    const port = portFor(target), config = () => (state.activeCompiled || state.compiled).config;
     wrap(port.bb_Unit.prototype, 'bbUnit_new', original => function (type, name, data, offset) {
       const result = original.apply(this, arguments);
       if (type >= 0 && type < 5) this.bbbuildtime = config().units[type].buildTicks;
@@ -233,11 +239,13 @@
     wrap(port.bb_Person.prototype, 'bbPerson_new', original => function (layer, unit) {
       const result = original.apply(this, arguments);
       if (unit.bbtype >= 0 && unit.bbtype < 5) this.bbwalkspeed = config().units[unit.bbtype].moveSpeed;
+      this[maximumHealth] = this.bbhealth;
       return result;
     });
     wrap(port.bb_Zombie.prototype, 'bbZombie_new', original => function (layer, unit) {
       const result = original.apply(this, arguments);
       if (unit.bbtype >= 32 && unit.bbtype < 37) this.bbwalkspeed = config().zombies[unit.bbtype-32].moveSpeed;
+      this[maximumHealth] = this.bbhealth;
       return result;
     });
     wrap(port.bb_Person.prototype, 'bbAnger', original => function () {
@@ -327,6 +335,13 @@
     });
     wrap(port.bb_Zomba.prototype, 'bbResetGame', original => function () {
       state.explodingBottle = null;
+      state.firedReinforcements = new Set();
+      // Promote next-match structural settings before the original reset reads
+      // the wave arrays and creates its bases. Existing template objects must
+      // be updated as well: the original reset does not reconstruct them.
+      state.activeCompiled = state.compiled;
+      writeRaw(target,state.compiled);
+      commitPlan(templatePlan(this,state.compiled.config,false));
       const result = original.apply(this, arguments), c = config(), level = c.levels[this.bbdifficulty];
       this.bbztp.bbcash = level.startingCash; this.bbztp.bbxp = level.startingXp;
       this.bbZombieDamageMultiplier = level.zombieDamageMultiplier;
@@ -344,16 +359,28 @@
       const result = original.apply(this, arguments), game = port.state.bb_Game;
       if (game && game.bbmainState === 2) {
         const previous = game.bbzombiehealth, current = game.bbzombiebase.bbhealth;
-        for (const entry of config().levels[game.bbdifficulty].reinforcements)
-          if (current <= entry.threshold && previous > entry.threshold)
-            for (const call of entry.calls) port.bb_ZombieMob.bbSpawn(call.type,call.count,call.delay);
+        for (const entry of (state.activeCompiled || state.compiled).reinforcements[game.bbdifficulty]) {
+          if (current <= entry.threshold && previous > entry.threshold && !state.firedReinforcements.has(entry.threshold)) {
+            let inserted = false;
+            for (const call of entry.calls) {
+              const head = port.bb_ZombieMob.bbqueue.bbFirst();
+              port.bb_ZombieMob.bbSpawn(call.type,call.count,call.delay);
+              // CustomRules may suppress bbSpawn while base reinforcements
+              // are disabled. A blocked/no-op call must not consume this
+              // threshold for a future, genuinely new health crossing.
+              inserted = port.bb_ZombieMob.bbqueue.bbFirst() !== head || inserted;
+            }
+            if (inserted) state.firedReinforcements.add(entry.threshold);
+          }
+        }
         game.bbzombiehealth = current;
       }
       return result;
     });
     // Use configured base maxima without temporarily mutating live health.
     wrap(port.bb_Zomba.prototype, 'bbDrawHealth', () => function () {
-      for (const [base,max,x,label,align] of [[this.bbpeoplebase,config().units[5].health,8,'My Base',0],[this.bbzombiebase,config().zombies[5].health,586,'Zombie Base',2]]) {
+      for (const [base,configuredMax,x,label,align] of [[this.bbpeoplebase,config().units[5].health,8,'My Base',0],[this.bbzombiebase,config().zombies[5].health,586,'Zombie Base',2]]) {
+        const max = base[maximumHealth] || configuredMax;
         const lost = (200 - ((base.bbhealth*200/max)|0))|0;
         this.bbblitrect4(this.bbprogress1,x,580,210,16);
         if (lost < 180 || (this.bbgameticks & 0x10) === 16)
@@ -367,9 +394,167 @@
   function stateFor(target, compiled) {
     let state = states.get(target);
     if (!state) {
-      state = {compiled}; states.set(target,state); hooks(target,state);
-    } else state.compiled = compiled;
+      state = {compiled,activeCompiled:compiled,firedReinforcements:new Set()}; states.set(target,state); hooks(target,state);
+    } else state.activeCompiled = state.compiled = compiled;
     return state;
+  }
+  function copy(value) { return JSON.parse(JSON.stringify(value)); }
+  function templatePlan(game, config, preserveTimerProgress) {
+    const plan = [];
+    function set(owner,key,value) {
+      if (!owner || typeof owner !== 'object') throw new Error('GameConfig: incomplete runtime templates');
+      plan.push([owner,key,value]);
+    }
+    function timer(owner,key,totalKey,nextTotal) {
+      if (preserveTimerProgress && nextTotal !== owner[totalKey] && owner[key] > 0 && owner[totalKey] > 0)
+        set(owner,key,Math.max(1,Math.ceil(Math.min(1,owner[key]/owner[totalKey])*nextTotal)));
+      set(owner,totalKey,nextTotal);
+    }
+    for (const [items,templates] of [[config.units,game.bbunits],[config.zombies,game.bbzunits]]) {
+      if (!Array.isArray(templates) || templates.length !== items.length) throw new Error('GameConfig: incomplete runtime unit templates');
+      for (const item of items) {
+        const unit = templates[item.id];
+        for (const [field,key] of [['name','bbname'],['cost','bbcost'],['health','bbhealth'],['damage','bbdamage'],
+          ['dependency','bbdependency'],['people','bbpeople'],['hitRadius','bbhitradius'],['hitOffset','bbhitoffset']])
+          if (field in item) set(unit,key,item[field]);
+        if ('buildTicks' in item) timer(unit,'bbbusy','bbbuildtime',item.buildTicks);
+      }
+    }
+    if (!Array.isArray(game.bbbuildings) || game.bbbuildings.length !== config.buildings.length ||
+        !Array.isArray(game.bbpowers) || game.bbpowers.length !== config.powers.length)
+      throw new Error('GameConfig: incomplete runtime building or power templates');
+    for (const item of config.buildings) {
+      const building = game.bbbuildings[item.id];
+      for (const [field,key] of [['name','bbname'],['cost','bbcost'],['dependency','bbdependency'],['maximum','bbmaximum']])
+        set(building,key,item[field]);
+      set(building,'bbnname',item.name.replace(/ /g,'__DemoStr_0A'));
+      timer(building,'bbbusy','bbbuildtime',item.buildTicks);
+    }
+    for (const item of config.powers) {
+      const power = game.bbpowers[item.id];
+      set(power,'bbxp',item.xp);
+      timer(power,'bbbusy','bbbuildtime',item.buildTicks);
+      timer(power,'bbcooldown','bbcooltime',item.cooldownTicks);
+    }
+    return plan;
+  }
+  function commitPlan(plan) { for (const [owner,key,value] of plan) owner[key] = value; }
+  function listItems(list) {
+    if (!list || typeof list.bbObjectEnumerator !== 'function') throw new Error('GameConfig: incomplete runtime lists');
+    const result = [], iterator = list.bbObjectEnumerator();
+    while (iterator.bbHasNext()) result.push(iterator.bbNextObject());
+    return result;
+  }
+  function getCurrent(target) {
+    portFor(target);
+    const state = states.get(target);
+    if (!state) throw new Error('GameConfig: install or apply configuration first');
+    return copy(state.compiled.config);
+  }
+  // Structural values remain frozen for an ongoing battle. In particular,
+  // changing bbpeople on a shared template would change the eventual death
+  // refund without changing the population already charged for that unit.
+  const deferredFields = {
+    units:['people','dependency'], buildings:['maximum','dependency'],
+    powers:['unlockAfterStage'], levels:['startingCash','startingXp','waves','reinforcements']
+  };
+  function same(a,b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function changedPaths(before,after,path,result) {
+    if (same(before,after)) return;
+    if (after && typeof after === 'object' && !Array.isArray(after)) {
+      for (const key of Object.keys(after)) changedPaths(before && before[key],after[key],path+'.'+key,result);
+    } else result.push(path);
+  }
+  function updateLive(target, input, options) {
+    const port = portFor(target), state = states.get(target);
+    if (!state) throw new Error('GameConfig: install or apply configuration before a live update');
+    const game = port.state.bb_Game;
+    if (!game) throw new Error('GameConfig: updateLive requires an initialized game; use apply before bb_Main');
+    options = options === undefined ? {} : options;
+    object(options,'$options',[],['healthPolicy','preserveTimerProgress']);
+    const policy = options.healthPolicy === undefined ? 'ratio' : options.healthPolicy;
+    if (!['ratio','new-only'].includes(policy)) fail('$options.healthPolicy','expected ratio or new-only');
+    if ('preserveTimerProgress' in options && typeof options.preserveTimerProgress !== 'boolean')
+      fail('$options.preserveTimerProgress','expected a boolean');
+    const next = compile(input), previous = (state.activeCompiled || state.compiled).config;
+    const effective = copy(next.config), deferred = [], applied = [];
+    // The original quit/pause dialog is state 6 and resumes the same match.
+    // Victory/defeat states 3/4 keep updating surviving units as well.
+    const inBattle = [2,3,4,6].includes(game.bbmainState);
+    for (const kind of KINDS) for (const item of effective[kind]) {
+      const old = previous[kind][item.id-(kind === 'levels' ? 1 : 0)];
+      for (const key of Object.keys(item)) {
+        const path = '$.'+kind+'['+(kind === 'levels' ? item.id-1 : item.id)+'].'+key;
+        if (inBattle && (deferredFields[kind] || []).includes(key)) {
+          if (!same(old[key],item[key])) deferred.push(path);
+          item[key] = copy(old[key]);
+        } else changedPaths(old[key],item[key],path,applied);
+      }
+    }
+    // Both source configurations were strictly validated above. Deferred
+    // reinforcement thresholds may exceed a newly reduced live base maximum;
+    // that is safe for this existing queue, but not a valid next-match preset.
+    // Do not reject the valid full preset merely because this transient hybrid
+    // intentionally retains the previous match's absolute thresholds.
+    const active = compileValidated(effective), c = active.config;
+    const plan = templatePlan(game,c,options.preserveTimerProgress !== false);
+    const oldLevel = previous.levels[game.bbdifficulty], level = c.levels[game.bbdifficulty];
+    if (!level || !oldLevel) throw new Error('GameConfig: invalid runtime difficulty');
+    plan.push([game,'bbZombieDamageMultiplier',level.zombieDamageMultiplier],
+      [game,'bbZombieHealthMultiplier',level.zombieHealthMultiplier]);
+    // Enumerate and calculate everything before writing any template, instance,
+    // raw table or installed configuration. Validation/traversal errors leave
+    // the entire running match and any previously pending settings intact.
+    const bodies = new Set([...listItems(game.bbpeople),...listItems(game.bbzombies),...listItems(game.bbpombies)]);
+    for (const body of bodies) {
+      const type = body.bbunit && body.bbunit.bbtype, human = type >= 0 && type <= 5;
+      const id = human ? type : type-32;
+      if (!Number.isInteger(id) || id < 0 || id > 5) throw new Error('GameConfig: unknown live body type');
+      const item = c[human ? 'units':'zombies'][id], old = previous[human ? 'units':'zombies'][id];
+      const dead = body.bbhealth <= 0 || body.bbmode === 14 || body.bbmode === 15;
+      if (!dead && id !== 5) {
+        const oldAnger = human && body.bbisangry ? previous.powers[0].effect.angerSpeedMultiplier : 1;
+        const newAnger = human && body.bbisangry ? c.powers[0].effect.angerSpeedMultiplier : 1;
+        const oldSpeed = old.moveSpeed*oldAnger, newSpeed = item.moveSpeed*newAnger;
+        // Preserve transient stops/slows and direction rather than replacing
+        // movement-state fields. A configured zero speed can be unfrozen.
+        const speed = newSpeed === oldSpeed ? body.bbwalkspeed : oldSpeed === 0 ? newSpeed : (body.bbwalkspeed/oldSpeed)*newSpeed;
+        if (!Number.isFinite(speed)) throw new Error('GameConfig: invalid live movement speed');
+        plan.push([body,'bbwalkspeed',speed]);
+      }
+      if (policy === 'ratio' && !dead) {
+        const newMaximum = item.health*(human || id === 5 ? 1 : Math.trunc(level.zombieHealthMultiplier));
+        const oldMaximum = body[maximumHealth] || old.health*(human || id === 5 ? 1 : Math.trunc(game.bbZombieHealthMultiplier));
+        if (!(oldMaximum > 0)) throw new Error('GameConfig: invalid live maximum health');
+        if (newMaximum !== oldMaximum) {
+          const health = Math.max(1,Math.min(newMaximum,Math.round(body.bbhealth*newMaximum/oldMaximum)));
+          plan.push([body,'bbhealth',health],[body,maximumHealth,newMaximum]);
+          if (body === game.bbzombiebase) plan.push([game,'bbzombiehealth',health]);
+        }
+      }
+    }
+    for (const effect of listItems(game.bbpowerups)) {
+      if (effect.bbtype !== 1 && effect.bbtype !== 2) continue;
+      const oldSpeed = previous.powers[effect.bbtype].effect.moveSpeed;
+      const newSpeed = c.powers[effect.bbtype].effect.moveSpeed;
+      plan.push([effect,'bbwalkspeed',newSpeed === oldSpeed ? effect.bbwalkspeed : (effect.bbwalkspeed/oldSpeed)*newSpeed]);
+    }
+    // These are our own class data properties, but check writability before
+    // beginning the commit so a frozen/malformed host cannot half-apply a plan.
+    for (const [owner,key] of plan) {
+      const property = Object.getOwnPropertyDescriptor(owner,key);
+      if (property ? !('value' in property) || !property.writable : !Object.isExtensible(owner))
+        throw new Error('GameConfig: runtime update target is not writable');
+    }
+    for (const key of Object.keys(active.raw)) {
+      const property = Object.getOwnPropertyDescriptor(target,key);
+      if (property ? !('value' in property) || !property.writable : !Object.isExtensible(target))
+        throw new Error('GameConfig: raw table update target is not writable');
+    }
+    commitPlan(plan);
+    writeRaw(target,active);
+    state.compiled = next; state.activeCompiled = active;
+    return {applied,deferred};
   }
   function writeRaw(target, compiled) {
     for (const [key,value] of Object.entries(compiled.raw)) target[key] = value.slice();
@@ -390,6 +575,8 @@
       if (typeof original !== 'function') throw new Error('GameConfig: missing runtime method bb_Init');
       state.initializer = function () {
         const result = original.apply(this,arguments);
+        state.activeCompiled = state.compiled;
+        state.firedReinforcements = new Set();
         state.explodingBottle = null; state.bottleLoopDepth = 0;
         writeRaw(target,state.compiled); return result;
       };
@@ -397,5 +584,5 @@
     target.bb_Init = port.bb_Init = state.initializer;
     return compiled;
   }
-  return Object.freeze({fromDocuments,validate,compile,apply,install});
+  return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive});
 });

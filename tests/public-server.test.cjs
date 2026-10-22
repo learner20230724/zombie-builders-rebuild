@@ -12,7 +12,7 @@ after(async () => {
   if (server) {server.closeAllConnections(); await new Promise(resolve => server.close(resolve));}
 });
 test('public game and health routes are available', async () => {
-  for (const name of ['/', '/src/runtime.js', '/src/game-config.js', '/config/units.json', '/config/levels.json', '/assets/manifest.json', '/public/vendor/BOX2D-LICENSE.txt']) {
+  for (const name of ['/', '/src/runtime.js', '/src/game-config.js', '/src/custom-rules.js', '/src/customization.js', '/src/settings-ui.js', '/src/settings-ui.css', '/config/units.json', '/config/levels.json', '/defaults/units.json', '/defaults/levels.json', '/assets/manifest.json', '/public/vendor/BOX2D-LICENSE.txt']) {
     const response = await fetch(base + name, {signal:AbortSignal.timeout(5000)});
     assert.equal(response.status, 200, name); await response.arrayBuffer();
   }
@@ -21,7 +21,7 @@ test('public game and health routes are available', async () => {
   assert.equal(health.port, server.address().port);
 });
 test('private and research files are not served', async () => {
-  for (const name of ['/README.md', '/.git/config', '/scripts/server.mjs', '/reference/', '/original/game.swf', '/config/README.md', '/config/missing.json', '/public/research/secret.json', '/assets/%2e%2e/%2e%2e/README.md']) {
+  for (const name of ['/README.md', '/.git/config', '/scripts/server.mjs', '/desktop/main.cjs', '/reference/', '/original/game.swf', '/config/README.md', '/config/missing.json', '/defaults/README.md', '/defaults/missing.json', '/public/research/secret.json', '/assets/%2e%2e/%2e%2e/README.md']) {
     const response = await fetch(base + name, {signal:AbortSignal.timeout(5000)});
     assert.equal(response.status, 404, name); await response.arrayBuffer();
   }

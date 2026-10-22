@@ -1,0 +1,1601 @@
+{
+  "schemaVersion": 1,
+  "levels": [
+    {
+      "id": 1,
+      "key": "stage-1",
+      "title": "Stage 1:",
+      "name": "Early to Dead, Early to Rise",
+      "zombieDamageMultiplier": 1.0,
+      "zombieHealthMultiplier": 1.0,
+      "startingCash": 100,
+      "startingXp": 0,
+      "waves": [
+        {
+          "type": 1,
+          "count": 5,
+          "delay": 3
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 2
+        },
+        {
+          "type": 2,
+          "count": 2,
+          "delay": 3
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 2,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 15,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 30,
+          "delay": 1.5
+        },
+        {
+          "type": 2,
+          "count": 5,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 30,
+          "delay": 0.5
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 3,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 50,
+          "delay": 0.8
+        },
+        {
+          "type": 3,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 2,
+          "count": 5,
+          "delay": 2
+        },
+        {
+          "type": 3,
+          "count": 2,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 10,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 3,
+          "delay": 2
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 10,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.6
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 4,
+          "count": 2,
+          "delay": 4
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 3,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 50,
+          "delay": 0.7
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 2,
+          "count": 5,
+          "delay": 2
+        },
+        {
+          "type": 3,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 3,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.5
+        },
+        {
+          "type": 2,
+          "count": 15,
+          "delay": 1.5
+        },
+        {
+          "type": 3,
+          "count": 4,
+          "delay": 2.5
+        },
+        {
+          "type": 4,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 6
+        },
+        {
+          "type": 4,
+          "count": 5,
+          "delay": 5
+        },
+        {
+          "type": 1,
+          "count": 100,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 2,
+          "delay": 5
+        },
+        {
+          "type": 3,
+          "count": 5,
+          "delay": 2.5
+        },
+        {
+          "type": 4,
+          "count": 3,
+          "delay": 3.5
+        },
+        {
+          "type": 5,
+          "count": 3,
+          "delay": 5
+        },
+        {
+          "type": 4,
+          "count": 5,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 10,
+          "delay": 2.5
+        },
+        {
+          "type": 5,
+          "count": 2,
+          "delay": 3
+        },
+        {
+          "type": 4,
+          "count": 20,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 100,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 3,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 20,
+          "delay": 1.5
+        },
+        {
+          "type": 4,
+          "count": 50,
+          "delay": 2
+        }
+      ],
+      "reinforcements": [
+        {
+          "threshold": 13000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 20,
+              "delay": 0.3
+            }
+          ]
+        },
+        {
+          "threshold": 9000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 30,
+              "delay": 0.3
+            },
+            {
+              "type": 4,
+              "count": 1,
+              "delay": 3.0
+            }
+          ]
+        },
+        {
+          "threshold": 5000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 40,
+              "delay": 0.2
+            },
+            {
+              "type": 3,
+              "count": 3,
+              "delay": 1.0
+            },
+            {
+              "type": 4,
+              "count": 1,
+              "delay": 2.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "key": "stage-2",
+      "title": "Stage 2:",
+      "name": "A kick in the Dead",
+      "zombieDamageMultiplier": 1.25,
+      "zombieHealthMultiplier": 1.25,
+      "startingCash": 100,
+      "startingXp": 0,
+      "waves": [
+        {
+          "type": 1,
+          "count": 5,
+          "delay": 3
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 2,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1.5
+        },
+        {
+          "type": 2,
+          "count": 4,
+          "delay": 3
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1.5
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 15,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 30,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 10,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 25,
+          "delay": 0.5
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 50,
+          "delay": 0.5
+        },
+        {
+          "type": 3,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 2,
+          "count": 5,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.7
+        },
+        {
+          "type": 2,
+          "count": 10,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 3,
+          "delay": 2
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 10,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.6
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 4,
+          "count": 2,
+          "delay": 4
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 5,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 50,
+          "delay": 0.5
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 2,
+          "count": 5,
+          "delay": 2
+        },
+        {
+          "type": 3,
+          "count": 4,
+          "delay": 2
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 4,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.5
+        },
+        {
+          "type": 2,
+          "count": 30,
+          "delay": 1.5
+        },
+        {
+          "type": 3,
+          "count": 4,
+          "delay": 2.5
+        },
+        {
+          "type": 4,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 6
+        },
+        {
+          "type": 4,
+          "count": 4,
+          "delay": 5
+        },
+        {
+          "type": 1,
+          "count": 100,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 2,
+          "delay": 5
+        },
+        {
+          "type": 3,
+          "count": 10,
+          "delay": 2.5
+        },
+        {
+          "type": 4,
+          "count": 4,
+          "delay": 3.5
+        },
+        {
+          "type": 5,
+          "count": 3,
+          "delay": 5
+        },
+        {
+          "type": 4,
+          "count": 10,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 10,
+          "delay": 2.5
+        },
+        {
+          "type": 5,
+          "count": 2,
+          "delay": 3
+        },
+        {
+          "type": 4,
+          "count": 20,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 100,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 3,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 20,
+          "delay": 1.5
+        },
+        {
+          "type": 4,
+          "count": 50,
+          "delay": 2
+        }
+      ],
+      "reinforcements": [
+        {
+          "threshold": 13000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 30,
+              "delay": 0.3
+            }
+          ]
+        },
+        {
+          "threshold": 9000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 40,
+              "delay": 0.3
+            },
+            {
+              "type": 4,
+              "count": 1,
+              "delay": 3.0
+            }
+          ]
+        },
+        {
+          "threshold": 5000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 50,
+              "delay": 0.2
+            },
+            {
+              "type": 3,
+              "count": 5,
+              "delay": 1.0
+            },
+            {
+              "type": 4,
+              "count": 2,
+              "delay": 2.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "key": "stage-3",
+      "title": "Stage 3:",
+      "name": "Nothing Ventured, Nothing Brained",
+      "zombieDamageMultiplier": 1.5,
+      "zombieHealthMultiplier": 1.5,
+      "startingCash": 100,
+      "startingXp": 0,
+      "waves": [
+        {
+          "type": 1,
+          "count": 5,
+          "delay": 3
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 2,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1.5
+        },
+        {
+          "type": 2,
+          "count": 4,
+          "delay": 3
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1.5
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 15,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 2,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 30,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 10,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 30,
+          "delay": 0.5
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 50,
+          "delay": 0.5
+        },
+        {
+          "type": 3,
+          "count": 3,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 2,
+          "delay": 3
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 2,
+          "count": 5,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.7
+        },
+        {
+          "type": 2,
+          "count": 10,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 4,
+          "delay": 2
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 15,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.6
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 4,
+          "count": 2,
+          "delay": 4
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 5,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 50,
+          "delay": 0.5
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 2,
+          "count": 5,
+          "delay": 2
+        },
+        {
+          "type": 3,
+          "count": 6,
+          "delay": 2
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 5,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.5
+        },
+        {
+          "type": 2,
+          "count": 30,
+          "delay": 1.5
+        },
+        {
+          "type": 3,
+          "count": 5,
+          "delay": 2.5
+        },
+        {
+          "type": 4,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 6
+        },
+        {
+          "type": 4,
+          "count": 5,
+          "delay": 5
+        },
+        {
+          "type": 1,
+          "count": 100,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 2,
+          "delay": 5
+        },
+        {
+          "type": 3,
+          "count": 10,
+          "delay": 2.5
+        },
+        {
+          "type": 4,
+          "count": 6,
+          "delay": 3.5
+        },
+        {
+          "type": 5,
+          "count": 3,
+          "delay": 5
+        },
+        {
+          "type": 4,
+          "count": 10,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 10,
+          "delay": 2.5
+        },
+        {
+          "type": 5,
+          "count": 2,
+          "delay": 3
+        },
+        {
+          "type": 4,
+          "count": 20,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 100,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 3,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 20,
+          "delay": 1.5
+        },
+        {
+          "type": 4,
+          "count": 50,
+          "delay": 2
+        }
+      ],
+      "reinforcements": [
+        {
+          "threshold": 13000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 40,
+              "delay": 0.3
+            }
+          ]
+        },
+        {
+          "threshold": 9000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 50,
+              "delay": 0.3
+            },
+            {
+              "type": 4,
+              "count": 2,
+              "delay": 3.0
+            }
+          ]
+        },
+        {
+          "threshold": 5000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 60,
+              "delay": 0.2
+            },
+            {
+              "type": 3,
+              "count": 6,
+              "delay": 1.0
+            },
+            {
+              "type": 4,
+              "count": 3,
+              "delay": 2.0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "key": "stage-4",
+      "title": "Stage 4:",
+      "name": "Trash Talks, Dead Walks",
+      "zombieDamageMultiplier": 1.75,
+      "zombieHealthMultiplier": 1.75,
+      "startingCash": 100,
+      "startingXp": 0,
+      "waves": [
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 2,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1.5
+        },
+        {
+          "type": 2,
+          "count": 4,
+          "delay": 3
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 1
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 15,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 3,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 30,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 10,
+          "delay": 1.5
+        },
+        {
+          "type": 1,
+          "count": 30,
+          "delay": 0.5
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 4
+        },
+        {
+          "type": 1,
+          "count": 50,
+          "delay": 0.5
+        },
+        {
+          "type": 3,
+          "count": 4,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 8,
+          "delay": 1
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 2,
+          "count": 6,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 3,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.7
+        },
+        {
+          "type": 2,
+          "count": 10,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 4,
+          "delay": 2
+        },
+        {
+          "type": 4,
+          "count": 3,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 1
+        },
+        {
+          "type": 2,
+          "count": 15,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.6
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 3
+        },
+        {
+          "type": 4,
+          "count": 3,
+          "delay": 4
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 5,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 50,
+          "delay": 0.5
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 5
+        },
+        {
+          "type": 2,
+          "count": 5,
+          "delay": 2
+        },
+        {
+          "type": 3,
+          "count": 7,
+          "delay": 2
+        },
+        {
+          "type": 4,
+          "count": 1,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 10,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 1,
+          "delay": 1
+        },
+        {
+          "type": 3,
+          "count": 5,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 20,
+          "delay": 0.5
+        },
+        {
+          "type": 2,
+          "count": 30,
+          "delay": 1.5
+        },
+        {
+          "type": 3,
+          "count": 5,
+          "delay": 2.5
+        },
+        {
+          "type": 4,
+          "count": 2,
+          "delay": 2
+        },
+        {
+          "type": 0,
+          "count": 1,
+          "delay": 6
+        },
+        {
+          "type": 4,
+          "count": 6,
+          "delay": 5
+        },
+        {
+          "type": 1,
+          "count": 100,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 2,
+          "delay": 5
+        },
+        {
+          "type": 3,
+          "count": 10,
+          "delay": 2.5
+        },
+        {
+          "type": 4,
+          "count": 6,
+          "delay": 3.5
+        },
+        {
+          "type": 5,
+          "count": 3,
+          "delay": 4
+        },
+        {
+          "type": 4,
+          "count": 10,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 15,
+          "delay": 2.5
+        },
+        {
+          "type": 5,
+          "count": 2,
+          "delay": 3
+        },
+        {
+          "type": 4,
+          "count": 20,
+          "delay": 2
+        },
+        {
+          "type": 1,
+          "count": 100,
+          "delay": 0.5
+        },
+        {
+          "type": 5,
+          "count": 3,
+          "delay": 3
+        },
+        {
+          "type": 3,
+          "count": 20,
+          "delay": 1.5
+        },
+        {
+          "type": 4,
+          "count": 50,
+          "delay": 1.5
+        }
+      ],
+      "reinforcements": [
+        {
+          "threshold": 13000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 40,
+              "delay": 0.3
+            },
+            {
+              "type": 2,
+              "count": 10,
+              "delay": 1.0
+            }
+          ]
+        },
+        {
+          "threshold": 9000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 50,
+              "delay": 0.3
+            },
+            {
+              "type": 4,
+              "count": 3,
+              "delay": 3.0
+            }
+          ]
+        },
+        {
+          "threshold": 5000,
+          "calls": [
+            {
+              "type": 1,
+              "count": 60,
+              "delay": 0.2
+            },
+            {
+              "type": 3,
+              "count": 7,
+              "delay": 1.0
+            },
+            {
+              "type": 4,
+              "count": 3,
+              "delay": 2.0
+            },
+            {
+              "type": 5,
+              "count": 1,
+              "delay": 2.0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

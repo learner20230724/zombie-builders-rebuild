@@ -11,15 +11,22 @@
   window.addEventListener('unhandledrejection', event => report(event.reason));
   window.addEventListener('ztp-runtime-error', event => report(event.detail.stack || event.detail.message));
   try {
-    const documents = Object.fromEntries(await Promise.all(
-      ['units', 'zombies', 'buildings', 'powers', 'levels'].map(async name => {
-        const response = await fetch(`/config/${name}.json`, {cache:'no-store'});
-        if (!response.ok) throw new Error(`配置 /config/${name}.json HTTP ${response.status}`);
-        return [name, await response.json()];
-      })
-    ));
-    const configuration = GameConfig.fromDocuments(documents);
+    async function loadDocuments(directory) {
+      return Object.fromEntries(await Promise.all(
+        ['units', 'zombies', 'buildings', 'powers', 'levels'].map(async name => {
+          const response = await fetch(`/${directory}/${name}.json`, {cache:'no-store'});
+          if (!response.ok) throw new Error(`配置 /${directory}/${name}.json HTTP ${response.status}`);
+          return [name, await response.json()];
+        })
+      ));
+    }
+    const [documents,defaultDocuments] = await Promise.all([loadDocuments('config'),loadDocuments('defaults')]);
+    const defaults = GameConfig.fromDocuments(defaultDocuments);
+    window.gameDefaults = defaults;
+    const prepared = Customization.prepare(defaults,GameConfig.fromDocuments(documents),globalThis);
+    const configuration = prepared.configuration;
     GameConfig.install(globalThis, configuration);
+    CustomRules.install(globalThis,prepared.rules);
     window.gameConfig = configuration;
     const response = await fetch('/public/assets/manifest.json');
     if (!response.ok) throw new Error(`资源清单 HTTP ${response.status}`);
@@ -30,11 +37,13 @@
     window.gameManifest = manifest;
     await bootRuntime({
       canvas: document.querySelector('#game'),
+      storageKey: prepared.storageKey,
       assets: {...manifest.images, ...manifest.sounds},
       movies: {splash},
       create() { bb_Init(); bb_Main(); }
     });
     status.textContent = '';
     window.gameReady = true;
+    Customization.attach(globalThis,{prepared});
   } catch (error) { report(error); }
 })();

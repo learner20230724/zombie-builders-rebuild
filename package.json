@@ -1,6 +1,6 @@
 {
   "name": "zombie-builders-rebuild",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "建筑工大战僵尸 / Zombie Trailer Park — configurable JavaScript game with Canvas 2D and Web Audio.",
   "license": "UNLICENSED",
@@ -19,9 +19,18 @@
     "test:browser": "node scripts/smoke.mjs",
     "test:journey": "node scripts/browser-journey.mjs",
     "config:check": "node scripts/check-config.cjs",
-    "package": "node scripts/package-release.cjs"
+    "package": "node scripts/package-release.cjs",
+    "desktop": "electron .",
+    "test:desktop": "node scripts/test-desktop.cjs",
+    "package:desktop": "node --max-old-space-size=4096 scripts/package-desktop.cjs"
   },
   "release": {
     "name": "zombie-builders"
-  }
+  },
+  "devDependencies": {
+    "@electron/packager": "20.3.0",
+    "electron": "45.0.0",
+    "playwright": "1.64.1"
+  },
+  "main": "desktop/main.cjs"
 }

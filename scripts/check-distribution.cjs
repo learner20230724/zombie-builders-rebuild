@@ -5,6 +5,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const vm = require('node:vm');
 const {checkConfig} = require('./check-config.cjs');
+const GameConfig = require('../src/game-config.js');
 const ROOT = path.resolve(__dirname, '..');
 
 function checkDistribution() {
@@ -32,12 +33,15 @@ function checkDistribution() {
   }
   for (const entry of [...splash.frames, ...splash.sounds]) fileFor(entry.src);
   assert.equal(splash.finishAt, 8200);
-  for (const name of ['runtime.js', 'generated-game.js', 'physics.js', 'game-config.js', 'boot.js'])
+  for (const name of ['runtime.js', 'generated-game.js', 'physics.js', 'game-config.js', 'custom-rules.js', 'customization.js', 'settings-ui.js', 'boot.js'])
     new vm.Script(read('src/' + name).toString('utf8'), {filename:name}); // Parse only; do not boot the game.
+  GameConfig.fromDocuments(Object.fromEntries(['units','zombies','buildings','powers','levels']
+    .map(name => [name,JSON.parse(read('config/defaults/' + name + '.json'))])));
+  assert(read('src/settings-ui.css').length > 0);
   assert(read('public/vendor/BOX2D-LICENSE.txt').toString().includes('Erin Catto'));
   assert(!read('index.html').toString().includes('href="/reference/"'));
   return {passed:true, assetHashesChecked:checked, gameImages:74, gameSounds:31,
-    splashSegments:splash.frames.length, configuration, sourceParsedNotExecuted:true};
+    splashSegments:splash.frames.length, configuration, immutableDefaultsValidated:true, sourceParsedNotExecuted:true};
 }
 if (require.main === module) console.log(JSON.stringify(checkDistribution(), null, 2));
 module.exports = {checkDistribution};

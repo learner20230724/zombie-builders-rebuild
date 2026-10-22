@@ -4,9 +4,9 @@ import {fileURLToPath} from 'node:url';
 import {readFile, realpath, stat} from 'node:fs/promises';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SOURCE_FILES = new Set(['boot.js', 'runtime.js', 'physics.js', 'generated-game.js', 'generated-game.report.json', 'data.js', 'game-config.js']);
+const SOURCE_FILES = new Set(['boot.js', 'runtime.js', 'physics.js', 'generated-game.js', 'generated-game.report.json', 'data.js', 'game-config.js', 'custom-rules.js', 'customization.js', 'settings-ui.js', 'settings-ui.css']);
 const CONFIG_FILES = new Set(['units.json', 'zombies.json', 'buildings.json', 'powers.json', 'levels.json']);
-const TYPES = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.json':'application/json; charset=utf-8', '.txt':'text/plain; charset=utf-8', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.mp3':'audio/mpeg', '.wav':'audio/wav'};
+const TYPES = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.json':'application/json; charset=utf-8', '.txt':'text/plain; charset=utf-8', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.mp3':'audio/mpeg', '.wav':'audio/wav'};
 
 // Public snapshot server: loopback only, with no original/reference/research routes.
 export function createGameServer() {
@@ -22,10 +22,12 @@ export function createGameServer() {
         res.end(req.method === 'HEAD' ? undefined : body); return;
       }
       const route = name === '/' ? '/index.html' :
+        (name.startsWith('/defaults/') && CONFIG_FILES.has(name.slice(10))) ? '/config/defaults/' + name.slice(10) :
         name.startsWith('/assets/') || name.startsWith('/vendor/') ? '/public' + name : name;
       const allowed = route === '/index.html' ||
         (route.startsWith('/src/') && SOURCE_FILES.has(route.slice(5))) ||
         (route.startsWith('/config/') && CONFIG_FILES.has(route.slice(8))) ||
+        (route.startsWith('/config/defaults/') && CONFIG_FILES.has(route.slice(17))) ||
         route.startsWith('/public/assets/') ||
         ['/public/vendor/box2dweb.js', '/public/vendor/BOX2D-LICENSE.txt'].includes(route);
       const file = path.resolve(ROOT, '.' + route);

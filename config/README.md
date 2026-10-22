@@ -1,6 +1,14 @@
 # Game configuration
 
-Edit these JSON files, then reload the game to load the new values. They are the editable source for game balance and are not overwritten when generated assets are rebuilt. Every file has `schemaVersion: 1` and an array named after the file.
+Edit these JSON files, then reload the web page or restart the desktop app to load the new values. They are kept separate from generated game code. Every file has `schemaVersion: 1` and an array named after the file.
+
+Source/web development uses this `config/` directory. The desktop release reads the five editable files from **`%APPDATA%\ZombieBuilders\config`**, not from its installation. Press **F1** to locate them. Defaults are copied only when a user file is missing, so an update does not overwrite an existing file.
+
+**`config/defaults/` is the original-mode baseline.** Do not edit it to customize play; the application exposes it as a separate read-only default source. Restoring original mode selects that baseline without deleting user JSON or named presets. It is not a security boundary against someone changing the installed source files.
+
+Applied in-game rules can be remembered between runs. The saved session's `sourceFingerprint` detects changes to the normalized external configuration: changed JSON takes precedence on the next startup; an unchanged source allows the selected session to resume. This field belongs to session storage, **not** to these five JSON documents, and is not a cryptographic security check. Saving a named preset alone neither applies it nor rewrites the JSON files.
+
+中文：源码／网页使用本目录，桌面版使用 `%APPDATA%\ZombieBuilders\config`，F1 可查看位置。`defaults/` 是恢复原版用的独立基准，不是用户编辑入口。已有配置不会被升级覆盖；外置 JSON 内容改变后，下次启动优先加载新文件，未改变时才恢复已应用的会话。游戏内保存预设与应用当前局分开，也不改写这五份文件。
 
 | File | Editable values |
 | --- | --- |
@@ -38,7 +46,7 @@ Shovel Man, Angry Farmer, Survivalist and the four melee zombie types use `damag
 Each stage has ordered `waves` and a separate `reinforcements` array. A wave or reinforcement call has this shape:
 
 ```json
-{ "type": 1, "count": 5, "delay": 3 }
+{ "type": 1, "count": 5, "delay": 3, "enabled": true }
 ```
 
 Wave `type` is **not** a zombie entry ID:
@@ -54,6 +62,14 @@ Wave `type` is **not** a zombie entry ID:
 
 The scheduler truncates `delay` toward zero before using it. For example, `0.3` becomes `0` and `2.5` becomes `2`. A zero delay still waits for a scheduler event; it does not create the whole group in one update. Decimal defaults are retained without changing that behavior.
 
+`enabled` is optional and defaults to `true`. Set it to **`false`** to omit that wave or reinforcement call without deleting its values; reordering the `waves` array changes queue order. Empty wave lists and stages with all entries disabled are allowed. `count` remains a positive integer, so do not use zero as an on/off switch. The default queue is finite and advances on its own schedule, not after all enemies are killed. Ending the fixed queue does not disable independent base reinforcements or corpse-impact spawns.
+
 Each reinforcement contains a base-health `threshold` and ordered `calls`. It triggers when the enemy base crosses from above the threshold to at or below it. Calls are inserted at the front of the queue **in the listed order**, so the last call in a trigger runs first. If several thresholds are crossed in one update, triggers are processed in their listed order. Preserve or intentionally edit both orders when designing a stage.
 
 `zombieDamageMultiplier` scales enemy melee attack damage before the result is truncated to an integer; it does not scale Corpse Thrower's projectiles. `zombieHealthMultiplier` is itself truncated to an integer before it scales a new enemy's health: `1.75` acts as `1`, while `2` doubles health. This preserves the existing simulation rules. Enemy-base health comes directly from `zombies[5].health` and is not scaled by the stage multiplier.
+
+## Live editing and presets
+
+Use **F2** for the in-game editor. Saving a preset only saves its draft. Applying to the current battle is a separate action, with proportional-health or new-units-only policies and clearly reported next-battle fields. The independent “replace upcoming waves” action retains the current group and replaces the entire following queue—including queued, unspawned reinforcements—with the edited stage's complete enabled list. Already spawned enemies remain, and reinforcement trigger history is not reset; it does not infer which draft rows have already run.
+
+Spawning/ability switches, income rules, Trailer population capacity, Harvester damage/range, and the named-preset wrapper are separate from these five entity documents. Their schema, live-apply boundaries, and storage keys are documented in the [development guide](../docs/DEVELOPMENT.md#presets-rules-and-sandbox) / [二次开发指南](../docs/DEVELOPMENT.zh-CN.md#预设规则与沙盒). New character types and entirely new mechanics require code rather than extra arbitrary JSON fields.
