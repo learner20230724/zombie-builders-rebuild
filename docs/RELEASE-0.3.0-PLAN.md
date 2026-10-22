@@ -1,6 +1,6 @@
 # v0.3.0 release plan / 发布验收计划
 
-Status / 状态：**实施中；下表不是已通过的测试报告。** 每项须以本次构建的实际结果验收；失败或未执行项不得标记为通过。
+Status / 状态：**源码回归及源码桌面检查已通过；打包与发布验收待完成。** 下表区分已实测范围与待执行范围，不能把单项通过解释为全部通过。
 
 ## Product scope / 交付范围
 
@@ -8,11 +8,11 @@ Status / 状态：**实施中；下表不是已通过的测试报告。** 每项
 | --- | --- | --- |
 | Windows desktop / 桌面版 | 解压后双击 `ZombieBuilders.exe` 出现独立游戏窗口；内置 Electron；无需安装 Node.js、不另开浏览器、不依赖 HTTP 端口 | 源码 Electron 启动通过；实际 ZIP 待验 |
 | Display / 显示 | 仅游戏与设置入口；窗口缩放、最大化、F11 全屏保持比例且点击坐标正确 | 源码桌面实测通过 |
-| Settings / 设置 | F2 与可见按钮打开设置；可以查看、修改单位、僵尸、建筑、技能及关卡已有配置字段 | 源码关键交互通过；完整回归待汇总 |
-| Rule presets / 规则预设 | 保存预设与“应用到本局”分开；导入、导出、重启恢复及恢复原版不会意外覆盖用户预设 | 源码保存／导出／重启通过；完整回归待汇总 |
-| Live changes / 本局生效 | 生效范围清晰；已有单位生命按比例更新或仅新单位生效；输入错误不得部分应用 | 源码属性／无效输入通过；完整回归待汇总 |
-| Waves / 出怪编辑 | 可编辑有限队列的启停、顺序、类型、数量与 delay；不默认增加无限波或“清完再出下一波”规则 | 源码队列／筛选／空队列通过；边界回归待汇总 |
-| Sandbox / 沙盒 | “肥胖僵尸”按钮点一次立即生成一只；其他可生成类型及手动操作不污染原版成绩 | 源码肥胖按钮通过；完整回归待汇总 |
+| Settings / 设置 | F2 与可见按钮打开设置；可以查看、修改单位、僵尸、建筑、技能及关卡已有配置字段 | 源码关键交互与自动回归通过 |
+| Rule presets / 规则预设 | 保存预设与“应用到本局”分开；导入、导出、重启恢复及恢复原版不会意外覆盖用户预设 | 源码保存／导出／重启及自动回归通过 |
+| Live changes / 本局生效 | 生效范围清晰；已有单位生命按比例更新或仅新单位生效；输入错误不得部分应用 | 源码属性／无效输入及自动回归通过 |
+| Waves / 出怪编辑 | 可编辑有限队列的启停、顺序、类型、数量与 delay；不默认增加无限波或“清完再出下一波”规则 | 源码队列／筛选／空队列及自动回归通过 |
+| Sandbox / 沙盒 | “肥胖僵尸”按钮点一次立即生成一只；其他可生成类型及手动操作不污染原版成绩 | 源码肥胖按钮与自动回归通过 |
 | Persistence / 数据持久化 | 桌面用户目录 `%APPDATA%\ZombieBuilders`；首次复制可编辑配置且不覆盖已有配置；F1 显示数据位置并可打开配置目录 | 隔离 profile 重启／外置 JSON 保留通过；迁移安装待验 |
 | Separation / 隔离 | 原版与自定义进度、成绩分开；旧网页存档不宣称会自动迁入桌面 | 源码非零分数夹具隔离通过；非自然通关 |
 | Distribution / 分发 | 源码、桌面 ZIP、网页包与校验值一致；压缩包带 Electron 及所含组件要求的完整许可 | 待验证 |
@@ -31,10 +31,10 @@ Status / 状态：**实施中；下表不是已通过的测试报告。** 每项
 
 | Layer / 层次 | Required checks / 必测项目 | Status / 状态 |
 | --- | --- | --- |
-| Validation / 校验 | 完整默认配置；边界值、负数、NaN、溢出、错误 ID、错误 JSON；失败无半应用 | 源码 GUI 原子失败通过；Node 全量重跑中 |
-| Runtime / 运行逻辑 | 近战、投射物、移速、训练/冷却、关卡倍率；比例生命与仅新单位；默认规则回归 | 源码 GUI 核心属性通过；Node 全量重跑中 |
-| Queue / 队列 | 启停、重排、零数量、等待条目、多个阈值、队列结束、手动生成数量与类型 | 源码 GUI 主要流程通过；最终边界回归待汇总 |
-| Presets / 预设 | 保存/读取/删除/导入/导出；重启保持；恢复默认；损坏数据与磁盘错误 | 源码 GUI 保存／导出／恢复通过；全量待汇总 |
+| Validation / 校验 | 完整默认配置；边界值、负数、NaN、溢出、错误 ID、错误 JSON；失败无半应用 | 源码 GUI 原子失败与 Node 全量通过 |
+| Runtime / 运行逻辑 | 近战、投射物、移速、训练/冷却、关卡倍率；比例生命与仅新单位；默认规则回归 | 源码 GUI 核心属性与 Node 全量通过 |
+| Queue / 队列 | 启停、重排、零数量、等待条目、多个阈值、队列结束、手动生成数量与类型 | 源码 GUI 主要流程与 Node 全量通过 |
+| Presets / 预设 | 保存/读取/删除/导入/导出；重启保持；恢复默认；损坏数据与磁盘错误 | 源码 GUI 保存／导出／恢复与 Node 全量通过 |
 | Records / 记录 | 原版／自定义命名空间、战中改规则、沙盒生成、返回主菜单、重启后的隔离 | 源码非零分数夹具通过；未自然通关 |
 | UI / 界面 | 键鼠、表单焦点、滚动、大量波次、小窗口、最大化、全屏、暂停与关闭恢复 | 源码桌面 15 项通过；包内复验待执行 |
 | Desktop / 桌面 | 首次启动、第二次启动、正常退出；用户数据路径；协议边界、安装迁移 | 源码初启／重启通过；单实例／安装迁移待汇总 |
@@ -51,6 +51,7 @@ Status / 状态：**实施中；下表不是已通过的测试报告。** 每项
 - **2026-10-23：Electron 初启 smoke 通过**。使用此前不存在的隔离 QA profile；确认 `ztp://game/`、`gameReady`、无运行错误／404，渲染层 `require`／`process` 不可用，F2 设置对话框截图完成。
 - **2026-10-23：源码 Electron 正式桌面检查 15/15 通过**。证据：`output/playwright/desktop-qa-jVX1a0/report.json`，`sourceMode: true`。覆盖真实缩放／全屏、画布点击招募、暂停、实时属性、肥胖按钮、自动出怪启停、无效输入原子性、波次表、导出、空队列、类型筛选、重启持久化与回原版；无运行／CSP／请求错误或 HTTP 依赖。
 - 记录隔离使用明确标记的分数夹具，不等于自然通关。此报告未测试迁移后的安装副本、干净机器、SmartScreen 或所有战斗动画组合。
-- 全量 Node 首轮为 **159/160**：Windows 发行打包的瞬时 `EPERM` rename 失败，正在修复有限重试并重跑，不标记全量通过。实际 Release ZIP、迁移安装与发布后下载验收仍待执行。
+- 全量 Node 首轮 **159/160**，暴露 Windows 发行打包瞬时 `EPERM` rename；已加有限重试，并通过重试及目标防覆盖回归。**最终完整 `npm test` 通过：165/165 Node 测试、56 组原始数据、7,200 模拟帧、215 项经济断言、83 个战斗用例**。证据：`output/test-v030-final2.log`。
+- **`npm run build` 通过**：105 项素材哈希、五份配置及原版基准检查。证据：`output/build-v030.log`。实际 Release ZIP、迁移安装与发布后下载验收仍待执行。
 
-English summary: v0.3.0 targets an unpack-and-run Windows desktop app, editable rule presets, explicit live-apply behavior, finite-wave editing, and one-click sandbox spawning. All statuses above are pending until checked against the actual build. Saved presets and active-battle edits are separate; custom runs must not update original-mode records.
+English summary: v0.3.0 targets an unpack-and-run Windows desktop app, editable rule presets, explicit live-apply behavior, finite-wave editing, and one-click sandbox spawning. Source regression and the 15-check source desktop workflow have passed; packaged-EXE, relocation, and release-download verification remain pending. Saved presets and active-battle edits are separate; custom runs must not update original-mode records.

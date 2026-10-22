@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
+const {pathToFileURL} = require('node:url');
 const {ELECTRON_VERSION, desktopReadme, collectDesktopFiles, collectPackagedDirectory,
   renameDirectoryWithRetry, buildDesktopPackage, parseArguments} = require('../scripts/package-desktop.cjs');
 
@@ -144,6 +145,7 @@ test('desktop packaging uses pinned win32-x64 Electron and retains all supplied 
   assert.equal(observed.name, 'ZombieBuilders'); assert.equal(observed.executableName, 'ZombieBuilders');
   assert.equal(observed.asar, false); assert.equal(observed.prune, true); assert.equal(observed.overwrite, false);
   assert.equal(observed.win32metadata.ProductName, '建筑工大战僵尸');
+  assert.equal(observed.win32metadata.CompanyName, 'Zombie Builders desktop contributors');
   assert.equal(result.installationDir, path.join(input.root, 'output', 'desktop-v0.3.0'));
   assert.equal(result.executablePath, path.join(result.installationDir, 'ZombieBuilders.exe'));
   assert(fs.existsSync(result.executablePath));
@@ -163,6 +165,28 @@ test('desktop packaging uses pinned win32-x64 Electron and retains all supplied 
   assert(!files.has('resources/app/scripts/server.mjs'));
   assert(files.get('DESKTOP-RUN.txt').toString().includes('%APPDATA%\\ZombieBuilders\\config'));
   assert.deepEqual(files.get('resources/app/config/units.json'), fs.readFileSync(path.join(input.root, 'config/units.json')));
+});
+
+test('real Electron Packager metadata preflight is self-contained and needs no original game author', async t => {
+  const input = fixture(t);
+  // Exercise the installed packager's actual primary-source metadata validator,
+  // not the fake file bundler or an imitation of its author requirement.
+  const inferPath = path.join(path.dirname(require.resolve('@electron/packager')), 'infer.js');
+  const {getMetadataFromPackageJSON} = await import(pathToFileURL(inferPath).href);
+  let checked = false;
+  await buildDesktopPackage({root: input.root, packager: async options => {
+    const staged = JSON.parse(fs.readFileSync(path.join(options.dir, 'package.json'), 'utf8'));
+    assert(!Object.hasOwn(staged, 'author'), 'Do not relabel the original game author');
+    assert(!Object.hasOwn(options, 'appCopyright'), 'Do not assign original game copyright to desktop contributors');
+    assert.equal(options.win32metadata.CompanyName, 'Zombie Builders desktop contributors');
+    // An absent starting directory proves metadata inference never falls back to
+    // package.json files in staging or its ancestors when all options are explicit.
+    const absentDirectory = path.join(input.root, 'metadata-must-not-search-here');
+    assert.deepEqual(await getMetadataFromPackageJSON(['win32'], options, absentDirectory), {});
+    checked = true;
+    return fakePackager()(options);
+  }});
+  assert(checked);
 });
 
 test('existing installation and custom configuration are untouched; subsequent install gets a unique directory', async t => {

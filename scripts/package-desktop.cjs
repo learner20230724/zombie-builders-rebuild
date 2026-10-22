@@ -229,7 +229,10 @@ async function buildDesktopPackage(options = {}) {
     platform: 'win32', arch: 'x64', electronVersion: ELECTRON_VERSION,
     asar: false, prune: true, overwrite: false,
     appVersion: version, buildVersion: version,
-    win32metadata: {ProductName: '建筑工大战僵尸', FileDescription: 'Zombie Builders', OriginalFilename: `${EXECUTABLE_NAME}.exe`}
+    // Identifies the desktop adaptation, not the original game's author/copyright.
+    // Explicit CompanyName also prevents Packager from searching parent packages for author.
+    win32metadata: {CompanyName: 'Zombie Builders desktop contributors',
+      ProductName: '建筑工大战僵尸', FileDescription: 'Zombie Builders', OriginalFilename: `${EXECUTABLE_NAME}.exe`}
   };
   if (options.electronZipDir) packagerOptions.electronZipDir = realDirectory(options.electronZipDir);
   const packagedPaths = await packager(packagerOptions);
