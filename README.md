@@ -7,6 +7,7 @@ A browser version of **Zombie Trailer Park (建筑工大战僵尸)** built with 
 ## Features
 
 - Four levels with unit production, base building, resource management, and combat.
+- Game-only view that scales with the window and browser fullscreen.
 - Survivor units, zombie types, and special powers with distinct roles.
 - Bundled graphics and audio, plus local progress and records.
 - Editable JSON configuration for units, zombies, buildings, powers, and levels.
