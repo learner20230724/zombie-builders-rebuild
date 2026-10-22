@@ -1,6 +1,6 @@
 # v0.3.0 release plan / 发布验收计划
 
-Status / 状态：**源码回归、实际 EXE 桌面检查及本地 ZIP 验收已通过；公开发布／下载核验待完成。** 下表区分已实测范围与待执行范围，不能把单项通过解释为全部通过。
+Status / 状态：**v0.3.0 已交付：源码回归、实际 EXE 桌面检查、ZIP 验收及公开下载核验均通过。** 已在 [GitHub Releases 正式发布](https://github.com/learner20230724/zombie-builders-rebuild/releases/tag/v0.3.0)，并设为 latest。下表记录具体实测范围，不表示已覆盖所有环境和玩法组合。
 
 ## Product scope / 交付范围
 
@@ -15,7 +15,7 @@ Status / 状态：**源码回归、实际 EXE 桌面检查及本地 ZIP 验收�
 | Sandbox / 沙盒 | “肥胖僵尸”按钮点一次立即生成一只；其他可生成类型及手动操作不污染原版成绩 | 实际 EXE 肥胖按钮与自动回归通过 |
 | Persistence / 数据持久化 | 桌面用户目录 `%APPDATA%\ZombieBuilders`；首次复制可编辑配置且不覆盖已有配置；F1 显示数据位置并可打开配置目录 | 包内隔离 profile 重启／外置 JSON／中文空格迁移／F1 位置显示通过；未实点 Explorer |
 | Separation / 隔离 | 原版与自定义进度、成绩分开；旧网页存档不宣称会自动迁入桌面 | 实际 EXE 非零分数夹具隔离通过；非自然通关 |
-| Distribution / 分发 | 源码、桌面 ZIP、网页包与校验值一致；压缩包带 Electron 及所含组件要求的完整许可 | 本地 CRC／字节／许可证通过；公开下载核验待执行 |
+| Distribution / 分发 | 源码、桌面 ZIP、网页包与校验值一致；压缩包带 Electron 及所含组件要求的完整许可 | 本地 CRC／字节／许可证及无认证公开下载核验通过 |
 
 ## Application rules / 生效规则
 
@@ -39,7 +39,7 @@ Status / 状态：**源码回归、实际 EXE 桌面检查及本地 ZIP 验收�
 | UI / 界面 | 键鼠、表单焦点、滚动、大量波次、小窗口、最大化、全屏、暂停与关闭恢复 | 源码 15 项、实际 EXE 18 项通过；非穷尽组合 |
 | Desktop / 桌面 | 首次启动、第二次启动、正常退出；用户数据路径；协议边界、安装迁移 | 实际 EXE 初启／重启／单实例／中文空格安装迁移通过 |
 | Browser / 浏览器 | 网页完整启动与基础实际玩法；较长旅程单独执行 | smoke 与 journey 13 项检查通过 |
-| Release / 发布包 | ZIP 完整性、解压 EXE 启动、离线运行、素材无缺失、许可、SHA-256、发布后下载核验 | 本地 ZIP／EXE 验收通过；公开发布／下载待执行 |
+| Release / 发布包 | ZIP 完整性、解压 EXE 启动、离线运行、素材无缺失、许可、SHA-256、发布后下载核验 | 已正式发布；本地验收及三个公开资产回下载通过 |
 
 ## Release gate / 发布门槛
 
@@ -67,6 +67,22 @@ Status / 状态：**源码回归、实际 EXE 桌面检查及本地 ZIP 验收�
 | `zombie-builders-desktop-win-x64-v0.3.0.zip` | 204,827,284 | 404 | 331 | `427cbf8121b9100e31ec2b828a9f98f38e78bee2980a11b250aa46190e903943` |
 | `zombie-builders-web-v0.3.0.zip` | 43,405,094 | 333 | 332 | `2ca92bce148fd7c18acdea71d66f8f1836955ecea91e542772e6049c588fd531` |
 
-**公开发布及发布后的下载核验尚待执行**；本地压缩包通过不代表远程资产已上传或下载成功。
+## Published release and download verification / 正式发布与回下载验收
 
-English summary: v0.3.0 provides an unpack-and-run Windows desktop app, editable presets, explicit live application, finite-wave editing, and one-click spawning. The 166-test Node regression, 18-check packaged-EXE workflow (including relocation), browser smoke/13-check journey, and local archive checks passed. Public release/download verification remains pending. Score isolation uses labeled fixtures, not a natural-win claim; clean-machine/SmartScreen and exhaustive combat combinations are not covered.
+- **Release**：[v0.3.0](https://github.com/learner20230724/zombie-builders-rebuild/releases/tag/v0.3.0)，公开正式版本，已设为 latest。
+- **标签对应提交**：`44c904b0e303077f310841372c939da4f5a4212e`。证据：`output/releases/v0.3.0/published.json`。本验收文档后续的完成状态更新不重打标签、不改变压缩包或包内字节。
+- **公开下载通过**：独立从公开 URL 回下载桌面 ZIP、网页 ZIP 与 `SHA256SUMS.txt`，未使用 Authorization；三项完整字节数、SHA-256 均与本地文件和 GitHub 提供的 digest 一致，两份 ZIP 的 CRC 再次通过。证据：`output/releases/v0.3.0/public-download-verification.json`，`passed: true`、`authorizationUsed: false`。
+- 首次 CDN 长流提前结束导致两份 ZIP 尾部截断；经 HTTP Range 续传补齐后，才按完整最终文件进行字节、哈希与 CRC 验证，不以单次网络请求成功代替完整性校验。
+- 独立产物复核检查桌面包 404 个文件、331 个应用源文件及 34 份应用文本：未发现所查本机路径／凭证特征或混入原始 SWF／原始 EXE，所需许可证逐字节一致。此项是所述发布范围检查，不是全系统安全审计。
+
+| Public asset / 公开资产 | Bytes / 字节 | SHA-256 |
+| --- | ---: | --- |
+| [桌面 ZIP](https://github.com/learner20230724/zombie-builders-rebuild/releases/download/v0.3.0/zombie-builders-desktop-win-x64-v0.3.0.zip) | 204,827,284 | `427cbf8121b9100e31ec2b828a9f98f38e78bee2980a11b250aa46190e903943` |
+| [网页 ZIP](https://github.com/learner20230724/zombie-builders-rebuild/releases/download/v0.3.0/zombie-builders-web-v0.3.0.zip) | 43,405,094 | `2ca92bce148fd7c18acdea71d66f8f1836955ecea91e542772e6049c588fd531` |
+| [SHA256SUMS.txt](https://github.com/learner20230724/zombie-builders-rebuild/releases/download/v0.3.0/SHA256SUMS.txt) | 208 | `64ee2edbaa0438d16c18d3a74e7af7a870a569096cf29c8420da7abcf1d88c3b` |
+
+## Coverage boundary / 覆盖边界
+
+本轮没有声称自然通关全部关卡、穷尽所有能力／攻击动画组合、原生 Flash 视听完全一致，或已在干净 Windows 机器验证安装器、签名信誉及 SmartScreen。F1 路径显示已实测，未点击打开 Explorer。所有 GUI 检查均使用隔离 QA profile，不读取或重置玩家正常存档。
+
+English summary: v0.3.0 is publicly released. The 166-test Node regression, 18-check packaged-EXE workflow (including relocation), browser smoke/13-check journey, archive checks, and unauthenticated re-download verification of all three public assets passed. Score isolation uses labeled fixtures, not a natural-win claim; clean-machine/SmartScreen and exhaustive combat combinations are not covered.
