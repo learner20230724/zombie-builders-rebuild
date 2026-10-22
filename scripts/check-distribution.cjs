@@ -4,9 +4,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const vm = require('node:vm');
+const {checkConfig} = require('./check-config.cjs');
 const ROOT = path.resolve(__dirname, '..');
 
 function checkDistribution() {
+  const configuration = checkConfig();
   const read = name => fs.readFileSync(path.join(ROOT, name));
   const manifest = JSON.parse(read('public/assets/manifest.json'));
   const splash = JSON.parse(read('public/assets/splash.json'));
@@ -30,12 +32,12 @@ function checkDistribution() {
   }
   for (const entry of [...splash.frames, ...splash.sounds]) fileFor(entry.src);
   assert.equal(splash.finishAt, 8200);
-  for (const name of ['runtime.js', 'generated-game.js', 'physics.js', 'boot.js'])
+  for (const name of ['runtime.js', 'generated-game.js', 'physics.js', 'game-config.js', 'boot.js'])
     new vm.Script(read('src/' + name).toString('utf8'), {filename:name}); // Parse only; do not boot the game.
   assert(read('public/vendor/BOX2D-LICENSE.txt').toString().includes('Erin Catto'));
   assert(!read('index.html').toString().includes('href="/reference/"'));
   return {passed:true, assetHashesChecked:checked, gameImages:74, gameSounds:31,
-    splashSegments:splash.frames.length, sourceParsedNotExecuted:true};
+    splashSegments:splash.frames.length, configuration, sourceParsedNotExecuted:true};
 }
 if (require.main === module) console.log(JSON.stringify(checkDistribution(), null, 2));
 module.exports = {checkDistribution};

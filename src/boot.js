@@ -1,4 +1,4 @@
-/* Browser bootstrap only; game logic is generated from the recovered source. */
+/* Stable browser entry point. Configuration is applied outside generated code. */
 (async function () {
   const status = document.querySelector('#status');
   const report = error => {
@@ -11,6 +11,16 @@
   window.addEventListener('unhandledrejection', event => report(event.reason));
   window.addEventListener('ztp-runtime-error', event => report(event.detail.stack || event.detail.message));
   try {
+    const documents = Object.fromEntries(await Promise.all(
+      ['units', 'zombies', 'buildings', 'powers', 'levels'].map(async name => {
+        const response = await fetch(`/config/${name}.json`, {cache:'no-store'});
+        if (!response.ok) throw new Error(`配置 /config/${name}.json HTTP ${response.status}`);
+        return [name, await response.json()];
+      })
+    ));
+    const configuration = GameConfig.fromDocuments(documents);
+    GameConfig.install(globalThis, configuration);
+    window.gameConfig = configuration;
     const response = await fetch('/public/assets/manifest.json');
     if (!response.ok) throw new Error(`资源清单 HTTP ${response.status}`);
     const manifest = await response.json();

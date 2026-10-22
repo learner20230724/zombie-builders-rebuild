@@ -31,3 +31,9 @@ Box2D 是适用自身许可声明的第三方组件，原声明保留在 [public
 ### 范围
 
 本快照不分发原始 SWF／EXE，也不包含完整源码恢复与取证工作区。这只是发布范围的边界，不代表已包含材料不存在第三方权利。计划复用时，应针对具体文件和用途核实适用授权；可公开访问本身不等于已获许可。
+
+## Node.js runtime / Node.js 运行时
+
+The Windows release includes Node.js 24.14.1. Its complete license and third-party notices are included as `node/LICENSE` in that archive and [licenses/Node.js-LICENSE.txt](licenses/Node.js-LICENSE.txt) in this repository. / Windows 发行包包含 Node.js 24.14.1，完整许可与第三方声明保存在包内 `node/LICENSE` 及仓库对应文件。
+
+Source / 来源：https://github.com/nodejs/node/blob/v24.14.1/LICENSE

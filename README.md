@@ -1,62 +1,148 @@
-# 建筑工大战僵尸 / Zombie Trailer Park — JavaScript Reconstruction
+# 建筑工大战僵尸 / Zombie Trailer Park
 
-[简体中文说明](README.zh-CN.md)
+[简体中文](README.zh-CN.md) · [Download](https://github.com/learner20230724/zombie-builders-rebuild/releases/latest)
 
-A browser-playable research reconstruction of **Zombie Trailer Park 0.33**, known in Chinese as **建筑工大战僵尸**, using JavaScript, Canvas 2D, and Web Audio. It runs without Flash, a SWF runtime, or Ruffle.
+A browser version of **Zombie Trailer Park (建筑工大战僵尸)** built with **JavaScript, Canvas 2D, and Web Audio**. Build your trailer park, grow your income, recruit survivors, and push back the zombie horde. No Flash or Ruffle is required.
 
-This repository is a **public research reconstruction snapshot**, not an official re-release or a claim of a perfect replica. The included game code and assets are not offered under MIT or another repository-wide open-source license. See [Third-party notices](THIRD_PARTY_NOTICES.md) before reusing anything.
+## Features
 
-## What is included
+- Four levels with unit production, base building, resource management, and combat.
+- Survivor units, zombie types, and special powers with distinct roles.
+- Bundled graphics and audio, plus local progress and records.
+- Editable JSON configuration for units, zombies, buildings, powers, and levels.
 
-The snapshot includes the opening sequence, four levels' data, the economy and unit-production systems, combat, bundled visual and audio assets, and local records. The browser uses the supplied JavaScript port rather than loading the original game executable. Four levels being represented in the data does **not** mean every complete campaign path has been validated on this version.
+## Default game parameters
 
-The former Mochi online services are no longer available. Records and leaderboard-style displays here are **local-only**; they do not connect to or restore an official online leaderboard.
+These are the defaults in [config/](config/). Durations below use **battle ticks**: speed **2** is the default, at about **120 ticks/second**. Movement is in pixels per tick while walking. Attacks follow each character's animation and state machine; the attack values are **not DPS or a shared attack-rate constant**.
 
-## Run locally
+### Recruitable units
 
-Install **Node.js 20 or newer**, then clone the repository and start its local server:
+| Unit | Cash | Population | HP | Effective attack value | Move speed | Train (ticks) |
+| --- | ---: | ---: | ---: | --- | ---: | ---: |
+| Shovel Man | 50 | 1 | 50 | 10 melee damage budget | 0.5 | 50 |
+| Angry Farmer | 200 | 2 | 100 | 15, nearest forward target | 0.328125 | 300 |
+| Survivalist | 900 | 5 | 400 | 5 per machine-gun shot event | 1.2 | 500 |
+| Moonshine Bomber | 350 | 2 | 80 | 100 per bottle explosion | 0.25 | 300 |
+| Preacher Man | 1,500 | 3 | 100 | Converts enemies; no direct damage | 0.4 | 1,500 |
 
-~~~sh
+Shovel, machine-gun, and explosion damage can pass leftover damage to later eligible targets; the listed value is not full damage to every target. Preachers convert the first four zombie types, not Corpse Throwers or bases. Recruitment prerequisites follow the building unlocks below.
+
+### Zombies
+
+| Type | Base HP | Base attack | Move speed | Kill XP | Behavior |
+| --- | ---: | --- | ---: | ---: | --- |
+| Zombie | 25 | 10 melee | 0.25 | 25 | Slow, close-range attacks |
+| Jumping Ghoul | 60 | 16 melee | 0.5 | 60 | Leaping approach and close-range jump attacks |
+| Fast Zombie | 150 | 20 melee | 1.5 | 150 | Fast movement and close-range scratches |
+| Big Fat Zombie | 1,000 | 60 melee damage budget | 0.4 | 1,000 | Heavy strikes share damage among nearby targets |
+| Corpse Thrower | 1,500 | 500 per corpse impact | 0.0625 | 1,500 | Ranged corpses; each impact also spawns a Zombie |
+
+Corpse impacts share their damage budget among eligible player targets; this damage is not scaled by the stage's melee multiplier. Kill XP uses the configured base HP. Conversion gives no XP, nor does the later death of a converted ally. Player/enemy bases have **4,000 / 16,000 HP**.
+
+### Buildings
+
+| Building | Cash | Maximum | Build (ticks) | Requires | Effect |
+| --- | ---: | ---: | ---: | --- | --- |
+| Trailer | 250 | 15 | 300 | — | +5 population capacity each |
+| Salvage Yard | 500 | 5 | 300 | — | Average $50 per 600 ticks per yard; income is pooled |
+| Farm House | 1,000 | 1 | 500 | — | Unlocks Angry Farmers |
+| Garage | 1,500 | 1 | 500 | Farm House | Unlocks Survivalists |
+| Still | 1,200 | 1 | 1,000 | Farm House | Unlocks Moonshine Bombers |
+| Chapel | 1,500 | 1 | 2,000 | Garage | Unlocks Preachers |
+
+You begin with one Trailer and one Salvage Yard; maximum counts include them. Each completed yard adds one income coin per tick to a shared pool, which pays $50 whenever it reaches 600 coins.
+
+### Special powers
+
+| Power | XP | Charge (ticks) | Cooldown (ticks) | Effect | Unlock |
+| --- | ---: | ---: | ---: | --- | --- |
+| Angry Mob | 3,000 | 150 | 5,000 | 12 Shovel Men + 4 Farmers; movement ×1.5, no recruitment population cost | Available immediately |
+| Harvester | 4,000 | 150 | 10,000 | Speed 0.6; 100 damage per tick to each zombie in its forward harvesting range, excluding the base | Saved Stage 1 win |
+| Air Strike | 5,000 | 150 | 10,000 | 3 jets at speed 6; each bomb has a 500-damage explosion budget | Saved Stage 2 win |
+
+Cooldown starts when the effect is deployed, after charging. Unlocks use local completion records.
+
+### Stage differences and waves
+
+| Stage | Melee damage × | Zombie / Fast hit | HP multiplier → effective factor | Starting cash | Fixed entries (waits) | Queued zombies |
+| --- | ---: | --- | --- | ---: | ---: | ---: |
+| 1 | 1 | 10 / 20 | 1 → 1 | 100 | 66 (10) | 764 |
+| 2 | 1.25 | 12 / 25 | 1.25 → 1 | 100 | 68 (10) | 794 |
+| 3 | 1.5 | 15 / 30 | 1.5 → 1 | 100 | 68 (10) | 816 |
+| 4 | 1.75 | 17 / 35 | 1.75 → 1 | 100 | 68 (10) | 835 |
+
+All stages start with **0 XP**. Melee damage is `truncate(base damage × stage multiplier)`. The HP multiplier is itself truncated **before** multiplication, so the five zombie types keep the HP shown above in all four default stages.
+
+Extra reinforcements trigger when the enemy base crosses from above a threshold to that HP or lower:
+
+| Stage | At 13,000 base HP | At 9,000 base HP | At 5,000 base HP | Extra / combined queued count |
+| --- | --- | --- | --- | --- |
+| 1 | 20 Zombies | 30 Zombies + 1 Fat | 40 Zombies + 3 Fast + 1 Fat | 95 / 859 |
+| 2 | 30 Zombies | 40 Zombies + 1 Fat | 50 Zombies + 5 Fast + 2 Fat | 128 / 922 |
+| 3 | 40 Zombies | 50 Zombies + 2 Fat | 60 Zombies + 6 Fast + 3 Fat | 161 / 977 |
+| 4 | 40 Zombies + 10 Ghouls | 50 Zombies + 3 Fat | 60 Zombies + 7 Fast + 3 Fat + 1 Corpse Thrower | 174 / 1,009 |
+
+Counts describe the configured queues, excluding waits, bases, and Zombies created by corpse impacts; combined counts assume all three reinforcements trigger. Reinforcement calls are inserted at the queue front, so their listed call order runs in reverse. Wave `delay` is an integer-truncated **scheduler value**, not a direct battle-tick duration or wall-clock seconds. See the [configuration reference](config/README.md) for wave timing and ordering.
+
+## Download and play
+
+Get the latest package from [Releases](https://github.com/learner20230724/zombie-builders-rebuild/releases/latest).
+
+- **Windows (`windows-x64`)**: extract the package and double-click **Start-Game.cmd**. Node.js is included; no separate installation is needed.
+- **Portable web package**: extract it, install **Node.js 20 or newer**, and run `npm start` from the extracted folder.
+
+Open **http://127.0.0.1:8318/** and keep the server running while playing. Progress and records are stored in your browser.
+
+## Run from source
+
+With **Node.js 20 or newer** installed:
+
+```sh
 git clone https://github.com/learner20230724/zombie-builders-rebuild.git
 cd zombie-builders-rebuild
 npm start
-~~~
+```
 
-Open **http://127.0.0.1:8318/** in your browser. On Windows, you can instead double-click **Start-Game.cmd** after installing Node.js. Keep the server running while playing.
+Then open **http://127.0.0.1:8318/**. On Windows, you can also double-click **Start-Game.cmd**. Startup does not require `npm install`. Use the local server rather than opening `index.html` directly.
 
-**No npm install is required for startup.** Runtime assets and vendor files are included in this snapshot. Serve the project through the supplied server rather than opening index.html directly from the filesystem.
+## Customize the game
 
-## Checks and optional browser tooling
+Edit the files in **[config/](config/)** to change game balance and level settings:
 
-~~~sh
-npm run build
-npm test
-~~~
+| File | Settings |
+| --- | --- |
+| `units.json` | Survivor stats, recruitment, and requirements |
+| `zombies.json` | Zombie stats and combat settings |
+| `buildings.json` | Building costs, limits, and requirements |
+| `powers.json` | Special-power costs and cooldowns |
+| `levels.json` | Level settings and zombie waves |
 
-- **npm run build** checks the files needed for distribution. It is not a source-recovery pipeline, a new decompilation, or a rebuild from the original SWF.
-- **npm test** runs the public copy's local unit and game-system checks. On 2026-10-22, this public snapshot passed the distribution check, 26 Node unit tests, 56 recovered-data checks, 7,200 headless simulation frames, 215 economy assertions, and 83 controlled combat cases (Node.js 24.14.1). These checks do not establish natural campaign completion or pixel/audio equivalence.
+Run `npm run config:check`, then refresh the browser to load your changes. These files are read at startup and are kept separate from the generated game code.
 
-Optional browser checks are available as **npm run test:browser** and **npm run test:journey**. They require Playwright to be installed manually with **npm install --no-save playwright**, an existing Microsoft Edge installation, and the local server already running. These are development checks, not prerequisites for normal play. No hosted demo is provided, and GitHub Pages is not enabled for this snapshot.
+See the [development guide](docs/DEVELOPMENT.md) for field examples, timing, and the runtime structure.
 
-## Fidelity: evidence and limits
+## Common commands
 
-The latest reported source-workspace comparison ran the original ActionScript bytecode (ABC) in an **restricted JavaScript interpreter** against the JavaScript port. A fixed startup sequence plus **89 controlled combat frames** passed **354 checkpoints**. This is narrow differential evidence, not a full-game equivalence proof. The fixture includes pre-damage and a granted Harvester ability; it is not a natural, unassisted campaign playthrough. Those results have not been presented here as a fresh execution of the public-copy test suite.
+| Command | Purpose |
+| --- | --- |
+| `npm start` | Start the local game server |
+| `npm run config:check` | Validate the game configuration |
+| `npm run build` | Check the distributable files |
+| `npm test` | Run automated game and runtime checks |
+| `npm run package` | Create the portable web package (default) |
 
-Historical natural Canvas victories for the first three levels came from an older generated version. They must not be transferred to the current port as proof of campaign completion. A natural fourth-level victory has not yet been established for the current version.
+Optional browser checks are covered in the [development guide](docs/DEVELOPMENT.md#browser-checks).
 
-Known unfinished fidelity work includes **font-scaling differences from the native Flash reference** and **complete PCM/loop verification for all 31 audio items**. The existence of the audio files is not evidence that every waveform and loop matches. In particular, 89 controlled frames must not be read as an entire level, every combat situation, or the whole game. See [Current status](docs/STATUS.md) for the concise bilingual summary.
+## Project structure
 
-## Repository scope
+```text
+config/          Editable game configuration
+src/             Browser runtime, game logic, and configuration adapter
+public/assets/   Graphics, fonts, audio, and asset manifests
+public/vendor/   Bundled third-party runtime components
+scripts/         Local server, validation, and packaging tools
+tests/           Automated checks
+docs/            Development documentation
+```
 
-- **src/**: browser runtime, generated game port, data integration, and physics integration.
-- **public/assets/** and **public/vendor/**: bundled runtime resources and third-party components.
-- **data/**: recovered game data and selected provenance/verification metadata.
-- **scripts/** and **tests/**: selected local checks and development helpers.
-
-The optional **scripts/transpile-game.py**, **scripts/extract-data.py**, and **scripts/verify-abc-data.py** are source-recovery development tools. Using them requires your own matching original files and decompilation materials. The runnable snapshot does not require that recovery workflow.
-
-This release excludes the original SWF/EXE, reference dumps, original ActionScript material, tool binaries, raw run logs, profiles, private machine paths, research artifacts, and duplicate releases. Consequently, it is not a complete local forensic environment, and historical verification evidence is not reproducible out of the box merely by cloning it.
-
-## Rights
-
-The publisher states that they have permission to publish the included material. That confirmation does not itself relicense the original game's code, art, fonts, audio, or trademarks, or grant downstream reuse rights. The package is marked **UNLICENSED**. Box2D retains its own notice in [public/vendor/BOX2D-LICENSE.txt](public/vendor/BOX2D-LICENSE.txt).
+[Third-party notices](THIRD_PARTY_NOTICES.md)

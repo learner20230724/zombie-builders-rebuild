@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "buildings": [
+    {
+      "id": 0,
+      "key": "trailer",
+      "type": 0,
+      "name": "Trailer",
+      "cost": 250,
+      "buildTicks": 300,
+      "dependency": 0,
+      "maximum": 15,
+      "description": "Each Trailer increases your maximum people limit by 5."
+    },
+    {
+      "id": 1,
+      "key": "salvage-yard",
+      "type": 1,
+      "name": "Salvage Yard",
+      "cost": 500,
+      "buildTicks": 300,
+      "dependency": 0,
+      "maximum": 5,
+      "description": "Each Salvage Yard generates $50 every 5 seconds."
+    },
+    {
+      "id": 2,
+      "key": "farm-house",
+      "type": 2,
+      "name": "Farm House",
+      "cost": 1000,
+      "buildTicks": 500,
+      "dependency": 0,
+      "maximum": 1,
+      "description": "Enables you to make Angry Farmers"
+    },
+    {
+      "id": 3,
+      "key": "garage",
+      "type": 3,
+      "name": "Garage",
+      "cost": 1500,
+      "buildTicks": 500,
+      "dependency": 2,
+      "maximum": 1,
+      "description": "Enables you to make Survivalists"
+    },
+    {
+      "id": 4,
+      "key": "still",
+      "type": 4,
+      "name": "Still",
+      "cost": 1200,
+      "buildTicks": 1000,
+      "dependency": 2,
+      "maximum": 1,
+      "description": "Enables you to make Moonshine Bombers"
+    },
+    {
+      "id": 5,
+      "key": "chapel",
+      "type": 5,
+      "name": "Chapel",
+      "cost": 1500,
+      "buildTicks": 2000,
+      "dependency": 3,
+      "maximum": 1,
+      "description": "Allows you to make Preachers"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 {
   "sourceSwfSha256": "8c518cfe4b0077bff3f1ed8f4c67627b63c4c5a8df6c3044f6ab019b234595a1",
   "sourceAsSha256": "bcfb5a048718b4f7ccea8001950643d29fda8fd4fee2cfd0aca3fd59bd2ea3c6",
-  "source": "C:\\Users\\折纸人\\Documents\\ChatGPT\\随机处理的需要文件夹的任务\\zombie-builders-rebuild\\reference\\simplified\\scripts\\main.as",
+  "source": "reference/simplified/scripts/main.as",
   "method": "bb_Init",
   "variables": {
     "bb_data_Hoedown": {

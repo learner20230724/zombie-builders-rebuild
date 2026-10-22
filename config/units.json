@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "units": [
+    {
+      "id": 0,
+      "key": "shovel-man",
+      "type": 0,
+      "name": "Shovel Man",
+      "cost": 50,
+      "buildTicks": 50,
+      "moveSpeed": 0.5,
+      "health": 50,
+      "damage": 10,
+      "dependency": 0,
+      "people": 1,
+      "hitRadius": 10,
+      "hitOffset": 0,
+      "description": "Uses a shovel to smash zombies good."
+    },
+    {
+      "id": 1,
+      "key": "angry-farmer",
+      "type": 1,
+      "name": "Angry Farmer",
+      "cost": 200,
+      "buildTicks": 300,
+      "moveSpeed": 0.328125,
+      "health": 100,
+      "damage": 15,
+      "dependency": 2,
+      "people": 2,
+      "hitRadius": 20,
+      "hitOffset": 12,
+      "description": "Armed with a shotgun and an attitude, this man shoots zombies with extreme prejudice."
+    },
+    {
+      "id": 2,
+      "key": "survivalist",
+      "type": 2,
+      "name": "Survivalist",
+      "cost": 900,
+      "buildTicks": 500,
+      "moveSpeed": 1.2,
+      "health": 400,
+      "damage": 5,
+      "dependency": 3,
+      "people": 5,
+      "hitRadius": 90,
+      "hitOffset": -65,
+      "description": "A .50cal machine gun mounted on a fast pickup truck. 'Nuff said."
+    },
+    {
+      "id": 3,
+      "key": "moonshine-bomber",
+      "type": 3,
+      "name": "Moonshine Bomber",
+      "cost": 350,
+      "buildTicks": 300,
+      "moveSpeed": 0.25,
+      "health": 80,
+      "projectileDamage": 100,
+      "dependency": 4,
+      "people": 2,
+      "hitRadius": 10,
+      "hitOffset": 0,
+      "description": "These guys can lob their vile cocktails to explosive effect."
+    },
+    {
+      "id": 4,
+      "key": "preacher-man",
+      "type": 4,
+      "name": "Preacher Man",
+      "cost": 1500,
+      "buildTicks": 1500,
+      "moveSpeed": 0.4,
+      "health": 100,
+      "dependency": 5,
+      "people": 3,
+      "hitRadius": 12,
+      "hitOffset": 4,
+      "description": "Through the power of faith the Preacher converts the damned into friendly units."
+    },
+    {
+      "id": 5,
+      "key": "player-base",
+      "type": 5,
+      "name": "Base",
+      "health": 4000,
+      "hitRadius": 80,
+      "hitOffset": 0
+    }
+  ]
+}
