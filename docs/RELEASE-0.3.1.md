@@ -1,6 +1,6 @@
 # v0.3.1 verification / 验收记录
 
-状态：**源码回归、实际 EXE 22 项检查及本地发布包验收通过；公开发布与下载核验尚待完成。** 本记录仅覆盖 v0.3.1，不修改 v0.3.0 的历史验收结果；本地压缩包通过不等于公开资产已上传或回下载成功。
+状态：**v0.3.1 已交付。** 源码回归、实际 EXE 22 项检查、发布包及无认证公开回下载核验通过；[正式 Release](https://github.com/learner20230724/zombie-builders-rebuild/releases/tag/v0.3.1) 已公开并设为 latest。本记录仅覆盖 v0.3.1，不修改 v0.3.0 的历史验收结果。
 
 ## Changes / 本次范围
 
@@ -40,10 +40,23 @@
 | `zombie-builders-desktop-win-x64-v0.3.1.zip` | 204,841,991 | 404 | 331 | `83727927d4208ee96521e178aba8ba7c3dea5495cea8159ec51bb3f1ba060a28` |
 | `zombie-builders-web-v0.3.1.zip` | 43,419,762 | 333 | 332 | `ba1c623ceb381438e9bf82b64a8908dc4d3d9621df5b9285a13383a559f44687` |
 
-## Pending and boundary / 待验收与边界
+## Published release / 正式发布
 
-- **公开发布、资产上传及公开回下载 SHA-256：待执行。** 不能以本地包或源码测试代替此步骤。
+- Release：[v0.3.1](https://github.com/learner20230724/zombie-builders-rebuild/releases/tag/v0.3.1)，标签提交 `629060df15d1de7bcbe1918fc7f9d21fa062d28c`。发布证据：`output/releases/v0.3.1/published.json`。
+- **三项资产均经独立公开 HTTP 回下载，未使用 Authorization**；完整字节数与 SHA-256 均匹配本地文件及 GitHub digest，两份 ZIP 的 CRC 再次通过。证据：`output/releases/v0.3.1/public-download-verification.json`，`passed: true`、`authorizationUsed: false`。
+- 长流及部分分段曾提前结束；经最多 8 路、每段 8 MiB 的 HTTP Range 请求与续传补齐后，才验证最终完整文件。桌面包首段也来自独立公开 Range 请求，不以本地包内容代替下载。
+
+| 公开资产 | 完整字节 | SHA-256 |
+| --- | ---: | --- |
+| [桌面 ZIP](https://github.com/learner20230724/zombie-builders-rebuild/releases/download/v0.3.1/zombie-builders-desktop-win-x64-v0.3.1.zip) | 204,841,991 | `83727927d4208ee96521e178aba8ba7c3dea5495cea8159ec51bb3f1ba060a28` |
+| [网页 ZIP](https://github.com/learner20230724/zombie-builders-rebuild/releases/download/v0.3.1/zombie-builders-web-v0.3.1.zip) | 43,419,762 | `ba1c623ceb381438e9bf82b64a8908dc4d3d9621df5b9285a13383a559f44687` |
+| [SHA256SUMS.txt](https://github.com/learner20230724/zombie-builders-rebuild/releases/download/v0.3.1/SHA256SUMS.txt) | 208 | `1c52859d15145fce2b2ce99ab15dbbfd82e5e513b580b8302286624ce0d32b28` |
+
+本验收文档的完成状态更新不重打标签、不修改 ZIP 或包内文档。
+
+## Coverage boundary / 覆盖边界
+
 - 未声称自然通关全部关卡、穷尽能力／动画组合、干净机器安装、签名信誉或 SmartScreen。
 - 记录持久化使用明确标记的非零分数夹具；GUI 检查使用独立 QA profile，不读取或重置玩家正常存档。
 
-English: v0.3.1 adds a non-modal dock, play-while-editing controls, live building limits, and identity-aware unspawned-wave updates. The 213-test Node regression, distribution build, 20-check source/22-check packaged Electron workflows, browser smoke/13-check journey, and local archive checks passed. Publication and public-download verification remain pending; no natural-win, exhaustive-combat, or clean-machine/SmartScreen claim is made.
+English: v0.3.1 is publicly released with a non-modal dock, play-while-editing controls, live building limits, and identity-aware wave updates. The 213-test Node regression, build, 20-check source/22-check packaged Electron workflows, browser smoke/13-check journey, archive checks, and unauthenticated downloads of all three public assets passed. Network truncation required Range retries before final verification. No natural-win, exhaustive-combat, or clean-machine/SmartScreen claim is made.
