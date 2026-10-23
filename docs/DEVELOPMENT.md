@@ -18,7 +18,7 @@ npm run config:check
 
 The browser reads configuration at page startup. No transpilation or code generation is needed for configuration changes. Invalid configuration stops startup and reports the affected JSON field instead of silently using defaults.
 
-An applied custom session is restored only while the external JSON content is unchanged. A change to the external source configuration takes precedence on the next startup and is reported in the settings state. Saving a preset alone does not select it for startup. Restoring original mode selects the baseline without rewriting external files.
+An applied custom session is restored while external gameplay settings are unchanged. A gameplay-value or wave-order change takes precedence on the next startup and is reported in settings. Wave IDs are identity metadata, excluded from this comparison and from original/custom-mode classification; adding IDs alone does not reset a v0.3.0 selected session. Saving a preset alone does not select it for startup. Restoring original mode selects the baseline without rewriting external files.
 
 ### Desktop development
 
@@ -112,7 +112,9 @@ In `buildings.json`, find `salvage-yard`:
 }
 ```
 
-`maximum` caps the number of that building. `dependency: 0` means no prerequisite; other values name the required building ID. Salvage income and Trailer capacity are editable through the preset's separate `rules.economy` fields, not building descriptions.
+`maximum` is an integer **0–100,000**: **0 removes the gameplay cap**, while positive values set the cap. The engine independently stops new orders at a safety ceiling of 100,000 per type. Counts include completed buildings and queued orders. A live decrease does not dismantle buildings or cancel already paid orders; it only prevents additional orders while at/above the new cap. Original defaults remain Trailer 15, Salvage Yard 5, and the other types 1.
+
+Rendering retains the original finite building slots, but extra completed buildings still count for income and population. Repeated unlock buildings do not invent extra abilities or new artwork. `dependency: 0` means no prerequisite; other values name the required building ID. Salvage income and Trailer capacity are editable through the preset's separate `rules.economy` fields, not building descriptions.
 
 ### Example: tune the Harvester
 
@@ -147,9 +149,9 @@ In `levels.json`, edit the existing `stage-1` entry. This fragment changes its s
   "zombieDamageMultiplier": 1,
   "zombieHealthMultiplier": 1,
   "waves": [
-    { "type": 1, "count": 5, "delay": 3 },
-    { "type": 0, "count": 1, "delay": 4 },
-    { "type": 2, "count": 2, "delay": 3 }
+    { "id": "stage-1-wave-1", "type": 1, "count": 5, "delay": 3 },
+    { "id": "stage-1-wave-2", "type": 0, "count": 1, "delay": 4 },
+    { "id": "stage-1-wave-3", "type": 2, "count": 2, "delay": 3 }
   ]
 }
 ```
@@ -157,6 +159,8 @@ In `levels.json`, edit the existing `stage-1` entry. This fragment changes its s
 Wave `type: 0` is a wait entry. Types **1–5** select zombie IDs **0–4**, respectively. `count` sets the entry's count. `delay` is a wave-scheduler parameter, not a battle-tick field or a precise wall-clock duration. The game truncates it to an integer before scheduling; use whole numbers when tuning it.
 
 Wave and reinforcement-call entries may include **`"enabled": false`** to skip them; omitting the field means enabled. An empty wave list is allowed. `count` must remain a positive integer: disable or delete an entry instead of using zero. The default scheduler does not wait until enemies are killed, and its finite queue does not loop automatically.
+
+Main-wave **`id`** is optional when loading a source configuration, and must be unique within its stage if supplied: 1–80 ASCII letters, digits, underscores, or hyphens. Validation fills original missing IDs such as `stage-1-wave-1`; starting a battle binds those identities to the real queue. Keep an ID when editing or moving a group. New editor rows receive a new `wave-...` ID. IDs identify groups, not zombie types or their screen row positions.
 
 The existing health calculation also converts `zombieHealthMultiplier` to an integer: for example, `1.75` uses a health factor of `1`. For the four melee zombie types, damage is multiplied first, then the result is truncated to an integer. This multiplier does not scale Corpse Thrower projectiles.
 
@@ -181,7 +185,7 @@ Wave `delay` uses its own scheduler, as described above; do not convert it with 
 | `src/game-config.js` | Validate JSON and adapt it to the game's tables and behavior |
 | `src/custom-rules.js` | Validated spawning and ability switches outside generated code |
 | `src/customization.js` | Named presets, explicit live operations, and separate custom records |
-| `src/settings-ui.js` / `.css` | Game-overlay settings, field editors, wave controls, and sandbox buttons |
+| `src/settings-ui.js` / `.css` | Non-modal settings dock, field editors, wave controls, and sandbox buttons |
 | `src/generated-game.js` | Game state, production, combat, UI, and level logic |
 | `src/runtime.js` | Canvas rendering, Web Audio, input, and browser storage |
 | `src/physics.js` | Physics integration |
@@ -197,6 +201,8 @@ The browser adapter is exposed as `GameConfig`; Node tools can load the same mod
 - `apply(target, config)`: apply directly after `bb_Init()` and before `bb_Main()`.
 - `getCurrent(target)`: return a deep copy of the latest complete configuration, including values deferred to the next battle.
 - `updateLive(target, config, options)`: update an initialized game, returning `{applied, deferred}` arrays of changed JSON paths. Supply the complete validated configuration, not a partial patch.
+- `getWaveProgress(target)`: snapshot tracked current/upcoming groups, consumed/spawned counts, completed IDs, and known group identities.
+- `applyLiveWaves(target, config)`: reconcile the current stage's unspawned schedule by identity, returning `{applied, deferred, notes, requiresNewBattle, reason, progress}`.
 
 ### Live-apply contract
 
@@ -214,10 +220,16 @@ const result = GameConfig.updateLive(globalThis, next, {
 - `ratio` maps each living body's remaining percentage to its new maximum, rounds to the nearest integer, and keeps at least 1 HP. This includes bases and converted allies; dead bodies are not revived. `new-only` retains existing bodies' individual maxima and affects newly created bodies.
 - Movement updates retain direction and temporary stops/slows. Shared cost, damage, and hit geometry change for subsequent actions. Existing projectiles retain the damage they were launched with.
 - Active training, power charging, and cooldown timers preserve remaining progress; fractional remaining ticks round up, with a minimum of one. Already paid resource/population costs are not recalculated.
-- During a battle, including pause and victory/defeat screens, unit `people`/`dependency`, building `maximum`/`dependency`, power `unlockAfterStage`, and level `startingCash`/`startingXp`/`waves`/`reinforcements` are deferred to the next reset. Menu-time updates have no active battle to preserve.
+- Building `maximum` updates during the current battle; lowering it preserves buildings and paid orders. Unit `people`/`dependency`, building `dependency`, power `unlockAfterStage`, and starting resources/reinforcement definitions remain deferred to the next reset. This low-level `updateLive` also defers wave arrays; the player-facing `Customization.applyDraft` immediately follows it with `applyLiveWaves` for the current stage. Other stages' waves stay deferred until that stage starts. Menu-time updates have no active battle to preserve.
 - Live changes use complete validation and a prepared update plan before committing; this is not an API for mutating arbitrary generated-game fields.
 
 Use **`Customization`**, not the low-level adapter alone, for player-facing operations: it handles mode promotion, preset storage, records, and UI pause behavior.
+
+### Non-modal editing
+
+Settings reserve a right-hand dock when the viewport is wider than **850 CSS pixels**; at **850 or below**, the game is above the settings. The canvas retains its 800×600 logical coordinate system while its visible area resizes. Opening settings takes an editor pause token; **继续战斗** releases that token without closing the dock, and **暂停战斗** takes a new token. These operations do not forcibly clear the game's own pause state. Closing settings restores the runtime state associated with its editor pause rather than replaying elapsed edit time.
+
+F2 toggles the dock globally. Esc closes it when focus is inside settings; form typing stays separate from game controls. Values remain a draft until explicit application: continuing the battle or saving a named preset is not an implicit apply.
 
 ### Presets, rules, and sandbox
 
@@ -233,13 +245,27 @@ Use **`Customization`**, not the low-level adapter alone, for player-facing oper
 | `applyLive(config, {healthPolicy})` | Promote an active original run to custom and apply supported values |
 | `applyRules(rules)` | Apply behavior switches in a custom battle |
 | `spawnZombie(type, count = 1)` | Immediately create zombie type 0–4 in a custom battle; count 1–20 |
-| `applyUpcomingWaves(config)` | Replace the upcoming schedule explicitly, not as a side effect of saving |
+| `applyUpcomingWaves(config)` | Compatibility wave-only alias for safe tracked-current-stage synchronization; does not apply other draft attributes |
+| `getBattleStatus()` | Read running/editor/game pause states, building counts, entity counts, and actual wave progress |
 | `restoreOriginal()` | Reload original mode; does not delete saved presets |
 | `pauseForEditor()`, `resumeFromEditor(token)` | Pause the editor safely without catch-up simulation on close |
 
 Use `applyDraft` for a complete player-edited draft rather than chaining `applyLive` and `applyRules`: an invalid rule must not leave a valid configuration half-applied. Validation failures leave the mode, stored data, and live configuration unchanged.
 
-`applyUpcomingWaves` preserves the first queued group's remaining count and the scheduler timer, then replaces **the entire queue after that group, including already queued but unspawned reinforcements**, with all enabled entries from the edited stage's wave list. Already spawned enemies are unaffected. It does not infer which draft entries have already run, wait for a cleared battlefield, or reset the reinforcement trigger history; a threshold that already fired does not fire again. Other unapplied draft fields are not committed by that action.
+### Current-battle wave reconciliation
+
+The normal `applyDraft` operation updates the current stage's waves; there is no separate replace/replay button. Its `waveReport` contains `{applied, deferred, notes, requiresNewBattle, reason, progress, stage, otherStages}`. A live application does not restart the battle or wait for enemies to be killed.
+
+- For an unfinished ID, **remaining = `max(0, requested count - consumed)`**. `consumed` counts scheduler events, including waits or types filtered out by automatic-spawn rules; `spawned` counts actual generated enemies. Editing a count changes the intended battle total, not an additional number to append.
+- Changing type affects only the unspawned remainder. Reordering moves IDs without losing their consumed counts. Disabled/deleted unfinished groups have their remaining queue entries removed; re-enabling a still-unfinished ID can restore its unconsumed remainder.
+- Reducing count to the consumed amount or below completes that ID and cancels its remainder. A completed ID never replays in the current battle, even if its count is raised later; its edits are reported for the next battle. Add a fresh ID to request a genuinely new group.
+- Existing group timers and the scheduler clock are preserved. A changed `delay` is used by the next original `time > truncate(delay)` check; elapsed time is not reset or rescaled. Existing enemies are untouched.
+- Already queued reinforcement objects keep their relative slots; main-wave synchronization does not delete them or reset reinforcement-trigger history. Changing reinforcement definitions still requires the next battle.
+- Editing another stage records the configuration, but does not change the active stage's queue. The report names those `otherStages` and their deferred paths.
+
+Legacy imported presets without reliable IDs receive reserved `legacy-untracked-...` markers. They are valid for saving and starting a new custom battle, but are not guessed to match the current queue by row number. Until bound in a new battle, waves return `requiresNewBattle: true` with a reason and no queue mutation; other valid draft attributes still apply. IDs survive load/save/export and ordinary cloning. Do not use the reserved prefix for hand-authored new groups.
+
+`getBattleStatus()` distinguishes runtime and gameplay state: `runtimeRunning`, `editorPaused`, `editorPauseCount`, `gamePaused`, and `battleRunning` are separate. It includes `buildings: [{id, built, queued, maximum}]`, `entities: {people, zombies, converted, total}`, `waveProgress`, `wavePending`, and `waveNotes`. `getState()` includes this as `battleStatus` plus core aliases. Progress exposes `current`, `upcomingGroups`, `remainingTotal`, `completedGroups`, `completed`, and `knownIds`; a group includes `id`, `type`, `total`, `consumed`, `spawned`, `remaining`, and `source` (`wave` or `reinforcement`). These are **actual running-state values**, not the editor's uncommitted draft.
 
 Rule format:
 

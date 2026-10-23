@@ -65,6 +65,14 @@ async function makeRunDirectory(parent, root = ROOT) {
   return fs.mkdtemp(path.join(parent, 'desktop-qa-'));
 }
 const sha256 = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+function rectanglesOverlap(a, b, tolerance = 1) {
+  return Math.min(a.right, b.right) - Math.max(a.left, b.left) > tolerance &&
+    Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > tolerance;
+}
+function expectedIncome(before, afterTicks, buildings, payout = 50, interval = 600) {
+  const accumulated = before.coins + (afterTicks - before.ticks) * buildings;
+  return {cash: before.cash + Math.floor(accumulated / interval) * payout, coins: accumulated % interval};
+}
 
 async function run(options) {
   const {_electron: electron} = require('playwright');
@@ -75,7 +83,7 @@ async function run(options) {
     schemaVersion: 1, started: new Date().toISOString(), passed: false,
     executable: options.executable || require('electron'), sourceMode: !options.executable,
     output: out, profile,
-    scope: 'Real Electron application, isolated persistent profile, real canvas and settings-button interaction. Manual runtime steps advance real gameplay only while the editor is closed.',
+    scope: 'Real Electron application, isolated persistent profile, real canvas and dock-button interaction. Deterministic runtime steps advance real gameplay only with the editor pause released; actual dock Continue/Pause is also exercised in realtime.',
     checks: [], snapshots: {}, pageErrors: [], consoleErrors: [], badResponses: [], failedRequests: [], remoteRequests: [], dialogs: [], syntheticFixtures: [],
     notCovered: ['Natural victory and every ability/attack-animation combination.', 'Clean-machine installer, unsigned EXE reputation/SmartScreen, and visual/audio equivalence to native Flash.']
   };
@@ -137,13 +145,17 @@ async function run(options) {
   }
   async function freeze() { await page.evaluate(() => { ZTPRuntime.stop(); ZTPRuntime.advance(0); }); }
   async function step(frames) {
-    assert.equal(await page.locator('.ztps-overlay').isVisible(), false, 'Never step gameplay while its editor is open');
+    assert.equal(await page.evaluate(() => Customization.getState().paused), false, 'Never step gameplay through an editor pause token');
+    assert.equal(await page.evaluate(() => ZTPRuntime.getStatus().running), false, 'Deterministic steps require an explicitly stopped real clock');
     await page.evaluate(n => ZTPRuntime.step(n), frames);
   }
   async function canvasClick(x, y) {
     const box = await page.locator('#game').boundingBox(); assert.ok(box, 'Canvas must have a real layout');
     await page.mouse.move(box.x + x * box.width / 800, box.y + y * box.height / 600);
-    await page.mouse.down(); await step(1); await page.mouse.up();
+    await page.mouse.down();
+    if (await page.evaluate(() => ZTPRuntime.getStatus().running)) await page.waitForTimeout(45);
+    else await step(1);
+    await page.mouse.up();
   }
   async function state() {
     return page.evaluate(() => {
@@ -157,12 +169,15 @@ async function run(options) {
       return {
         mainState: g.bbmainState, ticks: g.bbgameticks, cash: g.bbztp?.bbcash, coins: g.bbcoins,
         force: g.bbztp?.bbforce, maxForce: g.bbztp?.bbmaxforce, xp: g.bbztp?.bbxp, difficulty: g.bbdifficulty,
+        buildings: g.bbztp?.bbbuildingcount?.slice(),
+        buildingOrders: g.bbbuildings.map(building => ({maximum: building.bbmaximum, orders: building.bborders, busy: building.bbbusy, enabled: building.bbenabled})),
         records: [...g.bbrecords], people: entries(g.bbpeople).map(entity), zombies: entries(g.bbzombies).map(entity),
         units: g.bbunits.map(unit => ({cost: unit.bbcost, health: unit.bbhealth, orders: unit.bborders, busy: unit.bbbusy})),
         waves: entries(ZTPGamePort.bb_ZombieMob.bbqueue).map(wave => ({type: wave.bbtype, count: wave.bbcount, delay: wave.bbdelay, time: wave.bbtime})),
         waveTicks: ZTPGamePort.bb_ZombieMob.bbticks,
         runtime: {running: ZTPRuntime.getStatus().running, milliseconds: ZTPRuntime.getStatus().milliseconds, errors: ZTPRuntime.getStatus().diagnostics.errors},
-        customization: {mode: Customization.getState().mode, paused: Customization.getState().paused, isBattle: Customization.getState().isBattle}
+        customization: {mode: Customization.getState().mode, paused: Customization.getState().paused, isBattle: Customization.getState().isBattle},
+        waveProgress: Customization.getState().waveProgress
       };
     });
   }
@@ -179,10 +194,14 @@ async function run(options) {
   }
   async function openEditor() {
     if (!(await page.locator('.ztps-overlay').isVisible())) await page.keyboard.press('F2');
-    await page.getByRole('dialog').waitFor({state: 'visible'});
+    await page.locator('#ztps-panel[role="complementary"]').waitFor({state: 'visible'});
   }
   async function closeEditor() {
-    if (await page.locator('.ztps-overlay').isVisible()) await page.keyboard.press('Escape');
+    if (await page.locator('.ztps-overlay').isVisible()) {
+      // Esc is intentionally scoped to the dock; the canvas keeps its own game
+      // pause key. Focus the dock rather than sending Esc to the battle.
+      await page.locator('.ztps-close').focus(); await page.keyboard.press('Escape');
+    }
     await page.locator('.ztps-overlay').waitFor({state: 'hidden'});
   }
   async function field(name, value) {
@@ -202,6 +221,14 @@ async function run(options) {
     return page.evaluate(() => SettingsUI.mount().getDraft());
   }
   async function storage() { return page.evaluate(() => Object.fromEntries(Object.entries(localStorage))); }
+  async function importAndStart(fixture, filename) {
+    await openEditor();
+    await page.locator('input[type="file"]').setInputFiles({name: filename || 'desktop-fixture.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(fixture))});
+    await page.locator('.ztps-message').filter({hasText: '导入校验通过'}).waitFor();
+    await page.locator('#ztps-tab-sandbox').click();
+    await Promise.all([page.waitForEvent('domcontentloaded'), clickButton('开始自定义战局')]);
+    await ready(); await page.waitForFunction(() => Customization.getState().isBattle); await freeze();
+  }
 
   try {
     await launch(undefined, true);
@@ -253,6 +280,38 @@ async function run(options) {
       await page.waitForTimeout(300);
       assert.equal(await app.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows()[0].isFullScreen()), false);
       return {small, large, fullscreen};
+    });
+
+    await check('DOCK-LAYOUT', 'The non-modal editor reserves its own space: wide side-by-side and narrow stacked layouts never cover the 4:3 game canvas.', async () => {
+      await openEditor();
+      async function measure() {
+        return page.evaluate(() => {
+          const rect = selector => {
+            const b = document.querySelector(selector).getBoundingClientRect();
+            return {left: b.left, top: b.top, right: b.right, bottom: b.bottom, width: b.width, height: b.height};
+          };
+          return {canvas: rect('#game'), dock: rect('.ztps-overlay'), main: rect('main'), viewportWidth: innerWidth, viewportHeight: innerHeight,
+            docked: document.body.classList.contains('ztps-docked'), role: document.querySelector('#ztps-panel').getAttribute('role'),
+            modal: document.querySelector('#ztps-panel').getAttribute('aria-modal')};
+        });
+      }
+      function validate(box, narrow) {
+        assert.equal(box.docked, true); assert.equal(box.role, 'complementary'); assert.equal(box.modal, null);
+        assert.ok(box.canvas.width > 0 && box.canvas.height > 0); assert.ok(box.dock.width > 0 && box.dock.height > 0);
+        assert.equal(rectanglesOverlap(box.canvas, box.dock), false, 'Dock and canvas bounding boxes must not intersect');
+        assert.ok(Math.abs(box.canvas.width / box.canvas.height - 4 / 3) < 0.003);
+        assert.ok(Math.abs(box.canvas.width - Math.min(box.main.width, box.main.height * 4 / 3)) <= 2, 'Canvas fills remaining game area');
+        if (narrow) assert.ok(box.canvas.bottom <= box.dock.top + 1, 'Narrow view puts the dock below the canvas');
+        else assert.ok(box.canvas.right <= box.dock.left + 1, 'Wide view puts the dock beside the canvas');
+      }
+      await app.evaluate(({BrowserWindow}) => { const win = BrowserWindow.getAllWindows()[0]; win.unmaximize(); win.setBounds({width: 1280, height: 900}); });
+      await page.waitForTimeout(300); const wide = await measure(); validate(wide, false);
+      await page.screenshot({path: artifact('01a-dock-wide.png')});
+      await app.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows()[0].setBounds({width: 720, height: 800}));
+      await page.waitForTimeout(300); const narrow = await measure(); validate(narrow, true);
+      await page.screenshot({path: artifact('01b-dock-narrow.png')});
+      await closeEditor(); await app.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows()[0].maximize());
+      await page.waitForTimeout(250); return {wide, narrow};
     });
 
     await check('NATIVE-F1-HELP', 'Native F1 reaches the real desktop help handler, identifying this profile/config directory and F2/F11 shortcuts without opening Explorer.', async () => {
@@ -375,6 +434,33 @@ async function run(options) {
       return {soldier, cost: live.units[0].cost, scoreFixture: 'Original=1234 remains untouched; custom starts at zero.'};
     });
 
+    await check('DOCK-CONTINUE-AND-PLAY', 'A paused dock can continue realtime battle, leave the canvas usable for recruitment, then pause again without elapsed-time catch-up.', async () => {
+      // Enter with a real running clock, not an earlier deterministic QA clock,
+      // so releasing this editor's token exercises genuine realtime resume.
+      await closeEditor(); await page.evaluate(() => { ZTPRuntime.useRealtime(); ZTPRuntime.start(); }); await openEditor();
+      const paused = await state(); assert.equal(paused.customization.paused, true); assert.equal(paused.runtime.running, false);
+      await page.locator('[data-editor-playback]').click();
+      await page.waitForFunction(() => !Customization.getState().paused && ZTPRuntime.getStatus().running);
+      await page.waitForTimeout(250); const moving = await state();
+      assert.ok(moving.ticks > paused.ticks); assert.ok(moving.people.find(person => person.type === 0).x > paused.people.find(person => person.type === 0).x);
+      assert.equal(await page.locator('.ztps-overlay').isVisible(), true, 'Continuing must keep the settings dock visible');
+      const beforePurchase = await state(); await canvasClick(40, 90); const purchased = await state();
+      assert.equal(purchased.force, beforePurchase.force + 1, 'Canvas click reserves one more recruit while dock is open');
+      const income = Math.floor((beforePurchase.coins + (purchased.ticks - beforePurchase.ticks) * beforePurchase.buildings[1]) / 600) * 50;
+      assert.equal(purchased.cash, beforePurchase.cash + income - 25, 'Real pointer interaction charges the currently configured price');
+      await page.locator('[data-editor-playback]').click(); const again = await state();
+      assert.equal(again.customization.paused, true); assert.equal(again.runtime.running, false);
+      await page.waitForTimeout(450); const held = await state();
+      assert.equal(held.ticks, again.ticks); assert.equal(held.cash, again.cash); assert.deepEqual(held.people, again.people); assert.deepEqual(held.zombies, again.zombies);
+      await page.locator('[data-editor-playback]').click(); await freeze(); const resumed = await state();
+      assert.ok(resumed.ticks >= held.ticks && resumed.ticks - held.ticks <= 10, 'Continue must not replay the 450 ms editor pause');
+      await step(1); const firstFrame = await state(); assert.ok(firstFrame.ticks - resumed.ticks >= 0 && firstFrame.ticks - resumed.ticks <= 10);
+      // Re-acquire the actual editor token before the following editing tests.
+      await page.locator('[data-editor-playback]').click(); assert.equal((await state()).customization.paused, true);
+      await save('02a-dock-paused-after-playing');
+      return {pausedTicks: paused.ticks, movingTicks: moving.ticks, purchase: {before: beforePurchase.cash, after: purchased.cash}, heldTicks: held.ticks, resumedTicks: resumed.ticks};
+    });
+
     await check('FAT-BUTTON', 'One actual Fat Zombie button click creates exactly one type-35 instance, even when automatic waves and that automatic type are disabled.', async () => {
       const before = await state();
       await page.locator('[data-spawn="3"]').click();
@@ -408,24 +494,30 @@ async function run(options) {
       await field('config.units.0.health', 100);
     });
 
-    await check('WAVE-TABLE', 'UI wave enabled/count/type/order edits replace only upcoming groups; the in-flight group and timer survive.', async () => {
+    await check('WAVE-TABLE', 'The ordinary Apply button hot-updates enabled/count/type/order of future waves, preserving stable IDs and the already-running group rather than replaying the stage.', async () => {
       await page.locator('#ztps-tab-levels').click();
       const waves = page.locator('.ztps-section').filter({has: page.getByRole('heading', {name: '关卡波次顺序', exact: true})});
-      await waves.getByLabel('第 1 组启用', {exact: true}).uncheck();
-      await field('config.levels.0.waves.1.count', 3);
-      await waves.getByLabel('第 2 组类型', {exact: true}).selectOption('4');
-      await waves.getByLabel('第 2 组下移', {exact: true}).click();
+      const untouched = await exportedDraft(), movedId = untouched.config.levels[0].waves[2].id;
+      assert.equal(typeof movedId, 'string', 'Live schedules must have stable identities');
+      await waves.getByLabel('第 5 组启用', {exact: true}).uncheck();
+      await field('config.levels.0.waves.2.count', 3);
+      await waves.getByLabel('第 3 组类型', {exact: true}).selectOption('4');
+      await waves.getByLabel('第 3 组下移', {exact: true}).click();
       const draft = await exportedDraft(), selected = draft.config.levels[0].waves.filter(wave => wave.enabled !== false);
-      assert.equal(draft.config.levels[0].waves[0].enabled, false);
-      assert.equal(draft.config.levels[0].waves[2].type, 4); assert.equal(draft.config.levels[0].waves[2].count, 3);
+      assert.equal(draft.config.levels[0].waves[4].enabled, false);
+      assert.equal(draft.config.levels[0].waves[3].id, movedId);
+      assert.equal(draft.config.levels[0].waves[3].type, 4); assert.equal(draft.config.levels[0].waves[3].count, 3);
       const before = await state();
-      await clickButton('替换本局后续队列…'); const after = await state();
+      assert.equal(before.waveProgress.current.index, 0, 'The genuine original opening group should still be in progress');
+      await clickButton('应用本局'); const after = await state();
       assert.equal(after.waveTicks, before.waveTicks); assert.deepEqual(after.waves[0], before.waves[0]);
-      assert.deepEqual(after.waves.slice(1), selected.map(wave => ({type: wave.type, count: wave.count, delay: wave.delay | 0, time: 0})));
+      assert.equal(after.waveProgress.current.id, before.waveProgress.current.id);
+      assert.equal(after.waveProgress.current.consumed, before.waveProgress.current.consumed);
+      assert.deepEqual(after.waves.slice(1), selected.slice(1).map(wave => ({type: wave.type, count: wave.count, delay: wave.delay | 0, time: 0})));
       assert.equal(after.units[0].cost, before.units[0].cost);
       await page.getByLabel('规则名称', {exact: true}).fill(PRESET_NAME); await clickButton('保存规则');
       assert.equal(await page.evaluate(() => Customization.listPresets().length), 1);
-      return {retainedCurrent: after.waves[0], enabledUpcomingGroups: selected.length, editedFatGroup: draft.config.levels[0].waves[2]};
+      return {retainedCurrent: after.waveProgress.current, enabledUpcomingGroups: selected.length - 1, editedFatGroup: draft.config.levels[0].waves[3]};
     });
 
     await check('EXPORT-JSON', 'The actual export button produces a validated JSON file through the unchanged desktop download guard, with a QA-only save destination.', async () => {
@@ -456,15 +548,17 @@ async function run(options) {
       return {...result, bytes: Buffer.byteLength(text), sha256: sha256(text)};
     });
 
-    await check('EMPTY-WAVES', 'An explicitly empty future schedule is accepted safely for sandbox use and cannot leak unrelated draft attributes into the live battle.', async () => {
+    await check('EMPTY-WAVES', 'An empty schedule cancels unspawned normal waves, keeps already-spawned entities, and the schedule-only compatibility API cannot leak unrelated draft attributes.', async () => {
       const before = await state();
       const report = await page.evaluate(() => {
         const draft = Customization.getDraft().config; draft.levels[0].waves = []; draft.units[0].cost = 999;
         return Customization.applyUpcomingWaves(draft);
       });
       const after = await state();
-      assert.equal(report.upcomingGroups, 0); assert.deepEqual(after.waves, before.waves.slice(0, 1));
-      assert.equal(after.units[0].cost, 25); assert.equal(after.waveTicks, before.waveTicks);
+      assert.equal(report.requiresNewBattle, false); assert.deepEqual(after.waves, []);
+      assert.equal(after.waveProgress.current, null); assert.equal(after.waveProgress.remainingTotal, 0);
+      assert.deepEqual(after.people, before.people); assert.deepEqual(after.zombies, before.zombies);
+      assert.equal(after.units[0].cost, 25);
       return report;
     });
 
@@ -494,6 +588,94 @@ async function run(options) {
       await openEditor(); await page.locator('[data-spawn="3"]').click();
       assert.equal((await state()).zombies.filter(zombie => zombie.type === 35).length, 1);
       return {fixtureSchedule: fixture.config.levels[0].waves, before: initial.waves, remainingGroups: after.waves.length};
+    });
+
+    await check('WAVE-CONSUMED-PROGRESS', 'After a real completed group and two real current-group spawns, ordinary Apply changes total five→four to only two remaining, agrees with the dock status, and never replays completed groups.', async () => {
+      const fixture = await page.evaluate(() => {
+        const draft = Customization.getDraft();
+        draft.config.levels[0].waves = [
+          {id: 'qa-completed', type: 2, count: 1, delay: 0, enabled: true},
+          {id: 'qa-current', type: 1, count: 5, delay: 0, enabled: true},
+          {id: 'qa-future', type: 4, count: 1, delay: 30, enabled: true}
+        ];
+        draft.rules.automaticSpawning = true; draft.rules.baseReinforcements = false; draft.rules.corpseSpawnOnImpact = false;
+        draft.rules.zombieTypesEnabled = [true, true, true, true, true];
+        return {schemaVersion: 1, name: 'Consumed wave progress fixture', ...draft};
+      });
+      await importAndStart(fixture, 'consumed-wave-progress.json');
+      for (let n = 0; n < 160 && (await state()).zombies.filter(zombie => zombie.type === 32).length < 2; n++) await step(1);
+      const before = await state(), count = (snapshot, type) => snapshot.zombies.filter(zombie => zombie.type === type).length;
+      assert.equal(count(before, 33), 1); assert.equal(count(before, 32), 2);
+      assert.equal(before.waveProgress.completedGroups, 1);
+      assert.deepEqual({id: before.waveProgress.current.id, total: before.waveProgress.current.total, consumed: before.waveProgress.current.consumed,
+        spawned: before.waveProgress.current.spawned, remaining: before.waveProgress.current.remaining},
+      {id: 'qa-current', total: 5, consumed: 2, spawned: 2, remaining: 3});
+      assert.equal(before.waves[0].count, 3);
+      await openEditor(); await page.locator('#ztps-tab-levels').click();
+      await page.waitForFunction(() => document.querySelector('[data-wave-status]')?.textContent.includes('总量 5 · 已出 2 · 已调度 2 · 剩余 3'));
+      await field('config.levels.0.waves.1.count', 4);
+      assert.equal((await state()).waveProgress.current.total, 5, 'A draft edit must not silently mutate the running schedule');
+      await clickButton('应用本局'); const changed = await state();
+      assert.equal(changed.waveTicks, before.waveTicks); assert.equal(changed.waves[0].time, before.waves[0].time);
+      assert.deepEqual({id: changed.waveProgress.current.id, total: changed.waveProgress.current.total, consumed: changed.waveProgress.current.consumed,
+        spawned: changed.waveProgress.current.spawned, remaining: changed.waveProgress.current.remaining},
+      {id: 'qa-current', total: 4, consumed: 2, spawned: 2, remaining: 2});
+      assert.equal(changed.waves[0].count, 2); assert.deepEqual(changed.waves.map(wave => wave.type), [1, 4]);
+      await page.waitForFunction(() => {
+        const text = document.querySelector('[data-wave-status]')?.textContent || '';
+        return text.includes('已完成 1 组') && text.includes('队列剩余 3 次') && text.includes('总量 4 · 已出 2 · 已调度 2 · 剩余 2');
+      });
+      await save('04a-wave-total-four-remaining-two');
+      await closeEditor();
+      for (let n = 0; n < 100 && count(await state(), 32) < 4; n++) await step(1);
+      await step(90); const completed = await state();
+      assert.equal(count(completed, 33), 1, 'The already-completed first ghoul group must never replay');
+      assert.equal(count(completed, 32), 4, 'Only two further normal zombies may spawn, not a fresh total of four');
+      assert.equal(completed.waveProgress.completedGroups, 2); assert.equal(completed.waveProgress.current.id, 'qa-future');
+      // Applying another future change after both preceding groups completed
+      // must not reintroduce either of their IDs into the actual queue.
+      await openEditor(); await field('config.levels.0.waves.2.count', 2); await clickButton('应用本局');
+      const reapplied = await state();
+      assert.equal(reapplied.waveProgress.completedGroups, 2); assert.equal(reapplied.waveProgress.current.id, 'qa-future');
+      assert.deepEqual(reapplied.waves.map(wave => wave.type), [4]); assert.equal(reapplied.waves[0].count, 2);
+      await closeEditor(); await step(30); const later = await state();
+      assert.equal(count(later, 33), 1); assert.equal(count(later, 32), 4);
+      return {before: before.waveProgress, afterApply: changed.waveProgress, completed: completed.waveProgress, reapplied: reapplied.waveProgress,
+        actualSpawnCounts: {ghouls: count(later, 33), normal: count(later, 32), fat: count(later, 35)}};
+    });
+
+    await check('BUILDING-LIMITS-AND-INCOME', 'Real construction reaches a live-edited sixth salvage yard, then seventh/eighth with maximum=0; every actual yard contributes to income beyond the five original drawing slots.', async () => {
+      const fixture = await page.evaluate(() => {
+        const draft = Customization.getDraft();
+        draft.config.levels[0].startingCash = 10000; draft.config.levels[0].waves = [];
+        Object.assign(draft.config.buildings[1], {cost: 1, buildTicks: 1, maximum: 5});
+        draft.rules.automaticSpawning = false; draft.rules.baseReinforcements = false; draft.rules.corpseSpawnOnImpact = false;
+        draft.rules.economy.salvagePayout = 50; draft.rules.economy.salvageIntervalTicks = 600;
+        return {schemaVersion: 1, name: 'Real construction limits fixture', ...draft};
+      });
+      await importAndStart(fixture, 'construction-limits.json');
+      assert.equal((await state()).buildings[1], 1);
+      async function buildTo(target) {
+        await canvasClick(378, 88);
+        for (let n = 0; n < 20 && (await state()).buildings[1] < target; n++) await step(1);
+        const result = await state(); assert.equal(result.buildings[1], target); assert.equal(result.buildingOrders[1].orders, 0); return result;
+      }
+      for (let target = 2; target <= 5; target++) await buildTo(target);
+      const capped = await state(); await canvasClick(378, 88); const denied = await state();
+      assert.equal(denied.buildings[1], 5); assert.equal(denied.buildingOrders[1].orders, 0);
+      assert.equal(denied.cash, expectedIncome(capped, denied.ticks, 5).cash, 'An over-limit click must not charge cash');
+      await openEditor(); await page.locator('#ztps-tab-buildings').click(); await page.getByLabel('选择建筑', {exact: true}).selectOption('1');
+      await field('config.buildings.1.maximum', 6); await clickButton('应用本局');
+      assert.equal((await state()).buildingOrders[1].maximum, 6, 'Building limit change applies to this battle without restart');
+      await closeEditor(); await buildTo(6);
+      const sixBefore = await state(); await step(60); const sixAfter = await state(), sixExpected = expectedIncome(sixBefore, sixAfter.ticks, 6);
+      assert.equal(sixAfter.cash, sixExpected.cash); assert.equal(sixAfter.coins, sixExpected.coins);
+      assert.equal(sixAfter.buildings[1], 6, 'Rendering may not overwrite the real six-yard count');
+      await openEditor(); await field('config.buildings.1.maximum', 0); await clickButton('应用本局');
+      assert.equal((await state()).buildingOrders[1].maximum, 0); await closeEditor(); await buildTo(7); await buildTo(8);
+      const eightBefore = await state(); await step(60); const eightAfter = await save('06-buildings-unlimited'), eightExpected = expectedIncome(eightBefore, eightAfter.ticks, 8);
+      assert.equal(eightAfter.cash, eightExpected.cash); assert.equal(eightAfter.coins, eightExpected.coins); assert.equal(eightAfter.buildings[1], 8);
+      return {cappedCount: 5, liveLimit: 6, unlimitedCount: 8, six: {before: sixBefore, after: sixAfter, expected: sixExpected}, eight: {before: eightBefore, after: eightAfter, expected: eightExpected}};
     });
 
     await page.evaluate(() => { WriteInt('ZTPBestScores', '0', 9876); FlushInts(); });
@@ -573,7 +755,7 @@ async function run(options) {
   return evidence;
 }
 
-module.exports = {inside, parseArguments, makeRunDirectory, run, HELP, PRESET_NAME, PRESET_FILENAME};
+module.exports = {inside, parseArguments, makeRunDirectory, rectanglesOverlap, expectedIncome, run, HELP, PRESET_NAME, PRESET_FILENAME};
 if (require.main === module) {
   Promise.resolve().then(() => {
     const options = parseArguments(process.argv.slice(2));

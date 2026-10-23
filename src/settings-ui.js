@@ -26,7 +26,7 @@
     cost: ['招募 / 建造费用', '现金', '立即'], health: ['最大生命', 'HP', '按生命策略'], damage: ['攻击伤害', '伤害', '立即'],
     projectileDamage: ['投射物伤害', '伤害', '新投射物'], moveSpeed: ['移动速度', '距离 / 战斗 tick', '立即'],
     buildTicks: ['生产 / 蓄力时间', '战斗 tick', '保留进度'], cooldownTicks: ['冷却时间', '战斗 tick', '保留进度'],
-    dependency: ['所需建筑 ID', '0–5（见建筑页）', '下局'], people: ['占用人口', '人', '下局'], maximum: ['最大建筑数', '座', '下局'],
+    dependency: ['所需建筑 ID', '0–5（见建筑页）', '下局'], people: ['占用人口', '人', '下局'], maximum: ['最大建筑数', '0 = 不设上限', '立即'],
     hitRadius: ['水平命中半径', '距离', '立即'], hitOffset: ['水平命中偏移', '距离', '立即'], xp: ['技能所需经验', 'XP', '立即'],
     unlockAfterStage: ['通关解锁要求', '0=直接；1–4=需通关', '下局'],
     shovelCount: ['暴民铲工数量', '人', '下次技能'], shotgunCount: ['暴民农夫数量', '人', '下次技能'],
@@ -78,7 +78,7 @@
   }
   function summarizeReport(report) {
     const applied = report && report.applied || [], deferred = report && report.deferred || [];
-    return '本局已应用 ' + applied.length + ' 项' + (deferred.length ? '；' + deferred.length + ' 项下局生效（人口 / 前置建筑 / 开局资源 / 波次等）' : '。');
+    return '本局已应用 ' + applied.length + ' 项' + (deferred.length ? '；' + deferred.length + ' 项下局生效（人口 / 前置建筑 / 开局资源等）' : '。');
   }
   let instance = null;
   function mount(controller, options) {
@@ -87,7 +87,7 @@
     if (!controller || typeof controller.getState !== 'function') throw new Error('SettingsUI 需要 Customization 控制器');
     const doc = options.document || document, win = options.window || window;
     const canvas = options.canvas || doc.getElementById('game');
-    let opened = false, pauseToken, previousFocus = null, draft, baseline, selectedPresetId = '', activeTab = 'sandbox';
+    let opened = false, pauseToken, pollTimer, previousFocus = null, draft, baseline, baselineSaved = false, selectedPresetId = '', activeTab = 'sandbox', lastBattleStage = null, waveSequence = 0;
     let selection = {units: 0, zombies: 0, buildings: 0, powers: 0, levels: 0}, wavePage = 0, reinforcementPage = 0, reinforcementIndex = 0;
     const undo = [], invalid = new Map(), cleanups = [], consumedKeys = new Set();
     let disposed = false;
@@ -102,8 +102,21 @@
     function snapshot() { undo.push(clone(draft)); if (undo.length > 30) undo.shift(); }
     function dirty() { return draft && !equal(draft, baseline); }
     function change(path, value) { snapshot(); setAt(draft, path, value); updateDirty(); }
-    function updateDirty() { dirtyLabel.textContent = dirty() ? '有未保存的规则修改' : '规则已保存 / 未修改'; undoButton.disabled = undo.length === 0; }
+    function updateDirty(s) {
+      s = s || state();
+      const saved = dirty() ? '未保存' : baselineSaved ? '已保存' : '未修改';
+      const applied = draft && equal(draft.config, s.config) && equal(draft.rules, s.rules);
+      dirtyLabel.textContent = saved + ' · ' + (s.isBattle ? applied ? '当前规则一致' : '尚未应用本局' : applied ? '尚未开始战局' : '尚未应用，开始自定义战局后使用');
+      dirtyLabel.dataset.saved = String(!dirty() && baselineSaved); dirtyLabel.dataset.applied = String(!!applied);
+      undoButton.disabled = undo.length === 0;
+    }
     function defaults() { const s = state(); return {config: s.defaults, rules: s.defaultRules}; }
+    function newWaveId() {
+      const used = new Set(draft.config.levels.flatMap(level => level.waves.map(wave => wave.id)));
+      let id;
+      do { id = 'wave-' + (win.crypto && typeof win.crypto.randomUUID === 'function' ? win.crypto.randomUUID() : Date.now().toString(36) + '-' + (++waveSequence).toString(36)); } while (used.has(id));
+      return id;
+    }
     function notice(text, error) { message.textContent = text || ''; message.classList.toggle('ztps-error', !!error); message.setAttribute('role', error ? 'alert' : 'status'); }
     function focusError(error) {
       const text = String(error && error.message || error);
@@ -124,14 +137,14 @@
       const exact = path && all.find(el => el.dataset.path === (text.includes('CustomRules ') ? 'rules.' : 'config.') + path[1].replace(/\[(\d+)\]/g, '.$1'));
       if (exact) { exact.classList.add('ztps-invalid'); exact.setAttribute('aria-invalid', 'true'); exact.focus(); }
     }
-    async function action(fn) {
+    async function action(fn, allowInvalid = false) {
       try {
-        if (invalid.size) { const entry = invalid.entries().next().value; throw new Error(entry[1]); }
+        if (!allowInvalid && invalid.size) { const entry = invalid.entries().next().value; throw new Error(entry[1]); }
         await fn();
       } catch (error) { focusError(error); }
     }
-    function resetDraft(next, saved) {
-      draft = clone(next); baseline = clone(saved || next); invalid.clear(); undo.length = 0; wavePage = reinforcementPage = reinforcementIndex = 0;
+    function resetDraft(next, saved, persisted = false) {
+      draft = clone(next); baseline = clone(saved || next); baselineSaved = persisted; invalid.clear(); undo.length = 0; wavePage = reinforcementPage = reinforcementIndex = 0;
       updateDirty(); render();
     }
     function refreshPresets() {
@@ -142,31 +155,39 @@
       deleteButton.disabled = !selectedPresetId;
     }
     const entry = button('⚙ 自定义', () => open(), 'ztps-entry');
-    entry.title = '打开自定义规则与沙盒（F2）'; entry.setAttribute('aria-label', '打开自定义设置，快捷键 F2'); entry.setAttribute('aria-haspopup', 'dialog');
+    entry.title = '打开自定义规则与沙盒（F2）'; entry.setAttribute('aria-label', '打开自定义设置，快捷键 F2'); entry.setAttribute('aria-controls', 'ztps-panel'); entry.setAttribute('aria-expanded', 'false');
     const overlay = node('div', 'ztps-overlay'); overlay.hidden = true;
-    const modal = node('section', 'ztps-modal'); modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-labelledby', 'ztps-title'); modal.tabIndex = -1;
+    const modal = node('section', 'ztps-modal'); modal.id = 'ztps-panel'; modal.setAttribute('role', 'complementary'); modal.setAttribute('aria-labelledby', 'ztps-title'); modal.tabIndex = -1;
     overlay.appendChild(modal);
     const header = node('header', 'ztps-header'), heading = node('div');
     const title = node('h1', '', '自定义规则与沙盒'); title.id = 'ztps-title';
-    heading.appendChild(title); heading.appendChild(node('p', '', '保存自己的规则，或调整这一局。打开面板时，战斗已暂停。'));
+    heading.appendChild(title); heading.appendChild(node('p', '', '设置与游戏并列。默认暂停，也可继续战斗边玩边调。'));
     const closeButton = button('关闭 · Esc', () => close(), 'ztps-close'); header.appendChild(heading); header.appendChild(closeButton); modal.appendChild(header);
+    const playbackBar = node('div', 'ztps-playback-bar'), playbackStatus = node('span', 'ztps-playback-status');
+    playbackStatus.dataset.editorStatus = 'true';
+    const playbackButton = button('继续战斗', () => action(async () => {
+      if (pauseToken !== undefined) { const held = pauseToken; pauseToken = undefined; controller.resumeFromEditor(held); notice('设置暂停已解除，可以点击左侧游戏继续操作；修改后点击“应用本局”。'); }
+      else { pauseToken = controller.pauseForEditor(); notice('已暂停战斗，可以安心编辑；关闭设置会恢复此前运行状态。'); }
+      renderBattleState();
+    }, true), 'ztps-playback-toggle');
+    playbackButton.dataset.editorPlayback = 'true'; playbackBar.appendChild(playbackStatus); playbackBar.appendChild(playbackButton); modal.appendChild(playbackBar);
     const presetBar = node('div', 'ztps-preset-bar');
     const presetSelect = node('select'); presetSelect.setAttribute('aria-label', '选择已保存的规则');
     presetSelect.addEventListener('change', () => action(async () => {
       if (!presetSelect.value) { selectedPresetId = ''; presetName.value = ''; refreshPresets(); return; }
       if (dirty() && !win.confirm('加载规则将替换尚未保存的修改，继续吗？')) { presetSelect.value = selectedPresetId; return; }
       selectedPresetId = presetSelect.value; const next = await controller.loadPreset(selectedPresetId);
-      presetName.value = (controller.listPresets().find(p => p.id === selectedPresetId) || {}).name || ''; resetDraft(next); refreshPresets(); notice('已载入规则，尚未应用到本局。');
+      presetName.value = (controller.listPresets().find(p => p.id === selectedPresetId) || {}).name || ''; resetDraft(next, undefined, true); refreshPresets(); notice('已载入规则，尚未应用到本局。');
     }));
     const presetName = node('input'); presetName.type = 'text'; presetName.maxLength = 80; presetName.placeholder = '规则名称，例如：胖僵尸挑战'; presetName.setAttribute('aria-label', '规则名称');
     const saveButton = button('保存规则', () => action(async () => {
       const name = presetName.value.trim(); if (!name) { presetName.focus(); throw new Error('请先给这套规则起个名字。'); }
-      const meta = await controller.savePreset(name, clone(draft), selectedPresetId || undefined); selectedPresetId = meta.id; baseline = clone(draft); updateDirty(); refreshPresets(); notice('规则已保存。保存不会自动修改当前战局。');
+      const meta = await controller.savePreset(name, clone(draft), selectedPresetId || undefined); selectedPresetId = meta.id; baseline = clone(draft); baselineSaved = true; updateDirty(); refreshPresets(); notice('规则已保存。保存不会自动修改当前战局。');
     }), 'ztps-primary');
-    const saveNew = button('另存为', () => { selectedPresetId = ''; presetSelect.value = ''; presetName.value = ''; presetName.focus(); deleteButton.disabled = true; notice('输入新名称后点击“保存规则”。'); });
+    const saveNew = button('另存为', () => { selectedPresetId = ''; baselineSaved = false; presetSelect.value = ''; presetName.value = ''; presetName.focus(); deleteButton.disabled = true; updateDirty(); notice('输入新名称后点击“保存规则”。'); });
     const deleteButton = button('删除', () => action(async () => {
       if (!selectedPresetId || !win.confirm('删除这套已保存的规则？当前编辑内容和存档不受影响。')) return;
-      await controller.deletePreset(selectedPresetId); selectedPresetId = ''; refreshPresets(); notice('已删除已保存的规则；编辑中的内容仍保留。');
+      await controller.deletePreset(selectedPresetId); selectedPresetId = ''; baselineSaved = false; refreshPresets(); updateDirty(); notice('已删除已保存的规则；编辑中的内容仍保留。');
     }));
     presetBar.appendChild(labeled('已保存规则', presetSelect)); presetBar.appendChild(labeled('名称', presetName, 'ztps-grow'));
     presetBar.appendChild(saveButton); presetBar.appendChild(saveNew); presetBar.appendChild(deleteButton); modal.appendChild(presetBar);
@@ -183,6 +204,7 @@
       event.preventDefault(); activeTab = keys[next]; render(); tabButtons.get(activeTab).focus();
     });
     modal.appendChild(nav);
+    const waveStatus = node('p', 'ztps-wave-status'); waveStatus.dataset.waveStatus = 'true'; waveStatus.setAttribute('role', 'status'); modal.appendChild(waveStatus);
     const content = node('div', 'ztps-content'); content.id = 'ztps-content'; content.setAttribute('role', 'tabpanel'); content.tabIndex = -1; modal.appendChild(content);
     const message = node('p', 'ztps-message'); message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite'); modal.appendChild(message);
     const footer = node('footer', 'ztps-footer'), tools = node('div', 'ztps-tools'), actions = node('div', 'ztps-apply');
@@ -215,18 +237,28 @@
     const applyButton = button('应用本局', () => action(async () => {
       const s = state(); if (!s.isBattle) throw new Error('请先开始一局战斗，或从“沙盒 / 刷怪”开始自定义战局。');
       if (!s.isCustom && !win.confirm('应用后，本局将转为自定义战局，不计入原版成绩。继续吗？')) return;
+      const before = typeof controller.getBattleStatus === 'function' ? controller.getBattleStatus().waveProgress : s.waveProgress;
+      const completedIds = new Set(before && before.completed || []), oldWaves = s.config.levels.find(level => level.id === s.stage).waves;
+      const editedCompleted = draft.config.levels.find(level => level.id === s.stage).waves.flatMap((wave, i) => completedIds.has(wave.id) && oldWaves.some(old => old.id === wave.id && !equal(old, wave)) ? [i + 1] : []);
       // The controller validates config AND rules before promotion or mutation.
       // Sequential applyLive/applyRules would leave a half-applied battle when
       // the second document contains an invalid value.
       const report = await controller.applyDraft(clone(draft), {healthPolicy: hpPolicy.value});
-      notice(summarizeReport(report) + ' 未保存的规则不会因此保存。'); renderBattleState();
+      const waveReport = report.waveReport;
+      let result = summarizeReport(report);
+      if (waveReport && waveReport.requiresNewBattle) result += ' 波次未即时同步：这套旧规则缺少可靠波次 ID，请开始新自定义战局后使用。';
+      else if (waveReport && waveReport.notes && waveReport.notes.length) result += ' ' + waveReport.notes.join('；');
+      if (waveReport && waveReport.otherStages && waveReport.otherStages.length) result += ' 第 ' + waveReport.otherStages.map(value => typeof value === 'object' ? value.stage || value.id : value).join('、') + ' 关不是当前关，其波次在下次进入对应关卡时生效。';
+      if (editedCompleted.length) result += ' 第 ' + editedCompleted.slice(0, 8).join('、') + (editedCompleted.length > 8 ? ' 等' : '') + ' 组已完成，不补刷；如需再出怪，请新增一组。';
+      if (activeTab === 'levels' && draft.config.levels[selection.levels].id !== s.stage) result += ' 正在编辑的第 ' + draft.config.levels[selection.levels].id + ' 关不是当前第 ' + s.stage + ' 关，该关波次下次开局生效。';
+      notice(result + ' 未保存的规则不会因此保存。'); renderBattleState();
     }), 'ztps-primary'); actions.appendChild(applyButton);
     footer.appendChild(tools); footer.appendChild(actions); modal.appendChild(footer);
     doc.body.appendChild(entry); doc.body.appendChild(overlay);
     function makeInput(path, value, label) {
       let input;
       if (typeof value === 'boolean') { input = node('input'); input.type = 'checkbox'; input.checked = value; }
-      else if (typeof value === 'number') { input = node('input'); input.type = 'number'; input.step = 'any'; input.value = String(value); input.inputMode = 'decimal'; }
+      else if (typeof value === 'number') { input = node('input'); input.type = 'number'; input.step = 'any'; input.value = String(value); input.inputMode = 'decimal'; if (path.endsWith('.maximum')) { input.min = '0'; input.max = '100000'; input.step = '1'; } }
       else { input = node(path.endsWith('description') ? 'textarea' : 'input'); if (input.tagName === 'INPUT') input.type = 'text'; input.value = value; input.maxLength = path.endsWith('description') ? 2000 : 120; }
       input.dataset.path = path; input.setAttribute('aria-label', label); input.addEventListener('change', () => {
         try {
@@ -262,9 +294,43 @@
     }
     function renderBattleState() {
       if (!draft) return; const s = state(); applyButton.disabled = !s.isBattle;
+      const battle = typeof controller.getBattleStatus === 'function' ? controller.getBattleStatus() : s.battleStatus || s;
+      const ownsPause = pauseToken !== undefined;
+      playbackButton.textContent = ownsPause ? '继续战斗' : '暂停战斗'; playbackButton.setAttribute('aria-pressed', String(ownsPause));
+      playbackStatus.textContent = battle.gamePaused ? '原游戏暂停中，请在原游戏菜单继续' + (ownsPause ? ' · 设置也持有暂停' : '') : ownsPause ? '设置已暂停游戏' : battle.editorPaused || s.paused ? '游戏被其他设置暂停来源暂停' : battle.runtimeRunning === false ? '游戏当前未运行' : '可边玩边调 · 草稿未自动应用';
       const status = content.querySelector('[data-battle-status]');
-      if (status) status.textContent = s.isCustom && s.isBattle ? '自定义战局 · 第 ' + s.stage + ' 关 · 编辑中暂停' : s.isBattle ? '原版战局：应用本局后转为自定义，不计入原版成绩。' : '先选择关卡，开始自定义战局。';
+      if (status) status.textContent = s.isCustom && s.isBattle ? '自定义战局 · 第 ' + s.stage + ' 关' + (ownsPause ? ' · 设置暂停中' : ' · 设置与游戏可同时操作') : s.isBattle ? '原版战局：应用本局后转为自定义，不计入原版成绩。' : '先选择关卡，开始自定义战局。';
       for (const b of content.querySelectorAll('[data-spawn]')) b.disabled = !(s.isCustom && s.isBattle);
+      const editing = content.querySelector('[data-editing-stage]');
+      if (editing) { const other = Number(editing.dataset.editingStage); editing.textContent = s.isBattle && s.stage !== other ? '当前正在第 ' + s.stage + ' 关；你正在编辑第 ' + other + ' 关。此关波次下一次开该关时才生效。' : s.isBattle ? '正在编辑当前第 ' + s.stage + ' 关；应用本局会同步未完成的波次。' : '正在编辑第 ' + other + ' 关，开始该关自定义战局后生效。'; editing.classList.toggle('ztps-warning', !!(s.isBattle && s.stage !== other)); }
+      const buildingStatus = content.querySelector('[data-building-status]');
+      if (buildingStatus) { const building = (battle.buildings || []).find(value => value.id === Number(buildingStatus.dataset.buildingStatus)); buildingStatus.textContent = building ? '本局实际已建 ' + building.built + ' 座 · 排队 ' + building.queued + ' 座 · 当前上限 ' + (building.maximum === 0 ? '不设上限' : building.maximum + ' 座') : '尚未开始战局；这里将显示实际已建数量、排队数量与已生效上限。'; }
+      refreshWaveStatus(s, battle); refreshWaveRows(s, battle.waveProgress || s.waveProgress); updateDirty(s);
+    }
+    function refreshWaveRows(s, progress) {
+      const completed = new Set(progress && progress.completed || []);
+      for (const cell of content.querySelectorAll('[data-wave-row-id]')) {
+        const id = cell.dataset.waveRowId, stageId = Number(cell.dataset.waveStage), level = draft.config.levels.find(value => value.id === stageId), wave = level.waves.find(value => value.id === id);
+        if (!s.isBattle || stageId !== s.stage) { cell.textContent = '下次进入第 ' + stageId + ' 关生效'; continue; }
+        if (!id) { cell.textContent = '旧规则：需新局追踪'; continue; }
+        const current = progress && progress.current && progress.current.id === id ? progress.current : null;
+        const queued = progress && Array.isArray(progress.upcomingGroups) ? progress.upcomingGroups.find(value => value.id === id) : null;
+        if (completed.has(id)) cell.textContent = '已完成 · 不补刷\n需重放请新增一组';
+        else if (current) cell.textContent = '当前 · 已调度 ' + current.consumed + '\n剩余 ' + current.remaining + ' / 总量 ' + current.total;
+        else if (queued) cell.textContent = '待出 · 剩余 ' + queued.remaining;
+        else cell.textContent = wave && wave.enabled === false ? '禁用' : '新增 / 待应用';
+        if (wave && wave.enabled === false && (current || queued)) cell.textContent += '\n草稿已禁用，待应用';
+        if (wave && current && wave.count !== current.total) cell.textContent += '\n草稿总量 ' + wave.count + '，待应用';
+        cell.classList.toggle('ztps-wave-completed', completed.has(id)); cell.classList.toggle('ztps-wave-current', !!current);
+      }
+    }
+    function refreshWaveStatus(s, battle) {
+      if (!s.isBattle) { waveStatus.textContent = '当前没有进行中的战局。'; return; }
+      const progress = battle.waveProgress || s.waveProgress;
+      if (!progress) { waveStatus.textContent = '第 ' + s.stage + ' 关 · 波次状态加载中'; return; }
+      const current = progress.current, upcoming = Array.isArray(progress.upcomingGroups) ? progress.upcomingGroups.length : progress.upcomingGroups || 0;
+      const summary = '第 ' + s.stage + ' 关 · 已完成 ' + (progress.completedGroups || 0) + ' 组 · 后续 ' + upcoming + ' 组 · 队列剩余 ' + (progress.remainingTotal || 0) + ' 次';
+      waveStatus.textContent = current ? summary + '\n' + (current.source === 'reinforcement' ? '当前增援组' : '当前第 ' + (Number(current.index) + 1) + ' 组') + '：' + waveLabel(current.type) + ' · 总量 ' + current.total + ' · 已出 ' + current.spawned + ' · 已调度 ' + current.consumed + ' · 剩余 ' + current.remaining : summary + '\n当前没有待出组（在场敌人与未触发的增援不包含在队列中）。';
     }
     function renderEntities(kind) {
       const toolbar = node('div', 'ztps-section-heading'), picker = node('select'); picker.setAttribute('aria-label', '选择' + TABS.find(t => t[0] === kind)[1]);
@@ -272,8 +338,11 @@
       picker.addEventListener('change', () => { selection[kind] = Number(picker.value); wavePage = reinforcementPage = reinforcementIndex = 0; render(); });
       toolbar.appendChild(labeled('编辑对象', picker)); toolbar.appendChild(node('span', 'ztps-help', '只修改配置，不覆盖生成代码。')); content.appendChild(toolbar);
       const index = selection[kind], entity = draft.config[kind][index], original = defaults().config[kind].find(item => item.id === entity.id);
+      if (kind === 'levels') { const editing = node('p', 'ztps-editing-stage'); editing.dataset.editingStage = String(entity.id); content.appendChild(editing); }
+      if (kind === 'buildings') { const actual = node('p', 'ztps-building-status'); actual.dataset.buildingStatus = String(entity.id); content.appendChild(actual); }
       content.appendChild(parameterTable(entity, original, 'config.' + kind + '.' + index));
       if (kind === 'units' || kind === 'zombies') content.appendChild(node('p', 'ztps-help', '伤害与射程 / 动画命中规则不同；攻击频率由原状态机决定。投射物改值只影响修改后发出的投射物。'));
+      if (kind === 'buildings') content.appendChild(node('p', 'ztps-help', '最大建筑数 0 表示不设玩法上限，或输入任意正整数。应用本局立即生效；降低上限不会拆除已有建筑或取消已付费订单，只限制继续新建。'));
       if (kind === 'levels') {
         content.appendChild(node('p', 'ztps-help', '生命倍率先取整（1.75 与 1 相同）；近战伤害最终取整，尸弹不受伤害倍率影响。开局现金 / XP 下局生效。'));
         renderWaves(entity, index); renderReinforcements(entity, index);
@@ -286,13 +355,16 @@
       const prev = button('上一页', () => { setPage(page - 1); render(); }); prev.disabled = page === 0;
       const next = button('下一页', () => { setPage(page + 1); render(); }); next.disabled = page === pages - 1;
       top.appendChild(prev); top.appendChild(next);
-      const add = button('＋ 添加一组', () => { snapshot(); list.push({type: 1, count: 1, delay: 1, enabled: true}); setPage(Math.floor((list.length - 1) / pageSize)); updateDirty(); render(); });
+      const add = button('＋ 添加一组', () => { snapshot(); const wave = {type: 1, count: 1, delay: 1, enabled: true}; if (allowWait) wave.id = newWaveId(); list.push(wave); setPage(Math.floor((list.length - 1) / pageSize)); updateDirty(); render(); });
       add.disabled = list.length >= (allowWait ? 10000 : 1000); top.appendChild(add); area.appendChild(top);
       const scroll = node('div', 'ztps-table-scroll'), table = node('table', 'ztps-table ztps-wave-table'), head = node('tr');
       for (const title of ['序号', '启用', '类型', '数量 / 次数', '调度延迟', '顺序']) head.appendChild(node('th', '', title));
       const thead = node('thead'); thead.appendChild(head); table.appendChild(thead); const body = node('tbody');
       list.slice(page * pageSize, (page + 1) * pageSize).forEach((wave, offset) => {
-        const i = page * pageSize + offset, row = node('tr'); if (wave.enabled === false) row.classList.add('ztps-disabled-row'); row.appendChild(node('td', '', i + 1));
+        const i = page * pageSize + offset, row = node('tr'); if (wave.enabled === false) row.classList.add('ztps-disabled-row');
+        const indexCell = node('td', 'ztps-wave-index', i + 1);
+        if (allowWait) { const live = node('small', 'ztps-wave-row-status'); live.dataset.waveRowId = wave.id || ''; live.dataset.waveStage = String(draft.config.levels[Number(prefix.split('.')[2])].id); indexCell.appendChild(live); }
+        row.appendChild(indexCell);
         const enabledCell = node('td'), enabled = node('input'); enabled.type = 'checkbox'; enabled.checked = wave.enabled !== false; enabled.dataset.path = prefix + '.' + i + '.enabled'; enabled.setAttribute('aria-label', '第 ' + (i + 1) + ' 组启用');
         enabled.addEventListener('change', () => { snapshot(); wave.enabled = enabled.checked; updateDirty(); row.classList.toggle('ztps-disabled-row', !enabled.checked); }); enabledCell.appendChild(enabled); row.appendChild(enabledCell);
         const typeCell = node('td'), typeSelect = node('select'); for (let t = allowWait ? 0 : 1; t <= 5; t++) option(typeSelect, t, waveLabel(t)); typeSelect.value = String(wave.type); typeSelect.dataset.path = prefix + '.' + i + '.type'; typeSelect.setAttribute('aria-label', '第 ' + (i + 1) + ' 组类型');
@@ -301,21 +373,16 @@
         const commands = node('td', 'ztps-row-actions');
         const up = button('↑', () => { snapshot(); [list[i - 1], list[i]] = [list[i], list[i - 1]]; if (i % pageSize === 0) setPage(page - 1); updateDirty(); render(); }); up.disabled = i === 0; up.setAttribute('aria-label', '第 ' + (i + 1) + ' 组上移');
         const down = button('↓', () => { snapshot(); [list[i + 1], list[i]] = [list[i], list[i + 1]]; if (i % pageSize === pageSize - 1) setPage(page + 1); updateDirty(); render(); }); down.disabled = i === list.length - 1; down.setAttribute('aria-label', '第 ' + (i + 1) + ' 组下移');
-        const remove = button('删除', () => { snapshot(); list.splice(i, 1); updateDirty(); render(); }); remove.disabled = list.length === 1; remove.setAttribute('aria-label', '删除第 ' + (i + 1) + ' 组');
+        const remove = button('删除', () => { snapshot(); list.splice(i, 1); updateDirty(); render(); }); remove.disabled = !allowWait && list.length === 1; remove.setAttribute('aria-label', '删除第 ' + (i + 1) + ' 组');
         commands.appendChild(up); commands.appendChild(down); commands.appendChild(remove); row.appendChild(commands); body.appendChild(row);
       });
       table.appendChild(body); scroll.appendChild(table); area.appendChild(scroll); return area;
     }
     function renderWaves(level, index) {
       const section = node('section', 'ztps-section'); section.appendChild(node('h2', '', '关卡波次顺序'));
-      section.appendChild(node('p', 'ztps-help', '从上到下执行；0 为等待。数量是此组调度次数，delay 是原始调度值而不是秒，先向零取整（0.3 → 0）。关闭“启用”跳过整组。'));
+      section.appendChild(node('p', 'ztps-help', '从上到下执行；0 为等待。数量是此组调度次数，delay 是原始调度值而不是秒，先向零取整（0.3 → 0）。关闭“启用”跳过整组。点击“应用本局”会更新本关运行波次；上方实时显示当前组、已出与剩余。'));
       section.appendChild(waveTable(level.waves, 'config.levels.' + index + '.waves', wavePage, value => { wavePage = value; }, true));
-      const applyWaves = button('替换本局后续队列…', () => action(async () => {
-        const s = state(); if (!s.isCustom || !s.isBattle) throw new Error('仅可修改正在进行的自定义战局。');
-        if (s.stage !== level.id) throw new Error('当前战局为第 ' + s.stage + ' 关，请先选择对应关卡再替换后续队列。');
-        if (!win.confirm('保留当前正在出怪的这一组；之后的全部队列将替换为此关编辑表的所有启用组（不会自动扣除已出现过的组）。继续吗？')) return;
-        const report = await controller.applyUpcomingWaves(clone(draft.config)); notice('已替换后续队列：保留当前组，后续 ' + report.upcomingGroups + ' 组。不会修改已经生成的僵尸。');
-      })); applyWaves.disabled = !(state().isCustom && state().isBattle); section.appendChild(applyWaves); content.appendChild(section);
+      section.appendChild(node('p', 'ztps-help', '修改当前组总量时保留已调度数量；已完成的组不会因为应用而重播。想再次发送相同一波，请“添加一组”创建新组；移动只改变顺序，不会创建新组。')); content.appendChild(section);
     }
     function renderReinforcements(level, index) {
       const section = node('section', 'ztps-section'); section.appendChild(node('h2', '', '基地生命阈值增援'));
@@ -350,10 +417,10 @@
       start.appendChild(button('回到原版模式', () => action(async () => { if (!win.confirm('切回原版默认规则并回到主菜单？当前战局会结束，保存的自定义规则保留。')) return; await controller.restoreOriginal(); })));
       start.appendChild(node('p', 'ztps-help', '自定义战局与原版进度分开；面板内修改不会自动覆盖磁盘 JSON。')); content.appendChild(start);
       const spawn = node('section', 'ztps-section'); spawn.appendChild(node('h2', '', '一键刷怪'));
-      spawn.appendChild(node('p', 'ztps-help', '每点一次，在敌方入口生成一只。面板打开时战斗暂停，关闭面板后继续行动。手动刷怪不受“自动波次 / 允许类型”限制。'));
+      spawn.appendChild(node('p', 'ztps-help', '每点一次，在敌方入口生成一只。点击上方“继续战斗”可边看边刷；手动刷怪不受“自动波次 / 允许类型”限制。'));
       const cards = node('div', 'ztps-spawn-grid');
       ZOMBIES.forEach((name, type) => {
-        const b = button('', () => action(async () => { await controller.spawnZombie(type, 1); notice('已生成 1 只' + name + '。关闭面板（Esc）继续战斗。'); }), 'ztps-spawn'); b.dataset.spawn = String(type);
+        const b = button('', () => action(async () => { await controller.spawnZombie(type, 1); notice('已生成 1 只' + name + (pauseToken !== undefined ? '，点击“继续战斗”即可行动。' : '。')); }), 'ztps-spawn'); b.dataset.spawn = String(type);
         const icon = node('span', 'ztps-zombie-icon ztps-zombie-' + type); icon.setAttribute('aria-hidden', 'true'); b.appendChild(icon); b.appendChild(node('strong', '', name)); b.appendChild(node('small', '', '＋ 1 只')); cards.appendChild(b);
       }); spawn.appendChild(cards); content.appendChild(spawn);
       const rules = node('section', 'ztps-section'); rules.appendChild(node('h2', '', '出怪与能力规则'));
@@ -392,33 +459,33 @@
       if (opened || disposed) return;
       try { pauseToken = controller.pauseForEditor(); } catch (error) { notice(error.message, true); return; }
       previousFocus = doc.activeElement; opened = true; overlay.hidden = false; entry.hidden = true;
-      if (!draft) { const next = controller.getDraft(); draft = clone(next); baseline = clone(next); selectedPresetId = state().selectedPresetId || ''; }
+      doc.body.classList.add('ztps-docked'); entry.setAttribute('aria-expanded', 'true');
+      const s = state();
+      if (!draft) { const next = controller.getDraft(); draft = clone(next); baseline = clone(next); selectedPresetId = s.selectedPresetId || ''; baselineSaved = !!selectedPresetId; }
+      if (s.isBattle && s.stage >= 1 && s.stage <= 4 && s.stage !== lastBattleStage) { selection.levels = s.stage - 1; lastBattleStage = s.stage; }
       refreshPresets(); if (selectedPresetId) presetName.value = (controller.listPresets().find(p => p.id === selectedPresetId) || {}).name || '';
       render(); notice(''); closeButton.focus();
+      if (typeof win.setInterval === 'function') pollTimer = win.setInterval(() => { if (opened) renderBattleState(); }, 250);
     }
     function close() {
       if (!opened) return; opened = false; overlay.hidden = true; entry.hidden = false;
-      controller.resumeFromEditor(pauseToken); pauseToken = undefined;
+      doc.body.classList.remove('ztps-docked'); entry.setAttribute('aria-expanded', 'false');
+      if (pollTimer !== undefined) { win.clearInterval(pollTimer); pollTimer = undefined; }
+      if (pauseToken !== undefined) { const held = pauseToken; pauseToken = undefined; controller.resumeFromEditor(held); }
       if (previousFocus && typeof previousFocus.focus === 'function' && previousFocus.isConnected !== false) previousFocus.focus(); else if (canvas) canvas.focus();
       alignEntry();
     }
     function keys(event) {
       if (event.key === 'F2') { consumedKeys.add(event.key); event.preventDefault(); event.stopImmediatePropagation(); if (opened) close(); else open(); return; }
       if (!opened) return;
-      if (event.key === 'Escape') { consumedKeys.add(event.key); event.preventDefault(); event.stopImmediatePropagation(); close(); return; }
-      if (event.key === 'Tab') {
-        const focusable = Array.from(modal.querySelectorAll('button,input,select,textarea,a[href],[tabindex]')).filter(el => !el.disabled && !el.hidden && el.tabIndex !== -1);
-        if (!focusable.length) { event.preventDefault(); modal.focus(); return; }
-        const first = focusable[0], last = focusable[focusable.length - 1];
-        if (event.shiftKey && (doc.activeElement === first || !modal.contains(doc.activeElement))) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && (doc.activeElement === last || !modal.contains(doc.activeElement))) { event.preventDefault(); first.focus(); }
-      }
+      const inPanel = modal.contains(event.target) || modal.contains(doc.activeElement);
+      if (event.key === 'Escape' && inPanel) { consumedKeys.add(event.key); event.preventDefault(); event.stopImmediatePropagation(); close(); }
     }
-    // Stop bubbling events before the game's global input listeners. Capture the
-    // close key so it cannot also toggle the game's own pause/menu state.
-    for (const event of ['keydown', 'keyup', 'pointerdown', 'pointerup', 'click', 'wheel', 'contextmenu']) overlay.addEventListener(event, e => e.stopPropagation());
+    // Editor keydowns never trigger the game. Keyup/pointerup remain available
+    // to release a key/click originally held while interacting with the canvas.
+    overlay.addEventListener('keydown', e => e.stopPropagation());
     on(win, 'keydown', keys, true);
-    on(win, 'keyup', event => { const consumed = consumedKeys.delete(event.key); if (opened || consumed) event.stopImmediatePropagation(); }, true);
+    on(win, 'keyup', event => { if (consumedKeys.delete(event.key)) event.stopImmediatePropagation(); }, true);
     on(win, 'resize', alignEntry);
     if (typeof win.ResizeObserver === 'function' && canvas) { const ro = new win.ResizeObserver(alignEntry); ro.observe(canvas); cleanups.push(() => ro.disconnect()); }
     if (typeof controller.subscribe === 'function') { const unsubscribe = controller.subscribe(() => { if (opened) { renderBattleState(); refreshPresets(); } }); if (typeof unsubscribe === 'function') cleanups.push(unsubscribe); }

@@ -19,10 +19,11 @@ function items(list) {
 }
 function fixture(config = defaults(), start = true, rules) {
   const manifest = json('public/assets/manifest.json');
+  const drawingCommands=[];
   const drawing = new Proxy({Width:()=>800,Height:()=>600,LoadSurface(name) {
     const image = manifest.images[name]; assert.ok(image,name);
     return {Width:()=>image.width,Height:()=>image.height};
-  }},{get:(target,key)=>target[key] || (()=>0)});
+  }},{get:(target,key)=>target[key] || ((...args)=>{drawingCommands.push([key,...args]);return 0;})});
   const input = new Proxy({},{get:()=>()=>0});
   const audio = {LoadSample:name=>({name}),PlaySample:sample=>({sample}),StopChannel:()=>0};
   class App {
@@ -40,7 +41,7 @@ function fixture(config = defaults(), start = true, rules) {
   device.OnCreate(); device.OnUpdate();
   const game = target.ZTPGamePort.state.bb_Game;
   if (start) game.bbPlayGame(1);
-  return {target,game,port:target.ZTPGamePort,ticks(count=1){while(count-->0)game.bbGameTick(0);}};
+  return {target,game,drawingCommands,port:target.ZTPGamePort,ticks(count=1){while(count-->0)game.bbGameTick(0);}};
 }
 function snapshot(h) {
   const g=h.game;
@@ -129,6 +130,62 @@ test('production and cooldown retain percentages without changing paid orders, r
   assert.equal(items(g.bbpeople).filter(p=>p.bbunit.bbtype===0).length,1,'the paid order still produces once');
 });
 
+test('building maxima can exceed every original cap and zero removes the gameplay cap live',()=>{
+  const c=defaults();for(const b of c.buildings){b.maximum=100;b.cost=1;b.buildTicks=1;}
+  assert.equal(GameConfig.validate(c).buildings[1].maximum,100);
+  const h=fixture(c),g=h.game;g.bbztp.bbcash=1000;
+  for(let i=0;i<7;i++){g.bbBuyBuilding(g.bbbuildings[1]);h.ticks();}
+  assert.equal(g.bbztp.bbbuildingcount[1],8,'salvage yards continue past the old five-yard cap');
+  g.bbztp.bbbuildingcount[0]=15;g.bbBuyBuilding(g.bbbuildings[0]);h.ticks();
+  assert.equal(g.bbztp.bbbuildingcount[0],16);assert.equal(g.bbztp.bbmaxforce,80);
+  const next=GameConfig.getCurrent(h.target);for(const b of next.buildings)b.maximum=0;
+  const result=GameConfig.updateLive(h.target,next);
+  assert.ok(result.applied.includes('$.buildings[1].maximum'));
+  assert.ok(!result.deferred.some(p=>p.endsWith('.maximum')));
+  const chapel=g.bbbuildings[5];g.bbztp.bbbuildingcount[3]=1;
+  chapel.bbUpdate(g.bbztp);assert.equal(chapel.bbenabled,1);assert.equal(chapel.bbcapacity,0);
+  assert.ok(!chapel.bbhint.includes('maximum'),'an unbuilt unlimited building is not treated as full');
+  g.bbBuyBuilding(g.bbbuildings[1]);h.ticks();assert.equal(g.bbztp.bbbuildingcount[1],9);
+});
+
+test('lowering a live building limit preserves existing buildings and paid orders but rejects new ones',()=>{
+  const c=defaults();Object.assign(c.buildings[1],{maximum:0,cost:1,buildTicks:2});
+  const h=fixture(c),g=h.game,b=g.bbbuildings[1];g.bbztp.bbcash=100;
+  g.bbztp.bbbuildingcount[1]=8;g.bbBuyBuilding(b);g.bbBuyBuilding(b);
+  assert.equal(b.bborders,2);const paid=g.bbztp.bbcash;
+  const next=GameConfig.getCurrent(h.target);next.buildings[1].maximum=5;
+  GameConfig.updateLive(h.target,next);b.bbUpdate(g.bbztp);
+  assert.equal(g.bbztp.bbbuildingcount[1],8);assert.equal(b.bborders,2);
+  assert.equal(b.bbenabled,0);assert.equal(b.bbcapacity,1);
+  g.bbBuyBuilding(b);assert.equal(b.bborders,2);assert.equal(g.bbztp.bbcash,paid);
+  h.ticks(4);assert.equal(g.bbztp.bbbuildingcount[1],10);assert.equal(b.bborders,0);
+  b.bbUpdate(g.bbztp);assert.equal(b.bbenabled,0);assert.equal(g.bbztp.bbcash,paid);
+});
+
+test('unlimited building counts remain bounded by the technical safety line including queued orders',()=>{
+  const c=defaults();Object.assign(c.buildings[1],{maximum:0,cost:0,buildTicks:1});
+  const h=fixture(c),g=h.game,b=g.bbbuildings[1],limit=GameConfig.BUILDING_SAFETY_LIMIT;
+  assert.equal(limit,100000);g.bbztp.bbbuildingcount[1]=limit-1;
+  g.bbBuyBuilding(b);g.bbBuyBuilding(b);assert.equal(b.bborders,1);
+  h.ticks();assert.equal(g.bbztp.bbbuildingcount[1],limit);assert.equal(b.bborders,0);
+  g.bbBuyBuilding(b);b.bbUpdate(g.bbztp);assert.equal(b.bborders,0);assert.equal(b.bbenabled,0);
+});
+
+test('large building counts render only finite original slots and restore real counts after errors',()=>{
+  const c=defaults();for(const b of c.buildings)b.maximum=0;
+  const h=fixture(c,true,CustomRules.defaults()),g=h.game;
+  g.bbztp.bbbuildingcount.fill(100000);h.drawingCommands.length=0;
+  g.bbDrawPark();g.bbDrawPark2();
+  assert.deepEqual(Array.from(g.bbztp.bbbuildingcount),[100000,100000,100000,100000,100000,100000]);
+  assert.ok(h.drawingCommands.length<500,'decorative rendering is constant-sized, not a loop per owned building');
+  for(const command of h.drawingCommands)for(const value of command)if(typeof value==='number')assert.ok(Number.isFinite(value),command[0]);
+  const before=g.bbztp.bbcash;h.ticks();assert.ok(g.bbztp.bbcash>before);
+  assert.equal(g.bbztp.bbmaxforce,500000);
+  const draw=g.bbblood.bbDraw;g.bbblood.bbDraw=()=>{throw Error('fixture render failure');};
+  assert.throws(()=>g.bbDrawPark(),/fixture render failure/);g.bbblood.bbDraw=draw;
+  assert.equal(g.bbztp.bbbuildingcount[0],100000);assert.equal(g.bbztp.bbbuildingcount[1],100000);
+});
+
 test('live projectiles keep launched damage while the next bottle and corpse use new values',()=>{
   const h=fixture(),g=h.game,c=defaults();
   g.bbAddBottle(0,100,-10,0,0,0);g.bbAddFling(0,100,0);
@@ -140,7 +197,7 @@ test('live projectiles keep launched damage while the next bottle and corpse use
   assert.equal(items(g.bbbottles)[1].bbdamage,23);assert.equal(items(g.bbflinglist)[1].bbdamage,37);
 });
 
-test('structural values, wave order and reinforcements defer until the next reset and then reach real templates',()=>{
+test('dependencies, population and waves defer while a building maximum applies immediately',()=>{
   const h=fixture(),g=h.game,c=defaults(),mob=h.port.bb_ZombieMob;
   const oldQueue=items(mob.bbqueue).map(w=>[w.bbtype,w.bbcount,w.bbdelay]),cash=g.bbztp.bbcash;
   c.units[0].people=3;c.units[1].dependency=3;c.buildings[0].maximum=9;c.buildings[2].dependency=1;
@@ -148,12 +205,13 @@ test('structural values, wave order and reinforcements defer until the next rese
   c.levels[0].waves=[{type:4,count:2,delay:1},{type:2,count:1,delay:0,enabled:false}];
   c.levels[0].reinforcements=[{threshold:14000,calls:[{type:5,count:3,delay:2}]}];
   const result=GameConfig.updateLive(h.target,c);
-  assert.equal(result.deferred.length,9);assert.equal(g.bbunits[0].bbpeople,1);assert.equal(g.bbunits[1].bbdependency,2);
-  assert.equal(g.bbbuildings[0].bbmaximum,15);assert.equal(g.bbbuildings[2].bbdependency,0);
+  assert.equal(result.deferred.length,8);assert.equal(g.bbunits[0].bbpeople,1);assert.equal(g.bbunits[1].bbdependency,2);
+  assert.equal(g.bbbuildings[0].bbmaximum,9);assert.equal(g.bbbuildings[2].bbdependency,0);
+  assert.ok(result.applied.includes('$.buildings[0].maximum'));
   assert.equal(g.bbpowers[1].bblocked,1);assert.equal(g.bbztp.bbcash,cash);
   assert.deepEqual(items(mob.bbqueue).map(w=>[w.bbtype,w.bbcount,w.bbdelay]),oldQueue);
   assert.deepEqual(plain(h.target.bb_leveldata_level1),GameConfig.compile(defaults()).raw.bb_leveldata_level1);
-  assert.deepEqual(GameConfig.getCurrent(h.target),c);
+  assert.deepEqual(GameConfig.getCurrent(h.target),GameConfig.validate(c));
   g.bbResetGame(1);
   assert.equal(g.bbunits[0].bbpeople,3);assert.equal(g.bbunits[1].bbdependency,3);
   assert.equal(g.bbbuildings[0].bbmaximum,9);assert.equal(g.bbbuildings[2].bbdependency,1);
@@ -178,8 +236,8 @@ test('pause dialog and still-running result screens keep structural settings def
     const h=fixture(),c=defaults();h.game.bbmainState=state;
     c.units[0].people=3;c.buildings[0].maximum=9;c.levels[0].waves[0].enabled=false;
     const result=GameConfig.updateLive(h.target,c);
-    assert.equal(h.game.bbunits[0].bbpeople,1);assert.equal(h.game.bbbuildings[0].bbmaximum,15);
-    assert.deepEqual(result.deferred,['$.units[0].people','$.buildings[0].maximum','$.levels[0].waves']);
+    assert.equal(h.game.bbunits[0].bbpeople,1);assert.equal(h.game.bbbuildings[0].bbmaximum,9);
+    assert.deepEqual(result.deferred,['$.units[0].people','$.levels[0].waves']);
     if(state===6){h.game.bbContinueGame();assert.equal(h.game.bbmainState,2);assert.equal(h.game.bbunits[0].bbpeople,1);}
   }
 });

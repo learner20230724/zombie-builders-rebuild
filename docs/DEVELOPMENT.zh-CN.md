@@ -18,7 +18,7 @@ npm run config:check
 
 浏览器在页面启动时读取配置。调整配置不需要转译或重新生成代码。配置有误时会阻止启动并报告对应 JSON 字段，不会悄悄退回默认值。
 
-仅在外置 JSON 内容未变时恢复已应用的自定义会话；外置源配置变更后，下次启动优先使用新文件，并在设置状态中提示。只保存预设不会选择为启动规则。恢复原版选择基准，不改写外置文件。
+外置玩法设置未变时恢复已应用的自定义会话；数值或波次顺序变更后，下次启动优先使用新文件，并在设置中提示。波次 ID 是身份元数据，不参与此比较或原版／自定义分类，单纯补 ID 不会重置 v0.3.0 的已选会话。只保存预设不会选择为启动规则。恢复原版选择基准，不改写外置文件。
 
 ### 桌面开发
 
@@ -112,7 +112,9 @@ Windows 可编辑配置位于 **`%APPDATA%\ZombieBuilders\config`**，进度与�
 }
 ```
 
-`maximum` 是该建筑的数量上限。`dependency: 0` 表示无前置，其他值指向所需建筑的 ID。废料场收入与房车人口通过预设中独立的 `rules.economy` 字段调整，不通过建筑说明文字调整。
+`maximum` 为整数 **0–100,000**：**0 取消玩法数量上限**，正数设置上限；引擎另有每类 100,000 的新订单安全门槛。计数包含已完成建筑与排队订单。本局降低上限不拆建筑、不取消已付订单，只在数量已达／超过新上限时阻止继续下单。原版默认仍为房车 15、废料场 5、其余类型 1。
+
+绘图仍使用原有有限位置，但额外已完成建筑真实计入收入和人口；重复建造解锁建筑不会凭空增加技能或新美术。`dependency: 0` 表示无前置，其他值指向所需建筑的 ID。废料场收入与房车人口通过预设中独立的 `rules.economy` 字段调整，不通过建筑说明文字调整。
 
 ### 示例：调整收割机技能
 
@@ -147,9 +149,9 @@ Windows 可编辑配置位于 **`%APPDATA%\ZombieBuilders\config`**，进度与�
   "zombieDamageMultiplier": 1,
   "zombieHealthMultiplier": 1,
   "waves": [
-    { "type": 1, "count": 5, "delay": 3 },
-    { "type": 0, "count": 1, "delay": 4 },
-    { "type": 2, "count": 2, "delay": 3 }
+    { "id": "stage-1-wave-1", "type": 1, "count": 5, "delay": 3 },
+    { "id": "stage-1-wave-2", "type": 0, "count": 1, "delay": 4 },
+    { "id": "stage-1-wave-3", "type": 2, "count": 2, "delay": 3 }
   ]
 }
 ```
@@ -157,6 +159,8 @@ Windows 可编辑配置位于 **`%APPDATA%\ZombieBuilders\config`**，进度与�
 波次的 `type: 0` 表示等待条目，**1–5** 分别对应僵尸 ID **0–4**。`count` 设置该条目的数量。`delay` 是波次调度参数，不是战斗 tick，也不是精确的现实秒数；游戏在调度前会将其截断为整数，调整时建议使用整数。
 
 波次与增援调用可添加 **`"enabled": false`** 禁用，省略则启用；允许空波次列表。`count` 必须保持正整数，不要用 0 表示关闭，应禁用或删除条目。默认调度不等场上僵尸被杀完，有限队列结束后也不会自动循环。
+
+主波次 **`id`** 在加载源配置时可省略；提供时须在该关唯一，为 1–80 位 ASCII 字母、数字、下划线或连字符。校验会为原配置缺失的 ID 补成 `stage-1-wave-1` 等，开始战局后与真实队列绑定。修改或移动同一组要保留 ID，编辑器新增行生成新的 `wave-...` ID。它标识一组波次，不是僵尸类型，也不是画面中的行号。
 
 现有生命计算也会先将 `zombieHealthMultiplier` 转为整数，例如 `1.75` 实际使用的生命倍率为 `1`；四种近战僵尸的伤害先乘倍率，再把结果截断为整数；该倍率不影响尸体投掷者的尸弹。
 
@@ -181,7 +185,7 @@ Windows 可编辑配置位于 **`%APPDATA%\ZombieBuilders\config`**，进度与�
 | `src/game-config.js` | 校验 JSON，并适配到游戏数值表与行为 |
 | `src/custom-rules.js` | 在生成代码之外校验和应用出怪、能力开关 |
 | `src/customization.js` | 命名预设、明确的实时操作与自定义成绩隔离 |
-| `src/settings-ui.js` / `.css` | 游戏内覆盖式设置、字段编辑、波次控制与沙盒按钮 |
+| `src/settings-ui.js` / `.css` | 非模态并列设置、字段编辑、波次控制与沙盒按钮 |
 | `src/generated-game.js` | 游戏状态、生产、战斗、界面与关卡逻辑 |
 | `src/runtime.js` | Canvas 绘制、Web Audio、输入与浏览器存储 |
 | `src/physics.js` | 物理集成 |
@@ -197,6 +201,8 @@ Windows 可编辑配置位于 **`%APPDATA%\ZombieBuilders\config`**，进度与�
 - `apply(target, config)`：在 `bb_Init()` 后、`bb_Main()` 前直接应用。
 - `getCurrent(target)`：返回最新完整配置的深拷贝，包括延期到下一局的数值。
 - `updateLive(target, config, options)`：更新已初始化游戏，返回含变化 JSON 路径的 `{applied, deferred}`。传入完整配置，不是局部补丁。
+- `getWaveProgress(target)`：读取当前／后续组、已调度／已出数量、已完成 ID 与可信组身份。
+- `applyLiveWaves(target, config)`：按身份合并当前关尚未出场队列，返回 `{applied, deferred, notes, requiresNewBattle, reason, progress}`。
 
 ### 实时生效约定
 
@@ -214,10 +220,16 @@ const result = GameConfig.updateLive(globalThis, next, {
 - `ratio` 按各活体原剩余比例映射到新上限，四舍五入并保底 1 生命，含基地与已转化友军；不会复活死者。`new-only` 保留已有单位各自的真实上限，新生成单位使用新值。
 - 移速更新保留方向、临时停步或减速。共用费用、伤害和命中几何在后续行为使用新值；飞行中的投射物保留发射时伤害。
 - 正在训练、蓄力或冷却的计时器保留剩余进度，非整数剩余 tick 向上取整，至少 1 tick。已支付资源和人口不重新结算。
-- 战局存在期间，单位 `people`／`dependency`、建筑 `maximum`／`dependency`、技能 `unlockAfterStage`、关卡 `startingCash`／`startingXp`／`waves`／`reinforcements` 延期到下次重置。暂停、胜利和失败界面也不提前改变该局的结构设置；菜单更新没有活动战局需要保留。
+- 建筑 `maximum` 在本局更新，降低上限保留建筑及已付订单。单位 `people`／`dependency`、建筑 `dependency`、技能 `unlockAfterStage`、开局资源和增援定义仍延期到下次重置。底层 `updateLive` 也暂缓波次数组，但玩家使用的 `Customization.applyDraft` 会紧接着对当前关调用 `applyLiveWaves`，本局同步；其他关卡波次留待开始对应关时生效。菜单更新没有活动战局需要保留。
 - 实时更新先完整校验、准备修改计划，再提交；不是任意修改生成代码内部字段的接口。
 
 面向玩家的操作应通过 **`Customization`**，不要只调用底层适配器：前者负责模式切换、预设、成绩隔离及编辑器暂停。
+
+### 非模态编辑
+
+视口大于 **850 CSS 像素**时，设置在右侧占独立区域；**850 及以下**为游戏在上、设置在下。画布逻辑坐标仍为 800×600，实际显示区域随布局缩放。打开设置取得编辑器暂停令牌；**“继续战斗”**释放令牌但不关面板，**“暂停战斗”**重新取得令牌，不强制清除游戏自身的暂停。关闭时按编辑器暂停前的运行状态恢复，不补跑编辑期间的时间。
+
+F2 全局开关面板，焦点在设置内时 Esc 关闭；表单输入与游戏控制分开。继续战斗、保存命名预设都不隐式应用，草稿必须明确提交。
 
 ### 预设、规则与沙盒
 
@@ -233,13 +245,27 @@ const result = GameConfig.updateLive(globalThis, next, {
 | `applyLive(config, {healthPolicy})` | 将活动原版局转为自定义，再应用支持的字段 |
 | `applyRules(rules)` | 在自定义局应用行为开关 |
 | `spawnZombie(type, count = 1)` | 自定义局立即生成类型 0–4 的僵尸；单次 1–20 只 |
-| `applyUpcomingWaves(config)` | 明确替换后续队列，保存预设不会暗中触发 |
+| `applyUpcomingWaves(config)` | 兼容用波次接口：按本局进度安全同步当前关，不套用其他草稿属性 |
+| `getBattleStatus()` | 读取运行／编辑／游戏暂停、建筑数量、角色数量和实际波次进度 |
 | `restoreOriginal()` | 重载回原版，不删除预设 |
 | `pauseForEditor()`、`resumeFromEditor(token)` | 安全暂停编辑器，关闭后不补跑暂停期间的战斗 |
 
 完整玩家草稿应使用 `applyDraft`，不要把 `applyLive` 与 `applyRules` 串联：规则有误时，不应把正确的配置先应用一半。校验失败不改变模式、存储或当前配置。
 
-`applyUpcomingWaves` 保留队首当前组的剩余数量与调度计时，再将**该组之后的整个队列，包含已插入但尚未出场的增援**，替换为草稿该关全部启用的波次。已出场敌人不受影响。它不自动判断草稿哪些行已经出过，不等待清场，也不重置增援触发历史；已触发过的阈值不会再次触发。此操作不会把其他尚未应用的草稿属性一起提交。
+### 本局波次合并
+
+普通 `applyDraft` 就更新当前关波次，不再需要独立“替换／重播”按钮。返回值中的 `waveReport` 含 `{applied, deferred, notes, requiresNewBattle, reason, progress, stage, otherStages}`；应用不会重开战局，也不等待清场。
+
+- 未完成 ID 的**剩余量 = `max(0, 目标总量 - 已调度量)`**。`consumed` 包含等待和被自动类型开关过滤的调度次数；`spawned` 才是实际生成数量。修改 `count` 是修改本局期望总量，不是在后面追加这么多。
+- 类型变更只作用于未出余量；调整顺序保留各 ID 已调度数。禁用／删除未完成组会移除其剩余队列，重新启用尚未完成的同 ID 可恢复未消费余量。
+- 把数量降到已调度量或以下，将该 ID 完成并取消剩余。本局已完成 ID 即使加大数量也不补刷，改动留给下一局；确需再出一组，请新增 ID。
+- 保留已有各组计时和调度时钟。新 `delay` 供下次原有 `time > truncate(delay)` 判断使用，不重置时间、不按新间隔重算百分比；在场敌人不变。
+- 已入队增援对象保留原相对插槽，不被主波次合并删除，也不重置增援触发历史。增援定义修改仍需下一局。
+- 修改其他关卡会保存配置，不改当前关队列；报告通过 `otherStages`、延期路径提示下次对应关才生效。
+
+缺少可靠 ID 的旧导入预设会取得保留的 `legacy-untracked-...` 标记，可保存并用于新开自定义局，但不能按行号猜它属于本局哪组。新局绑定之前，波次报告 `requiresNewBattle: true` 与原因，不改队列；草稿其他有效属性仍可应用。载入、保存、导出和普通深拷贝保留这些 ID，手写新组不要使用该保留前缀。
+
+`getBattleStatus()` 分开提供 `runtimeRunning`、`editorPaused`、`editorPauseCount`、`gamePaused`、`battleRunning`，并包含 `buildings: [{id, built, queued, maximum}]`、`entities: {people, zombies, converted, total}`、`waveProgress`、`wavePending`、`waveNotes`。`getState()` 通过 `battleStatus` 和核心别名提供相同信息。进度含 `current`、`upcomingGroups`、`remainingTotal`、`completedGroups`、`completed`、`knownIds`；组信息含 `id`、`type`、`total`、`consumed`、`spawned`、`remaining`、`source`（`wave` 或 `reinforcement`）。这些是**实际运行状态**，不是编辑器尚未提交的草稿。
 
 规则格式：
 

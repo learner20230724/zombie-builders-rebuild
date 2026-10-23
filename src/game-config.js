@@ -7,6 +7,8 @@
 })(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   const KINDS = ['units', 'zombies', 'buildings', 'powers', 'levels'];
+  // A zero maximum removes the gameplay cap, not the engine's numeric guard.
+  const BUILDING_SAFETY_LIMIT = 100000;
   // These original table cells have no gameplay consumer. They are deliberately
   // not JSON options. Keeping them here makes the default raw tables lossless.
   const UNIT_ROWS = [
@@ -64,8 +66,10 @@
     if (type !== undefined && item.type !== type) fail(path + '.type', 'fixed runtime type must be ' + type);
   }
   function wave(item, path, allowWait) {
-    object(item, path, ['type', 'count', 'delay'], ['enabled']);
+    object(item, path, ['type', 'count', 'delay'], allowWait ? ['enabled','id'] : ['enabled']);
     if ('enabled' in item && typeof item.enabled !== 'boolean') fail(path + '.enabled', 'expected a boolean');
+    if ('id' in item && (typeof item.id !== 'string' || !/^[A-Za-z0-9_-]{1,80}$/.test(item.id)))
+      fail(path + '.id', 'expected 1..80 ASCII letters, digits, underscores or hyphens');
     integer(item.type, path + '.type', allowWait ? 0 : 1, 5);
     integer(item.count, path + '.count', 1, 100000);
     // The original bbInit/bbSpawn convert this to int, intentionally including
@@ -105,7 +109,7 @@
       integer(item.buildTicks, path + '.buildTicks', 1);
       integer(item.dependency, path + '.dependency', 0, 5);
       if (item.dependency !== 0 && item.dependency === item.id) fail(path + '.dependency', 'a building cannot require itself');
-      integer(item.maximum, path + '.maximum', 1, item.id === 0 ? 15 : item.id === 1 ? 5 : 1);
+      integer(item.maximum, path + '.maximum', 0, BUILDING_SAFETY_LIMIT);
       string(item.description, path + '.description');
     });
     // Existing initial buildings are trailer 0 and yard 1; dependency 0 is the
@@ -145,6 +149,11 @@
       integer(item.startingCash, path + '.startingCash'); integer(item.startingXp, path + '.startingXp');
       array(item.waves, path + '.waves', 0, 10000);
       item.waves.forEach((w,i) => wave(w, path + '.waves[' + i + ']', true));
+      const waveIds = new Set();
+      item.waves.forEach((w,i) => {
+        if ('id' in w && waveIds.has(w.id)) fail(path+'.waves['+i+'].id','duplicate wave id');
+        if ('id' in w) waveIds.add(w.id);
+      });
       array(item.reinforcements, path + '.reinforcements', 0, 1000);
       const thresholds = new Set();
       item.reinforcements.forEach((entry,i) => {
@@ -165,6 +174,15 @@
     });
     const result = JSON.parse(JSON.stringify(input));
     for (const kind of KINDS) result[kind].sort((a,b) => a.id-b.id);
+    for (const level of result.levels) {
+      const ids = new Set(level.waves.filter(w => 'id' in w).map(w => w.id));
+      level.waves.forEach((w,i) => {
+        if ('id' in w) return;
+        const base = 'stage-'+level.id+'-wave-'+(i+1); let id = base, suffix = 0;
+        while (ids.has(id)) id = base+'-auto'+(++suffix);
+        w.id = id; ids.add(id);
+      });
+    }
     return result;
   }
   function fromDocuments(documents) {
@@ -231,6 +249,40 @@
     });
     wrap(port.bb_Building.prototype, 'bbBuilding_new', original => function (type) {
       const result = original.apply(this, arguments); this.bbbuildtime = config().buildings[type].buildTicks; return result;
+    });
+    wrap(port.bb_Building.prototype, 'bbUpdate', original => function (economy) {
+      const configured = this.bbmaximum, limit = configured || BUILDING_SAFETY_LIMIT;
+      // Let the original handle affordability, prerequisites and normal hints.
+      // Its == 0 checks must not interpret an unlimited unbuilt building as full.
+      this.bbmaximum = limit;
+      let result;
+      try { result = original.apply(this,arguments); }
+      finally { this.bbmaximum = configured; }
+      const built = economy.bbbuildingcount[this.bbtype];
+      if (built + this.bborders >= limit) {
+        this.bbenabled = 0;
+        this.bbcapacity = built >= limit ? 1 : 0;
+        const suffix = built >= limit ? 's' : 's under construction';
+        this.bbhint = target.bb_data_buildingabout[this.bbtype] + '[You already have the maximum number of ' +
+          target.bb_data_buildingname[this.bbtype] + suffix + ']';
+      }
+      return result;
+    });
+    wrap(port.bb_Zomba.prototype, 'bbBuyBuilding', original => function (building) {
+      const limit = building.bbmaximum || BUILDING_SAFETY_LIMIT;
+      if (this.bbztp.bbbuildingcount[building.bbtype] + building.bborders >= limit) return 0;
+      return original.apply(this,arguments);
+    });
+    wrap(port.bb_Zomba.prototype, 'bbDrawPark', original => function () {
+      const counts = this.bbztp.bbbuildingcount, trailer = counts[0], junk = counts[1];
+      // Extra copies remain part of the real economy/population. Only this
+      // decorative draw leaf is limited to finite original placement slots.
+      // No NaN transforms, unbounded draw loops, or out-of-range array reads.
+      const trailerSlots = Math.min(15,Math.floor(target.bb_data_trailerpos.length/3)+1);
+      const junkSlots = Math.min(5,Math.floor(target.bb_data_junkpos.length/3));
+      counts[0] = Math.min(trailer,trailerSlots); counts[1] = Math.min(junk,junkSlots);
+      try { return original.apply(this,arguments); }
+      finally { counts[0] = trailer; counts[1] = junk; }
     });
     wrap(port.bb_Power.prototype, 'bbPower_new', original => function (type) {
       const result = original.apply(this, arguments), p = config().powers[type];
@@ -342,7 +394,12 @@
       state.activeCompiled = state.compiled;
       writeRaw(target,state.compiled);
       commitPlan(templatePlan(this,state.compiled.config,false));
-      const result = original.apply(this, arguments), c = config(), level = c.levels[this.bbdifficulty];
+      const previousStage = state.initializingWaveStage;
+      state.initializingWaveStage = arguments[0] ? (arguments[0]|0)-1 : this.bbdifficulty;
+      let result;
+      try { result = original.apply(this, arguments); }
+      finally { state.initializingWaveStage = previousStage; }
+      const c = config(), level = c.levels[this.bbdifficulty];
       this.bbztp.bbcash = level.startingCash; this.bbztp.bbxp = level.startingXp;
       this.bbZombieDamageMultiplier = level.zombieDamageMultiplier;
       this.bbZombieHealthMultiplier = level.zombieHealthMultiplier;
@@ -352,11 +409,42 @@
       }
       return result;
     });
+    wrap(port.bb_ZombieMob, 'bbInit', original => function () {
+      const result = original.apply(this,arguments);
+      bindWaveQueue(target,state,state.initializingWaveStage);
+      return result;
+    });
+    wrap(port.bb_ZombieMob, 'bbSpawn', original => function (type,count,delay) {
+      const before = port.bb_ZombieMob.bbqueue.bbFirst(), result = original.apply(this,arguments);
+      const node = port.bb_ZombieMob.bbqueue.bbFirst();
+      if (node && node !== before && state.waveSchedule) state.waveSchedule.nodes.set(node,
+        {id:null,index:null,type:type|0,total:count|0,consumed:0,spawned:0,delay:Number(delay),enabled:true,source:'reinforcement',node});
+      return result;
+    });
+    wrap(port.bb_Zomba.prototype, 'bbAddZombie', original => function () {
+      const result = original.apply(this,arguments);
+      const track = state.waveSchedule && state.waveSchedule.nodes.get(state.consumingWaveNode);
+      if (result && track) track.spawned++;
+      return result;
+    });
     // bbGameTick calls this immediately BEFORE its hardcoded reinforcement
     // block. Insert the configurable calls at exactly that original point, then
     // synchronize its previous-health cell to suppress the obsolete block.
     wrap(port.bb_ZombieMob, 'bbUpdate', original => function () {
-      const result = original.apply(this, arguments), game = port.state.bb_Game;
+      // The original removes its consumed head before returning and may then
+      // be interrupted by newly inserted reinforcements. Track that exact
+      // object, never the new queue index or a repeated type/count signature.
+      const head = port.bb_ZombieMob.bbqueue.bbFirst(), count = head && head.bbcount;
+      const previousNode = state.consumingWaveNode; state.consumingWaveNode = head;
+      let result;
+      try { result = original.apply(this, arguments); }
+      finally { state.consumingWaveNode = previousNode; }
+      const track = state.waveSchedule && state.waveSchedule.nodes.get(head);
+      if (track) {
+        track.consumed += Math.max(0,count-head.bbcount);
+        if (track.source === 'wave' && head.bbcount <= 0) track.completed = true;
+      }
+      const game = port.state.bb_Game;
       if (game && game.bbmainState === 2) {
         const previous = game.bbzombiehealth, current = game.bbzombiebase.bbhealth;
         for (const entry of (state.activeCompiled || state.compiled).reinforcements[game.bbdifficulty]) {
@@ -445,6 +533,113 @@
     while (iterator.bbHasNext()) result.push(iterator.bbNextObject());
     return result;
   }
+  function bindWaveQueue(target,state,stage) {
+    const port = portFor(target), game = port.state.bb_Game;
+    const schedule = {stage:Number.isInteger(stage) ? stage+1 : game ? game.bbdifficulty+1 : null,
+      trusted:Number.isInteger(stage) && stage >= 0 && stage < 4,tracks:new Map(),nodes:new WeakMap()};
+    if (schedule.trusted) {
+      const waves = (state.activeCompiled || state.compiled).config.levels[stage].waves;
+      const queued = listItems(port.bb_ZombieMob.bbqueue); let index = 0;
+      waves.forEach((wave,sourceIndex) => {
+        const node = wave.enabled === false ? null : queued[index++];
+        const track = {id:wave.id,index:sourceIndex,type:wave.type,total:wave.count,consumed:0,spawned:0,
+          delay:wave.delay,enabled:wave.enabled !== false,source:'wave',completed:false,node};
+        schedule.tracks.set(wave.id,track);
+        if (node) schedule.nodes.set(node,track);
+      });
+      if (index !== queued.length) schedule.trusted = false;
+    }
+    state.waveSchedule = schedule;
+  }
+  function waveView(node,track) {
+    if (!track) return {id:null,index:null,type:node.bbtype,total:node.bbcount,consumed:0,spawned:0,
+      remaining:node.bbcount,delay:node.bbdelay,enabled:true,source:'reinforcement'};
+    return {id:track.id,index:track.index,type:track.type,total:track.total,consumed:track.consumed,
+      spawned:track.spawned,remaining:Math.max(0,node.bbcount),delay:track.delay,enabled:track.enabled,source:track.source};
+  }
+  function getWaveProgress(target) {
+    const port = portFor(target), state = states.get(target);
+    if (!state) throw new Error('GameConfig: install or apply configuration first');
+    const schedule = state.waveSchedule;
+    const queued = port.bb_ZombieMob.bbqueue ? listItems(port.bb_ZombieMob.bbqueue) : [];
+    const groups = queued.map(node => waveView(node,schedule && schedule.nodes.get(node)));
+    const completed = schedule ? [...schedule.tracks.values()].filter(track => track.completed).map(track => track.id) : [];
+    return {stage:schedule ? schedule.stage : null,current:groups[0] || null,upcomingGroups:groups.slice(1),
+      remainingTotal:groups.reduce((sum,group) => sum+group.remaining,0),completedGroups:completed.length,
+      completed,knownIds:schedule ? [...schedule.tracks.keys()] : [],pending:[]};
+  }
+  function applyLiveWaves(target,input) {
+    const port = portFor(target), state = states.get(target);
+    if (!state) throw new Error('GameConfig: install or apply configuration before updating waves');
+    // Validate the entire requested document first, even when reconciliation
+    // will be refused. A valid legacy document may be saved for a new battle,
+    // but its unbound row positions are never guessed as current identities.
+    const requested = compile(input), game = port.state.bb_Game, schedule = state.waveSchedule;
+    const stage = game && game.bbdifficulty, path = '$.levels['+stage+'].waves';
+    function refused(reason) {
+      return {applied:[],deferred:[path],notes:[reason],requiresNewBattle:true,reason,progress:getWaveProgress(target)};
+    }
+    if (!game || ![2,6].includes(game.bbmainState)) return refused('请在进行中或暂停的战局应用波次；当前修改将用于新局。');
+    if (!schedule || !schedule.trusted || schedule.stage !== stage+1)
+      return refused('当前队列没有可靠的波次身份；请开始新局后再修改出怪计划。');
+    const incoming = input.levels.find(level => level.id === stage+1);
+    if (incoming.waves.some(wave => !Object.prototype.hasOwnProperty.call(wave,'id')))
+      return refused('旧格式波次缺少稳定 ID，不能按位置猜测进度；请用这套规则开始新局。');
+    const waves = requested.config.levels[stage].waves;
+    if (waves.some(wave => /^legacy-untracked-/.test(wave.id) && !schedule.tracks.has(wave.id)))
+      return refused('导入的旧波次尚未绑定本局进度；请用这套规则开始新局。');
+    const plan = [], tracks = new Map([...schedule.tracks].map(([id,track]) => [id,{...track,enabled:false}]));
+    const main = [], deferred = [], notes = [];
+    waves.forEach((wave,index) => {
+      const previous = schedule.tracks.get(wave.id);
+      const track = tracks.get(wave.id) || {id:wave.id,consumed:0,spawned:0,completed:false,node:null,source:'wave'};
+      if (track.completed && previous && (previous.total !== wave.count || previous.type !== wave.type || previous.delay !== wave.delay)) {
+        deferred.push(path+'['+index+']');notes.push('已完成波次 '+wave.id+' 的改动留给下一局，本局不会重播。');
+      }
+      // Keep a closed row's actually fulfilled definition separate from its
+      // next-match preset. Otherwise a second identical Apply would silently
+      // drop the deferred notice even though this row still cannot replay.
+      Object.assign(track,track.completed ? {index,enabled:wave.enabled !== false} :
+        {index,type:wave.type,total:wave.count,delay:wave.delay,enabled:wave.enabled !== false});
+      if (!track.completed && wave.enabled !== false) {
+        const remaining = Math.max(0,wave.count-track.consumed);
+        if (remaining > 0) {
+          const node = track.node || new port.bb_ZombieMob().bbZombieMob_new(wave.type,remaining,wave.delay|0);
+          track.node = node;
+          plan.push([node,'bbtype',wave.type],[node,'bbcount',remaining],[node,'bbdelay',wave.delay|0]);
+          main.push(node);
+        } else track.completed = true;
+      }
+      tracks.set(wave.id,track);
+    });
+    const oldQueue = listItems(port.bb_ZombieMob.bbqueue), nextQueue = [], nodes = new WeakMap(); let cursor = 0;
+    // Keep non-wave entries in their original relative queue slots. These are
+    // AddFirst reinforcements in ordinary play, but even an interleaved entry
+    // is never mistaken for a main-plan row or accidentally removed.
+    for (const node of oldQueue) {
+      const track = schedule.nodes.get(node);
+      if (track && track.source === 'wave') { if (cursor < main.length) nextQueue.push(main[cursor++]); }
+      else { nextQueue.push(node); if (track) nodes.set(node,track); }
+    }
+    while (cursor < main.length) nextQueue.push(main[cursor++]);
+    for (const track of tracks.values()) if (track.node) nodes.set(track.node,track);
+    const queue = new port.bb_std_list_List().bbList_new();
+    for (const node of nextQueue) queue.bbAddLast(node);
+    const pendingConfig = copy(state.compiled.config);pendingConfig.levels[stage].waves = copy(waves);
+    const pending = compile(pendingConfig), activeConfig = copy((state.activeCompiled || state.compiled).config);
+    activeConfig.levels[stage].waves = copy(waves);
+    const active = compileValidated(activeConfig), rawKey = 'bb_leveldata_level'+(stage+1);
+    for (const [owner,key] of plan.concat([[port.bb_ZombieMob,'bbqueue',queue],[target,rawKey,null]])) {
+      const descriptor = Object.getOwnPropertyDescriptor(owner,key);
+      if (descriptor ? !('value' in descriptor) || !descriptor.writable : !Object.isExtensible(owner))
+        throw new Error('GameConfig: wave update target is not writable');
+    }
+    const changed = !same((state.activeCompiled || state.compiled).config.levels[stage].waves,waves);
+    commitPlan(plan);port.bb_ZombieMob.bbqueue = queue;target[rawKey] = active.raw[rawKey].slice();
+    state.compiled = pending;state.activeCompiled = active;
+    state.waveSchedule = {...schedule,tracks,nodes};
+    return {applied:changed ? [path] : [],deferred,notes,requiresNewBattle:false,reason:null,progress:getWaveProgress(target)};
+  }
   function getCurrent(target) {
     portFor(target);
     const state = states.get(target);
@@ -455,7 +650,7 @@
   // changing bbpeople on a shared template would change the eventual death
   // refund without changing the population already charged for that unit.
   const deferredFields = {
-    units:['people','dependency'], buildings:['maximum','dependency'],
+    units:['people','dependency'], buildings:['dependency'],
     powers:['unlockAfterStage'], levels:['startingCash','startingXp','waves','reinforcements']
   };
   function same(a,b) { return JSON.stringify(a) === JSON.stringify(b); }
@@ -577,6 +772,7 @@
         const result = original.apply(this,arguments);
         state.activeCompiled = state.compiled;
         state.firedReinforcements = new Set();
+        state.waveSchedule = null;state.consumingWaveNode = null;
         state.explodingBottle = null; state.bottleLoopDepth = 0;
         writeRaw(target,state.compiled); return result;
       };
@@ -584,5 +780,5 @@
     target.bb_Init = port.bb_Init = state.initializer;
     return compiled;
   }
-  return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive});
+  return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive,getWaveProgress,applyLiveWaves,BUILDING_SAFETY_LIMIT});
 });

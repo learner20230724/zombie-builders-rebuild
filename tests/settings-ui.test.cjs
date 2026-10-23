@@ -58,12 +58,14 @@ function fixture({custom=false,battle=false}={}) {
   const doc={createElement(tag){return new Element(tag,this);},getElementById(id){return this.body.querySelector('#'+id);},activeElement:null};doc.body=new Element('body',doc);
   const canvas=doc.createElement('canvas');canvas.id='game';doc.body.appendChild(canvas);canvas.focus();
   const win=new Target();win.innerWidth=1000;win.confirm=()=>true;win.Blob=Blob;win.setTimeout=fn=>fn();
+  const intervals=new Map();let timerSequence=0;win.setInterval=fn=>{const id=++timerSequence;intervals.set(id,fn);return id;};win.clearInterval=id=>intervals.delete(id);
   const urls=[],revoked=[];win.URL={createObjectURL(blob){urls.push(blob);return 'blob:test';},revokeObjectURL(url){revoked.push(url);}};
   const baseline=defaults(),rules=CustomRules.defaults(),calls=[],presets=[],listeners=new Set();let nextId=0;
-  const current={mode:custom?'custom':'original',isCustom:custom,isBattle:battle,stage:1,config:clone(baseline),rules:clone(rules),defaults:clone(baseline),defaultRules:clone(rules),presets,selectedPresetId:'',storageAvailable:true,warnings:[],paused:false};
+  const current={mode:custom?'custom':'original',isCustom:custom,isBattle:battle,stage:1,config:clone(baseline),rules:clone(rules),defaults:clone(baseline),defaultRules:clone(rules),presets,selectedPresetId:'',storageAvailable:true,warnings:[],paused:false,gamePaused:false,waveProgress:{stage:1,current:{id:'stage-1-wave-1',index:0,type:1,total:5,consumed:2,spawned:2,remaining:3,delay:3,enabled:true,source:'wave'},upcomingGroups:[],remainingTotal:3,completedGroups:0,completed:[],pending:[]}};
   const notify=()=>{for(const fn of listeners)fn();};
   const controller={
     getState(){return clone(current);},getDraft(){return {config:clone(current.config),rules:clone(current.rules)};},listPresets(){return presets.map(({id,name,updatedAt})=>({id,name,updatedAt}));},
+    getBattleStatus(){return {isBattle:current.isBattle,stage:current.stage,runtimeRunning:!current.paused,editorPaused:current.paused,gamePaused:current.gamePaused,battleRunning:current.isBattle&&!current.paused&&!current.gamePaused,waveProgress:clone(current.waveProgress),buildings:current.config.buildings.map(b=>({id:b.id,built:b.id<2?1:0,queued:0,maximum:b.maximum}))};},
     pauseForEditor(){calls.push(['pause']);current.paused=true;return 'pause-token';},resumeFromEditor(token){calls.push(['resume',token]);current.paused=false;},
     subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},
     savePreset(name,spec,id){GameConfig.validate(spec.config);CustomRules.validate(spec.rules);calls.push(['save',name]);let p=presets.find(p=>p.id===id);if(!p){p={id:'p'+(++nextId)};presets.push(p);}Object.assign(p,{name,spec:clone(spec),updatedAt:'2026-10-23'});notify();return {id:p.id,name};},
@@ -74,7 +76,7 @@ function fixture({custom=false,battle=false}={}) {
     restoreOriginal(){calls.push(['original']);current.isCustom=current.isBattle=false;notify();},
     applyLive(config,options){GameConfig.validate(config);calls.push(['apply',clone(config),options]);current.config=clone(config);current.isCustom=true;notify();return {applied:['$.zombies[3].health'],deferred:[]};},
     applyRules(rules){CustomRules.validate(rules);calls.push(['rules',clone(rules)]);current.rules=clone(rules);notify();},
-    applyDraft(spec,options){GameConfig.validate(spec.config);CustomRules.validate(spec.rules);calls.push(['applyDraft',clone(spec),options]);current.config=clone(spec.config);current.rules=clone(spec.rules);current.isCustom=true;notify();return {applied:['$.zombies[3].health'],deferred:[]};},
+    applyDraft(spec,options){GameConfig.validate(spec.config);CustomRules.validate(spec.rules);calls.push(['applyDraft',clone(spec),options]);current.config=clone(spec.config);current.rules=clone(spec.rules);current.isCustom=true;notify();return {applied:['$.zombies[3].health'],deferred:[],...(current.applyReport||{})};},
     applyUpcomingWaves(config){GameConfig.validate(config);calls.push(['waves',clone(config)]);return {retainedCurrent:true,upcomingGroups:config.levels[0].waves.filter(w=>w.enabled!==false).length};},
     spawnZombie(type,count){calls.push(['spawn',type,count]);return {count,type,positions:[1500]};}
   };
@@ -82,7 +84,7 @@ function fixture({custom=false,battle=false}={}) {
   const findText=text=>doc.body.querySelectorAll('button').find(b=>b.textContent===text);
   const byPath=p=>doc.body.querySelectorAll('[data-path]').find(e=>e.dataset.path===p);
   const byLabel=label=>doc.body.querySelectorAll('input,select,button').find(e=>e.getAttribute('aria-label')===label);
-  return {doc,win,canvas,controller,current,calls,presets,handle,findText,byPath,byLabel,urls,revoked,notify};
+  return {doc,win,canvas,controller,current,calls,presets,handle,findText,byPath,byLabel,urls,revoked,notify,intervals,tick(){for(const fn of intervals.values())fn();}};
 }
 test('field flattening exposes only real mutable scalar fields, recursively',()=>{
   assert.deepEqual(UI.flattenFields({id:0,key:'a',type:1,name:'A',effect:{moveSpeed:2},waves:[{}],reinforcements:[]}).map(f=>f.path),['name','effect.moveSpeed']);
@@ -101,10 +103,10 @@ test('export filenames stay within dedicated JSON download namespace',()=>{
 test('numeric parsing rejects blanks and nonfinite inputs rather than silently storing zero',()=>{
   assert.equal(UI.numericValue('0'),0);assert.equal(UI.numericValue('1.25'),1.25);assert.throws(()=>UI.numericValue('  '),/留空/);assert.throws(()=>UI.numericValue('Infinity'),/有限/);assert.throws(()=>UI.numericValue('hello'),/有限/);
 });
-test('modal pauses once, restores token and focus, and has accessible dialog semantics',()=>{
-  const f=fixture();f.handle.open();f.handle.open();assert.deepEqual(f.calls,[['pause']]);assert.equal(f.current.paused,true);assert.equal(f.doc.body.querySelector('.ztps-modal').getAttribute('aria-modal'),'true');
+test('nonmodal dock reserves layout, pauses once, then restores token, timer and focus',()=>{
+  const f=fixture();f.handle.open();f.handle.open();assert.deepEqual(f.calls,[['pause']]);assert.equal(f.current.paused,true);assert.equal(f.doc.body.querySelector('.ztps-modal').getAttribute('aria-modal'),null);assert.equal(f.doc.body.querySelector('.ztps-modal').getAttribute('role'),'complementary');assert.equal(f.doc.body.classList.contains('ztps-docked'),true);assert.equal(f.intervals.size,1);
   assert.equal(f.doc.body.querySelector('.ztps-entry').hidden,true);assert.equal(f.byLabel('打开自定义设置，快捷键 F2').style.top,'270px');assert.equal(f.byLabel('打开自定义设置，快捷键 F2').style.left,'108px');
-  f.handle.close();assert.deepEqual(f.calls.at(-1),['resume','pause-token']);assert.equal(f.doc.activeElement,f.canvas);assert.equal(f.handle.isOpen(),false);f.handle.destroy();assert.equal(f.doc.body.querySelector('.ztps-overlay'),null);
+  f.handle.close();assert.deepEqual(f.calls.at(-1),['resume','pause-token']);assert.equal(f.doc.activeElement,f.canvas);assert.equal(f.handle.isOpen(),false);assert.equal(f.intervals.size,0);assert.equal(f.doc.body.classList.contains('ztps-docked'),false);f.handle.destroy();assert.equal(f.doc.body.querySelector('.ztps-overlay'),null);
 });
 test('F2/Escape consumed on close never reach game; unhandled Escape keyup remains available',async()=>{
   const f=fixture();let gameKeys=0;await f.win.emit('keydown',{key:'F2'});assert.equal(f.handle.isOpen(),true);
@@ -124,12 +126,13 @@ test('attribute edits remain draft only; save and apply are separate, original p
 });
 test('wave editor paginates, edits enable/type/count/delay, and reorders safely',async()=>{
   const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-levels').click();
+  const initial=f.handle.getDraft().config.levels[0].waves[0];
   assert.ok(f.doc.body.querySelectorAll('[data-path]').filter(e=>/\.waves\.\d+\.count$/.test(e.dataset.path)).length<=12);
   const enabled=f.byPath('config.levels.0.waves.0.enabled');enabled.checked=false;await enabled.emit('change');
   const type=f.byPath('config.levels.0.waves.0.type');type.value='4';await type.emit('change');const count=f.byPath('config.levels.0.waves.0.count');count.value='2';await count.emit('change');
-  assert.deepEqual(f.handle.getDraft().config.levels[0].waves[0],{type:4,count:2,delay:3,enabled:false});
+  assert.deepEqual(f.handle.getDraft().config.levels[0].waves[0],{...initial,type:4,count:2,enabled:false});
   await f.byLabel('第 1 组下移').click();assert.equal(f.handle.getDraft().config.levels[0].waves[1].type,4);
-  await f.findText('替换本局后续队列…').click();assert.equal(f.calls.filter(c=>c[0]==='waves').length,1);f.handle.destroy();
+  await f.findText('应用本局').click();assert.equal(f.calls.filter(c=>c[0]==='applyDraft').length,1);assert.equal(f.calls.filter(c=>c[0]==='waves').length,0);f.handle.destroy();
 });
 test('real rule booleans and numeric economy fields edit the draft and apply together',async()=>{
   const f=fixture({custom:true,battle:true});f.handle.open();
@@ -164,4 +167,58 @@ test('exports only after controller validation and revokes the Blob URL',async()
 test('untrusted preset and entity labels render as literal text, never HTML',async()=>{
   const f=fixture();const malicious='<img src=x onerror=alert(1)>';f.current.config.zombies[0].name=malicious;f.controller.savePreset(malicious,f.controller.getDraft());f.handle.open();await f.doc.getElementById('ztps-tab-zombies').click();assert.equal(f.doc.body.querySelectorAll('img').length,0);assert.ok(f.doc.body.textContent.includes(malicious));f.handle.destroy();
   const source=fs.readFileSync(path.join(__dirname,'../src/settings-ui.js'),'utf8');assert.doesNotMatch(source,/innerHTML|outerHTML|insertAdjacentHTML|\beval\s*\(|new Function/);
+});
+test('dock play/pause owns only its token and never forces the original game pause to resume',async()=>{
+  const f=fixture({custom:true,battle:true});f.current.gamePaused=true;f.handle.open();
+  assert.match(f.doc.body.querySelector('[data-editor-status]').textContent,/原游戏暂停/);await f.findText('继续战斗').click();
+  assert.equal(f.current.paused,false);assert.equal(f.current.gamePaused,true);assert.match(f.doc.body.querySelector('[data-editor-status]').textContent,/原游戏暂停/);
+  await f.findText('暂停战斗').click();assert.equal(f.current.paused,true);assert.equal(f.calls.filter(c=>c[0]==='pause').length,2);
+  await f.findText('继续战斗').click();f.handle.close();assert.equal(f.calls.filter(c=>c[0]==='resume').length,2);assert.equal(f.current.gamePaused,true);f.handle.destroy();
+});
+test('running dock does not trap Tab or intercept canvas keys and all release events remain available',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();await f.findText('继续战斗').click();f.canvas.focus();
+  const tab=await f.win.emit('keydown',{key:'Tab',target:f.canvas});assert.equal(tab.prevented,false);assert.equal(tab.stopped,false);
+  const escape=await f.win.emit('keydown',{key:'Escape',target:f.canvas});assert.equal(escape.stopped,false);assert.equal(f.handle.isOpen(),true);
+  const released=await f.win.emit('keyup',{key:'ArrowLeft',target:f.canvas});assert.equal(released.stopped,false);
+  const pane=f.doc.body.querySelector('.ztps-overlay');assert.equal((await pane.emit('keydown',{key:'a'})).stopped,true);assert.equal((await pane.emit('keyup',{key:'a'})).stopped,false);assert.equal((await pane.emit('pointerup')).stopped,false);
+  f.byLabel('规则名称').focus();assert.equal((await f.win.emit('keydown',{key:'Escape',target:f.doc.activeElement})).stopped,true);assert.equal(f.handle.isOpen(),false);f.handle.destroy();
+});
+test('live status polling updates wave counters without replacing focused unsaved inputs',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-zombies').click();const health=f.byPath('config.zombies.0.health');health.value='111';await health.emit('change');health.focus();
+  f.current.waveProgress.current.spawned=3;f.current.waveProgress.current.consumed=3;f.current.waveProgress.current.remaining=2;f.current.waveProgress.remainingTotal=2;f.tick();
+  assert.equal(f.byPath('config.zombies.0.health'),health);assert.equal(f.doc.activeElement,health);assert.equal(health.value,'111');assert.equal(f.handle.getDraft().config.zombies[0].health,111);assert.match(f.doc.body.querySelector('[data-wave-status]').textContent,/已出 3.*剩余 2/);f.handle.destroy();assert.equal(f.intervals.size,0);
+});
+test('current stage is selected first; other-stage edits are clearly marked and reported',async()=>{
+  const f=fixture({custom:true,battle:true});f.current.stage=3;f.handle.open();await f.doc.getElementById('ztps-tab-levels').click();assert.equal(f.byLabel('选择关卡 / 出怪').value,'2');assert.match(f.doc.body.querySelector('[data-editing-stage]').textContent,/当前第 3 关/);
+  const select=f.byLabel('选择关卡 / 出怪');select.value='0';await select.emit('change');assert.match(f.doc.body.querySelector('[data-editing-stage]').textContent,/当前正在第 3 关.*编辑第 1 关/);await f.findText('应用本局').click();assert.match(f.doc.body.querySelector('.ztps-message').textContent,/第 1 关不是当前第 3 关/);f.handle.destroy();
+});
+test('building maximum shows zero-as-unlimited and live built counts without original cap input bounds',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-buildings').click();const maximum=f.byPath('config.buildings.0.maximum');assert.equal(maximum.min,'0');assert.equal(maximum.max,'100000');assert.match(UI.fieldInfo('maximum')[1],/0.*不设/);assert.equal(UI.fieldInfo('maximum')[2],'立即');
+  maximum.value='0';await maximum.emit('change');await f.findText('应用本局').click();assert.equal(f.current.config.buildings[0].maximum,0);assert.match(f.doc.body.querySelector('[data-building-status]').textContent,/实际已建 1.*不设上限/);f.handle.destroy();
+});
+test('new wave rows get unique stable IDs and moving them never creates duplicate IDs',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-levels').click();const before=f.handle.getDraft().config.levels[0].waves.length;
+  await f.findText('＋ 添加一组').click();let waves=f.handle.getDraft().config.levels[0].waves;const id=waves.at(-1).id;assert.match(id,/^wave-[A-Za-z0-9_-]+$/);assert.equal(waves.length,before+1);
+  await f.byLabel('第 '+(before+1)+' 组上移').click();waves=f.handle.getDraft().config.levels[0].waves;assert.equal(waves[before-1].id,id);assert.equal(waves.filter(w=>w.id===id).length,1);f.handle.destroy();
+});
+test('legacy wave synchronization warning explicitly asks for a new custom battle',async()=>{
+  const f=fixture({custom:true,battle:true});f.current.applyReport={waveReport:{requiresNewBattle:true,reason:'missing identifiers'}};f.handle.open();await f.findText('应用本局').click();assert.match(f.doc.body.querySelector('.ztps-message').textContent,/旧规则缺少可靠波次 ID.*开始新自定义战局/);f.handle.destroy();
+});
+test('new reinforcement calls retain their strict no-wave-ID shape',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-levels').click();const buttons=f.doc.body.querySelectorAll('button').filter(b=>b.textContent==='＋ 添加一组');assert.equal(buttons.length,2);await buttons[1].click();
+  const spec=f.handle.getDraft(),call=spec.config.levels[0].reinforcements[0].calls.at(-1);assert.equal(call.id,undefined);assert.deepEqual(call,{type:1,count:1,delay:1,enabled:true});assert.doesNotThrow(()=>GameConfig.validate(spec.config));f.handle.destroy();
+});
+test('invalid unfinished field never blocks independent play/pause controls',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-zombies').click();const health=f.byPath('config.zombies.0.health');health.value='';await health.emit('change');await f.findText('继续战斗').click();assert.equal(f.current.paused,false);f.handle.destroy();
+});
+test('saved and applied status remain independent until explicit application',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-zombies').click();const hp=f.byPath('config.zombies.0.health');hp.value='55';await hp.emit('change');
+  assert.match(f.doc.body.querySelector('.ztps-dirty').textContent,/未保存.*尚未应用本局/);f.byLabel('规则名称').value='保存不等于应用';await f.findText('保存规则').click();assert.match(f.doc.body.querySelector('.ztps-dirty').textContent,/已保存.*尚未应用本局/);
+  await f.findText('应用本局').click();assert.match(f.doc.body.querySelector('.ztps-dirty').textContent,/已保存.*当前规则一致/);f.handle.destroy();
+});
+test('wave rows show ID-based current/completed progress and completed edits explain no replay',async()=>{
+  const f=fixture({custom:true,battle:true});const first=f.current.config.levels[0].waves[0].id;f.current.waveProgress.current.id=first;f.handle.open();await f.doc.getElementById('ztps-tab-levels').click();
+  const findRow=id=>f.doc.body.querySelectorAll('[data-wave-row-id]').find(el=>el.dataset.waveRowId===id);assert.match(findRow(first).textContent,/当前.*已调度 2/);
+  f.current.waveProgress.completed=[first];f.current.waveProgress.completedGroups=1;f.current.waveProgress.current=null;f.tick();assert.match(findRow(first).textContent,/已完成.*不补刷/);
+  const count=f.byPath('config.levels.0.waves.0.count');count.value='8';await count.emit('change');await f.findText('应用本局').click();assert.match(f.doc.body.querySelector('.ztps-message').textContent,/第 1 组已完成，不补刷.*新增一组/);assert.match(findRow(first).textContent,/需重放请新增一组/);f.handle.destroy();
 });

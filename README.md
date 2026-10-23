@@ -13,6 +13,7 @@ A desktop and browser version of **Zombie Trailer Park (建筑工大战僵尸)**
 - Bundled graphics and audio, plus local progress and records.
 - Editable JSON configuration for units, zombies, buildings, powers, and levels.
 - In-game custom presets, live balance changes, wave editing, and one-click zombie spawning.
+- Side-by-side settings: keep the game visible and choose whether to pause or play while editing.
 
 ## Default game parameters
 
@@ -54,6 +55,8 @@ Corpse impacts share their damage budget among eligible player targets; this dam
 | Chapel | 1,500 | 1 | 2,000 | Garage | Unlocks Preachers |
 
 You begin with one Trailer and one Salvage Yard; maximum counts include them. Each completed yard adds one income coin per tick to a shared pool, which pays $50 whenever it reaches 600 coins.
+
+The table shows the original defaults. In custom rules, a building's **`maximum: 0` removes its gameplay cap**; positive values **1–100,000** set a cap. Changes apply to the current battle without removing existing buildings or paid orders. Extra buildings still contribute income/population even when the artwork has no additional drawing slots. A separate engine safety ceiling of 100,000 per building type remains.
 
 ### Special powers
 
@@ -114,7 +117,9 @@ Then open **http://127.0.0.1:8318/**. On Windows, you can also double-click **St
 
 ## Customize the game
 
-Click **⚙ 自定义** along the left edge of the game or press **F2** to open the customization panel; **Esc** closes it. Opening it pauses the battle. The six tabs cover sandbox/spawning, survivors, zombies, buildings, powers, and stages/waves. Each field shows its default, edited value, unit, and application timing.
+Click **⚙ 自定义** or press **F2** to toggle settings. The game stays beside a **right-hand dock**, switching to a game-above/settings-below layout on narrow windows. Opening settings pauses by default; **继续战斗** resumes while the dock remains open, and **暂停战斗** pauses again. Close with F2, the close button, or Esc while focus is inside settings.
+
+The six tabs cover sandbox/spawning, survivors, zombies, buildings, powers, and stages/waves. Each field shows its default, edited value, unit, and application timing. **Editing or resuming gameplay does not automatically apply the draft**: use **应用本局**. Saving a preset remains a separate action.
 
 | Action | Result |
 | --- | --- |
@@ -126,7 +131,7 @@ Click **⚙ 自定义** along the left edge of the game or press **F2** to open 
 | Return to original mode (`回到原版模式`) | Ends the current battle and returns to original mode; keeps presets |
 | Export JSON (`导出 JSON`) | Downloads a JSON file for backup or sharing |
 
-**Try one-click spawning:** open **沙盒 / 刷怪**, select a stage and **开始自定义战局**. Open F2 again and click **肥胖僵尸** once to add one, then close the panel with Esc to let it move. Spawning requires an active custom battle.
+**Try one-click spawning:** open **沙盒 / 刷怪**, select a stage and **开始自定义战局**. Open F2 again, choose **继续战斗**, and click **肥胖僵尸** once to add one while watching the game beside it. Spawning requires an active custom battle.
 
 ### What changes immediately?
 
@@ -137,11 +142,14 @@ Click **⚙ 自定义** along the left edge of the game or press **F2** to open 
 | Training, charging, cooldown | Preserve the remaining percentage, rather than restarting completed work |
 | Salvage payout / interval, population per Trailer | Live rule settings; existing cash/units are kept and the income pool retains its progress |
 | Harvester damage / range, listed ability switches | Subsequent battle ticks/actions, including active Harvesters |
-| Population, prerequisites, building limits, power unlocks | Next battle; previously paid orders are not refunded or recharged |
-| Starting cash / XP, waves, base reinforcements | Next battle by default |
-| Replace upcoming waves | Keep the current group/timer; replace everything after it, including queued reinforcements, with the edited stage's enabled entries |
+| Building maximum | Current battle; lowering it blocks new orders without deleting existing buildings or paid orders |
+| Recruitment population, prerequisites, power unlocks | Next battle; previously paid orders are not refunded or recharged |
+| Current stage's waves | Apply now by stable group ID; deduct already scheduled counts and do not replay finished groups |
+| Starting cash / XP, reinforcement definitions, other stages' waves | Next corresponding battle |
 
 Wave entries can be enabled/disabled, reordered, and edited by type, count, and scheduler `delay`. The sandbox also controls automatic queues, the five queued zombie types, base reinforcements, corpse-impact spawns, Ghoul long leaps, preacher conversion, Fat Zombie area attacks, and corpse throwing. Economy and Harvester damage/range are editable rule values. **Manual spawn is independent of automatic-spawn switches**: the **Big Fat Zombie** button creates one immediately, without changing wave order.
+
+**Apply waves with the normal `应用本局` button.** For a partially scheduled group, `count` is the desired total, so remaining = `max(0, count − already scheduled)`. Existing enemies, elapsed timers, and queued reinforcements are retained. Finished groups do not replay; add a new group if you want more enemies. The panel shows current, scheduled, spawned, and remaining counts, separately from your draft. Editing another stage affects its next battle. Old imported rules without a trusted group identity require starting a new custom battle before their waves can be live-edited; other valid attributes can still apply now.
 
 Original and custom runs have separate completion records and scores. Applying custom rules or sandbox changes must not improve original-mode records. Presets survive restoring original rules; they are local to the current desktop profile or browser.
 

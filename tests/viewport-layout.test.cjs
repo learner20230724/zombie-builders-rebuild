@@ -29,10 +29,13 @@ test('canvas can grow beyond its logical size while fitting either viewport axis
   assert.match(styles, /@supports\(height:100dvh\)/);
   assert.match(rule('html,body'), /overflow:hidden/);
   assert.match(rule('main'), /place-items:center/);
+  assert.match(rule('main'), /container-type:size/);
+  assert.doesNotMatch(rule('main'), /height:var\(--viewport-height\)/, 'Dock bottom inset must be able to shrink the available game height');
+  assert.match(styles, /@supports\(width:1cqw\)\{canvas\{width:min\(100cqw,calc\(100cqh \* 4 \/ 3\)\);height:min\(100cqh,calc\(100cqw \* 3 \/ 4\)\)/);
 });
 
 test('loading and errors overlay the canvas without reserving viewport space', () => {
-  assert.match(rule('#status'), /position:fixed/);
+  assert.match(rule('#status'), /position:absolute/);
   assert.match(rule('#status'), /pointer-events:none/);
   assert.match(rule('#status:empty'), /display:none/);
   assert.doesNotMatch(html, /(?:ondblclick|requestFullscreen|addEventListener)/);

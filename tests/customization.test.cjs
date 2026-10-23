@@ -12,7 +12,18 @@ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const plain=value=>JSON.parse(JSON.stringify(value));
 const baseline=()=>GameConfig.fromDocuments(Object.fromEntries(['units','zombies','buildings','powers','levels'].map(kind=>[kind,JSON.parse(read('config/'+kind+'.json'))])));
 const constants=Customization.constants;
+function noWaveIds(config) {const copy=plain(config);for(const level of copy.levels)for(const wave of level.waves)delete wave.id;return copy;}
+function oldSourceFingerprint(config) {
+  const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+  const text=JSON.stringify(canonical(noWaveIds(config))),lanes=[0x811c9dc5,0x9e3779b9,0x85ebca6b,0xc2b2ae35];
+  for(let n=0;n<text.length;n++)for(let lane=0;lane<lanes.length;lane++)lanes[lane]=Math.imul(lanes[lane]^text.charCodeAt(n),0x01000193+lane*2);
+  return text.length+':'+lanes.map(lane=>(lane>>>0).toString(16).padStart(8,'0')).join('');
+}
 function entries(list) {const values=[],it=list.bbObjectEnumerator();while(it.bbHasNext())values.push(it.bbNextObject());return values;}
+function dispatch(h,count=1) {
+  const mob=h.target.ZTPGamePort.bb_ZombieMob;
+  for(let i=0;i<count;i++) {const head=entries(mob.bbqueue)[0];assert.ok(head,'dispatch requires a queued group');head.bbtime=1000;mob.bbticks=60;mob.bbUpdate();}
+}
 function fixture({storage=new Map(),external=baseline(),custom=false,throwStorage=false,throwWrites=false}={}) {
   if(custom) storage.set(constants.SESSION_KEY,JSON.stringify({schemaVersion:1,mode:'custom',config:external,rules:CustomRules.defaults(),stage:1,selectedPresetId:null}));
   const manifest=JSON.parse(read('public/assets/manifest.json'));
@@ -26,7 +37,7 @@ function fixture({storage=new Map(),external=baseline(),custom=false,throwStorag
     ReadInt:(group,key)=>Number(storage.get(namespace+'/shared/'+group+'/'+key)||0)|0,
     WriteInt:(group,key,value)=>storage.set(namespace+'/shared/'+group+'/'+key,String(value|0)),FlushInts:()=>0,
     PlayMovie:()=>0,MovieFinished:()=>1,EndMovie:()=>{ended++;},ShowMochi:()=>0,ShowMochiScores:()=>0,HideMochiScores:()=>0,MochiState:()=>0,Redirect:()=>0,
-    configureRuntime:options=>{namespace=options.storageKey;},location:{reload:()=>{reloads++;}},
+    configureRuntime:options=>{if(runtimeState.running)throw Error('Stop the runtime before reconfiguring it');namespace=options.storageKey;},location:{reload:()=>{reloads++;}},
     CustomEvent:class {constructor(type,options){this.type=type;this.detail=options.detail;}},dispatchEvent:event=>events.push(event),
     ZTPRuntime:{getStatus:()=>({...runtimeState}),stop:()=>{runtimeCalls.push('stop');runtimeState.running=false;},advance:n=>runtimeCalls.push('advance:'+n),
       useRealtime:()=>runtimeCalls.push('realtime'),start:()=>{runtimeCalls.push('start');runtimeState.running=true;}}
@@ -66,6 +77,34 @@ test('changing external JSON after a saved session takes precedence without dele
   assert.equal(next.prepared.mode,'custom');assert.equal(next.controller.getState().config.zombies[0].health,88);
   assert.equal(next.controller.getState().isBattle,false);assert.equal(next.controller.listPresets().length,1);
   assert.ok(next.controller.getState().warnings.some(message=>message.includes('外置 JSON')));
+});
+
+test('upgrading a real v0.3.0 source fingerprint retains the selected custom health and economy',()=>{
+  const external=baseline(),selected=noWaveIds(baseline()),rules=CustomRules.defaults();selected.zombies[0].health=321;rules.economy.salvagePayout=777;
+  const storage=new Map([[constants.SESSION_KEY,JSON.stringify({schemaVersion:1,mode:'custom',config:selected,rules,stage:2,selectedPresetId:null,sourceFingerprint:oldSourceFingerprint(external)})]]);
+  const h=fixture({storage,external});assert.equal(h.controller.getState().mode,'custom');assert.equal(h.controller.getState().stage,2);
+  assert.equal(h.controller.getState().config.zombies[0].health,321);assert.equal(h.controller.getState().rules.economy.salvagePayout,777);
+  assert.equal(h.controller.getState().warnings.some(text=>text.includes('外置 JSON')),false);
+  assert.ok(h.controller.getState().config.levels[0].waves.every(wave=>wave.id.startsWith('legacy-untracked-')));
+});
+
+test('wave identity metadata alone neither changes original mode nor discards a selected session',()=>{
+  const external=baseline();for(const level of external.levels)level.waves.forEach((wave,index)=>wave.id='identity-'+level.id+'-'+index);
+  const h=fixture({external});assert.equal(h.prepared.mode,'original');assert.equal(h.namespace,constants.ORIGINAL_STORAGE);
+  const draft=h.controller.getDraft();draft.config.zombies[0].health=432;h.controller.startCustomBattle(1,draft);
+  const renamed=plain(external);for(const level of renamed.levels)level.waves.forEach((wave,index)=>wave.id='renamed-'+level.id+'-'+index);
+  const next=fixture({storage:h.storage,external:renamed});assert.equal(next.controller.getState().config.zombies[0].health,432);
+  assert.equal(next.controller.getState().warnings.some(text=>text.includes('外置 JSON')),false);
+});
+
+test('legacy fingerprint compatibility does not hide real external damage or wave-order changes',()=>{
+  for(const edit of [config=>{config.zombies[0].damage=11;},config=>{[config.levels[0].waves[0],config.levels[0].waves[1]]=[config.levels[0].waves[1],config.levels[0].waves[0]];}]) {
+    const original=baseline(),selected=noWaveIds(baseline()),rules=CustomRules.defaults();selected.zombies[0].health=321;rules.economy.salvagePayout=777;
+    const storage=new Map([[constants.SESSION_KEY,JSON.stringify({schemaVersion:1,mode:'custom',config:selected,rules,stage:2,sourceFingerprint:oldSourceFingerprint(original)})]]);
+    const external=baseline();edit(external);const h=fixture({storage,external});
+    assert.equal(h.controller.getState().config.zombies[0].health,25);assert.equal(h.controller.getState().rules.economy.salvagePayout,50);
+    assert.equal(h.controller.getState().isBattle,false);assert.ok(h.controller.getState().warnings.some(text=>text.includes('外置 JSON')));
+  }
 });
 
 test('invalid stored sessions are ignored atomically, without deleting or partially applying them',()=>{
@@ -228,6 +267,29 @@ test('combined draft validation is pure and combined apply updates both validate
   const session=JSON.parse(h.storage.get(constants.SESSION_KEY));assert.equal(session.config.units[0].cost,75);assert.equal(session.rules.automaticSpawning,false);
 });
 
+test('live apply owns a short frozen-clock transaction when the editor lets the game run',()=>{
+  const h=fixture();h.game.bbPlayGame(1);const draft=h.controller.getDraft();draft.config.units[0].cost=65;
+  assert.equal(h.controller.getBattleStatus().battleRunning,true);
+  assert.doesNotThrow(()=>h.controller.applyDraft(draft));
+  assert.deepEqual(h.runtimeCalls,['stop','advance:0','realtime','start']);assert.equal(h.controller.getBattleStatus().runtimeRunning,true);
+  assert.equal(h.controller.getBattleStatus().editorPaused,false);assert.equal(h.game.bbunits[0].bbcost,65);
+  const token=h.controller.pauseForEditor(),before=h.runtimeCalls.slice();draft.config.units[0].cost=66;
+  h.controller.applyDraft(draft);assert.deepEqual(h.runtimeCalls,before);assert.equal(h.controller.getBattleStatus().editorPaused,true);
+  assert.equal(h.controller.getBattleStatus().runtimeRunning,false);h.controller.resumeFromEditor(token);
+  assert.equal(h.controller.getBattleStatus().battleRunning,true);
+});
+
+test('battle status distinguishes editor locks, native game pause and live building counts without changing simulation',()=>{
+  const h=fixture({custom:true});h.game.bbbuildings[0].bborders=2;
+  let status=h.controller.getBattleStatus();assert.equal(status.battleRunning,true);assert.equal(status.gamePaused,false);
+  assert.deepEqual(status.buildings[0],{id:0,built:1,queued:2,maximum:15});assert.equal(status.entities.total,2);
+  const ticks=h.game.bbgameticks,token=h.controller.pauseForEditor();status=h.controller.getBattleStatus();
+  assert.equal(status.editorPauseCount,1);assert.equal(status.editorPaused,true);assert.equal(status.runtimeRunning,false);assert.equal(status.battleRunning,false);
+  h.controller.resumeFromEditor(token);h.game.bbmainState=6;status=h.controller.getBattleStatus();
+  assert.equal(status.runtimeRunning,true);assert.equal(status.gamePaused,true);assert.equal(status.battleRunning,false);
+  assert.equal(h.game.bbgameticks,ticks);assert.deepEqual(h.controller.getState().battleStatus,status);
+});
+
 test('manual buttons create all five real types while automatic spawning is disabled',()=>{
   const h=fixture({custom:true}),rules=CustomRules.defaults();rules.automaticSpawning=false;rules.zombieTypesEnabled.fill(false);h.controller.applyRules(rules);
   for(let type=0;type<5;type++) {
@@ -250,24 +312,88 @@ test('manual spawning cannot alter original mode or exceed batch/entity safety l
   assert.throws(()=>h.controller.spawnZombie(3),/1000/);
 });
 
-test('replacing upcoming waves retains current group identity/time/count and does not apply unrelated draft changes',()=>{
+test('wave-only compatibility apply synchronizes tracked current progress without leaking unrelated draft values',()=>{
   const h=fixture({custom:true}),mob=h.target.ZTPGamePort.bb_ZombieMob;
-  const first=entries(mob.bbqueue)[0];first.bbcount=3;first.bbtime=1.5;mob.bbticks=42;
+  dispatch(h,2);const first=entries(mob.bbqueue)[0];first.bbtime=1.5;mob.bbticks=42;
   h.game.bbzombiehealth=12345;
   const draft=h.controller.getDraft().config;draft.units[0].health=999;
-  draft.levels[0].waves=[{type:4,count:20,delay:1},{type:1,count:100,delay:0},{type:5,count:3,delay:3,enabled:false},{type:3,count:20,delay:2}];
+  draft.levels[0].waves=[{...draft.levels[0].waves[0],type:4,count:20,delay:1},{id:'test-new-normal',type:1,count:100,delay:0},{id:'test-disabled',type:5,count:3,delay:3,enabled:false},{id:'test-new-fast',type:3,count:20,delay:2}];
   const result=h.controller.applyUpcomingWaves(draft),queue=entries(mob.bbqueue);
-  assert.equal(queue[0],first);assert.equal(first.bbcount,3);assert.equal(first.bbtime,1.5);assert.equal(mob.bbticks,42);
-  assert.deepEqual(queue.slice(1).map(x=>[x.bbtype,x.bbcount,x.bbdelay]),[[4,20,1],[1,100,0],[3,20,2]]);
+  assert.equal(queue[0],first);assert.equal(first.bbcount,18);assert.equal(first.bbtime,1.5);assert.equal(mob.bbticks,42);
+  assert.deepEqual(queue.slice(1).map(x=>[x.bbtype,x.bbcount,x.bbdelay]),[[1,100,0],[3,20,2]]);
   assert.equal(h.game.bbzombiehealth,12345);assert.equal(h.game.bbunits[0].bbhealth,50);
-  assert.deepEqual(result,{retainedCurrent:true,upcomingGroups:3,totalUpcoming:140});
+  assert.equal(result.requiresNewBattle,false);assert.equal(result.progress.current.remaining,18);
 });
 
-test('empty future wave replacement safely keeps only the active group',()=>{
-  const h=fixture({custom:true}),mob=h.target.ZTPGamePort.bb_ZombieMob,first=entries(mob.bbqueue)[0];
+test('empty wave-only synchronization cancels all remaining main waves without deleting live enemies',()=>{
+  const h=fixture({custom:true}),mob=h.target.ZTPGamePort.bb_ZombieMob;dispatch(h,2);
+  const zombies=entries(h.game.bbzombies);
   const config=h.controller.getDraft().config;config.levels[0].waves=[];
-  const result=h.controller.applyUpcomingWaves(config);assert.equal(result.upcomingGroups,0);assert.equal(entries(mob.bbqueue)[0],first);
+  const result=h.controller.applyUpcomingWaves(config);assert.equal(result.progress.remainingTotal,0);assert.equal(entries(mob.bbqueue).length,0);
+  assert.deepEqual(entries(h.game.bbzombies),zombies);
   mob.bbqueue.bbClear();assert.doesNotThrow(()=>h.controller.applyUpcomingWaves(config));assert.equal(entries(mob.bbqueue).length,0);
+});
+
+test('ordinary combined apply immediately updates current remaining counts and never replays completed IDs',()=>{
+  const h=fixture({custom:true}),mob=h.target.ZTPGamePort.bb_ZombieMob;dispatch(h,2);
+  const current=entries(mob.bbqueue)[0];current.bbtime=1.75;mob.bbticks=42;
+  let draft=h.controller.getDraft();const id=draft.config.levels[0].waves[0].id;draft.config.levels[0].waves[0].count=8;
+  const report=h.controller.applyDraft(draft),status=h.controller.getBattleStatus();
+  assert.equal(report.waveReport.requiresNewBattle,false);assert.ok(report.applied.includes('$.levels[0].waves'));
+  assert.equal(report.deferred.includes('$.levels[0].waves'),false);assert.equal(entries(mob.bbqueue)[0],current);
+  assert.equal(current.bbcount,6);assert.equal(current.bbtime,1.75);assert.equal(mob.bbticks,42);
+  assert.equal(status.waveProgress.current.consumed,2);assert.equal(status.waveProgress.current.spawned,2);assert.equal(status.waveProgress.current.total,8);
+  dispatch(h,6);assert.ok(h.controller.getBattleStatus().waveProgress.completed.includes(id));
+  const before=entries(mob.bbqueue).slice();draft=h.controller.getDraft();draft.config.levels[0].waves[0].count=100;
+  const completedReport=h.controller.applyDraft(draft);
+  assert.ok(completedReport.waveReport.notes.some(text=>text.includes('不会重播')));assert.ok(completedReport.waveReport.deferred.length);
+  assert.deepEqual(entries(mob.bbqueue),before);assert.notEqual(h.controller.getBattleStatus().waveProgress.current?.id,id);
+});
+
+test('reducing current total below consumed cancels only undispatched slots, while reinforcements retain their own identity',()=>{
+  const h=fixture({custom:true}),mob=h.target.ZTPGamePort.bb_ZombieMob;dispatch(h,2);
+  const zombies=entries(h.game.bbzombies).slice(),draft=h.controller.getDraft();draft.config.levels[0].waves[0].count=1;
+  h.controller.applyDraft(draft);assert.deepEqual(entries(h.game.bbzombies),zombies);
+  assert.notEqual(h.controller.getBattleStatus().waveProgress.current?.id,draft.config.levels[0].waves[0].id);
+  mob.bbSpawn(4,2,0);const reinforcement=entries(mob.bbqueue)[0],next=h.controller.getDraft();next.config.levels[0].waves[2].count=77;
+  h.controller.applyDraft(next);assert.equal(entries(mob.bbqueue)[0],reinforcement);
+  assert.equal(h.controller.getBattleStatus().waveProgress.current.source,'reinforcement');assert.equal(reinforcement.bbcount,2);
+});
+
+test('other-stage wave edits explicitly remain pending for that stage rather than claiming current-stage changes',()=>{
+  const h=fixture({custom:true}),draft=h.controller.getDraft(),before=entries(h.target.ZTPGamePort.bb_ZombieMob.bbqueue).slice();
+  draft.config.levels[1].waves[0].count=123;const report=h.controller.applyDraft(draft);
+  assert.equal(report.waveReport.stage,1);assert.deepEqual(report.waveReport.otherStages,[2]);
+  assert.ok(report.deferred.includes('$.levels[1].waves'));assert.ok(report.waveReport.notes.some(text=>text.includes('当前战斗为第 1 关')&&text.includes('第 2 关')));
+  assert.deepEqual(entries(h.target.ZTPGamePort.bb_ZombieMob.bbqueue),before);
+});
+
+test('legacy imports retain unknown identity across two applies and preset round trips, then bind on a new battle',()=>{
+  const h=fixture({custom:true}),mob=h.target.ZTPGamePort.bb_ZombieMob;dispatch(h,2);
+  const queue=mob.bbqueue,before=entries(queue).map(node=>({node,count:node.bbcount,time:node.bbtime})),ticks=mob.bbticks;
+  const legacy={schemaVersion:1,name:'旧版规则',config:noWaveIds(baseline()),rules:CustomRules.defaults()};legacy.config.units[0].cost=88;
+  const imported=h.controller.importPreset(JSON.stringify(legacy)),draft={config:imported.config,rules:imported.rules};
+  assert.ok(draft.config.levels[0].waves.every(wave=>wave.id.startsWith('legacy-untracked-')));
+  for(let attempt=0;attempt<2;attempt++) {
+    const report=h.controller.applyDraft(draft);assert.equal(report.waveReport.requiresNewBattle,true);
+    assert.equal(mob.bbqueue,queue);assert.equal(mob.bbticks,ticks);assert.equal(h.game.bbunits[0].bbcost,88);
+    before.forEach(({node,count,time},i)=>{assert.equal(entries(mob.bbqueue)[i],node);assert.equal(node.bbcount,count);assert.equal(node.bbtime,time);});
+    assert.equal(h.controller.getBattleStatus().waveProgress.knownIds.some(id=>id.startsWith('legacy-untracked-')),false);
+  }
+  const record=h.controller.savePreset('旧版规则',draft),loaded=h.controller.loadPreset(record.id);
+  const roundTrip=h.controller.importPreset(h.controller.exportPreset(loaded,'往返规则'));
+  assert.equal(h.controller.applyDraft({config:roundTrip.config,rules:roundTrip.rules}).waveReport.requiresNewBattle,true);
+  h.controller.startCustomBattle(1,loaded);const next=fixture({storage:h.storage});dispatch(next,2);
+  const bound=next.controller.getDraft();bound.config.levels[0].waves[0].count=9;
+  const applied=next.controller.applyDraft(bound);assert.equal(applied.waveReport.requiresNewBattle,false);
+  assert.equal(next.controller.getBattleStatus().waveProgress.current.remaining,7);
+});
+
+test('duplicate wave identities fail complete validation before mode, storage, clocks or templates change',()=>{
+  const h=fixture();h.game.bbPlayGame(1);const draft=h.controller.getDraft(),before=h.controller.getState(),storage=[...h.storage],calls=h.runtimeCalls.slice();
+  draft.config.units[0].cost=99;draft.config.levels[0].waves[1].id=draft.config.levels[0].waves[0].id;
+  assert.throws(()=>h.controller.applyDraft(draft),/duplicate/);
+  assert.deepEqual(h.controller.getState(),before);assert.deepEqual([...h.storage],storage);assert.deepEqual(h.runtimeCalls,calls);assert.equal(h.game.bbunits[0].bbcost,50);
 });
 
 test('nested pause tokens freeze the manual clock and only the final valid token resumes once',()=>{

@@ -169,11 +169,16 @@
       }
       return original.apply(this,arguments);
     });
-    wrap(port.bb_Zomba.prototype,'bbAddWealth',original => function (amount) {
+    wrap(port.bb_Zomba.prototype,'bbAddWealth',() => function (amount) {
       const economy = state.rules.economy;
-      if (economy.salvagePayout === 50 && economy.salvageIntervalTicks === 600) return original.apply(this,arguments);
-      const pending = this.bbcoins + (amount|0), payments = Math.floor(pending / economy.salvageIntervalTicks);
-      this.bbcoins = pending - payments * economy.salvageIntervalTicks;
+      // Preserve the original integer input conversion, shared yard-tick pool,
+      // payout count and remainder without looping once per payout. Unlimited
+      // buildings can otherwise turn a short interval into a huge tight loop.
+      // Keep the intermediate sum wide so signed-int32 overflow cannot turn a
+      // large positive income into debt; stored cash saturates instead of wraps.
+      const pending = (this.bbcoins|0) + (amount|0);
+      const payments = pending >= economy.salvageIntervalTicks ? Math.floor(pending / economy.salvageIntervalTicks) : 0;
+      this.bbcoins = Math.max(-2147483648,pending - payments * economy.salvageIntervalTicks);
       this.bbztp.bbcash = Math.min(2147483647,this.bbztp.bbcash + payments * economy.salvagePayout)|0;
       return 0;
     });

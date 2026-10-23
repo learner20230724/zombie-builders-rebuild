@@ -59,6 +59,20 @@
     for (let n=0;n<text.length;n++) for (let lane=0;lane<lanes.length;lane++) lanes[lane]=Math.imul(lanes[lane]^text.charCodeAt(n),0x01000193+lane*2);
     return text.length+':'+lanes.map(lane=>(lane>>>0).toString(16).padStart(8,'0')).join('');
   }
+  function withoutWaveIds(configuration) {
+    const copy=plain(configuration);
+    for (const level of copy.levels||[]) for (const wave of level.waves||[]) delete wave.id;
+    return copy;
+  }
+  function identifyLegacyWaves(configuration) {
+    if (!Array.isArray(configuration?.levels)) return configuration;
+    if (!configuration.levels.some(level=>Array.isArray(level?.waves) && level.waves.some(wave=>wave && typeof wave==='object' && !Object.prototype.hasOwnProperty.call(wave,'id')))) return configuration;
+    const stamp=fingerprint(configuration).replace(':','-');
+    for (const level of configuration.levels) if (Array.isArray(level?.waves)) level.waves.forEach((wave,index)=>{
+      if (wave && typeof wave==='object' && !Object.prototype.hasOwnProperty.call(wave,'id')) wave.id='legacy-untracked-'+stamp+'-s'+level.id+'-w'+(index+1);
+    });
+    return configuration;
+  }
   function dependencies(target) {
     const config = target.GameConfig || importedConfig || root.GameConfig;
     const rules = target.CustomRules || importedRules || root.CustomRules;
@@ -95,15 +109,15 @@
   function spec(state, input) {
     object(input,['config','rules'],'preset');
     if (!input.config || !input.rules) fail('preset requires config and rules');
-    const checked=plain(input);
+    const checked=plain(input);identifyLegacyWaves(checked.config);
     return {config:state.api.config.validate(checked.config),rules:state.api.rules.validate(checked.rules)};
   }
   function prepare(defaults,externalConfig,target=root) {
     if (states.has(target)) fail('prepare may only be called once per window');
     const api=dependencies(target), baseline=api.config.validate(plain(defaults)), external=api.config.validate(plain(externalConfig));
     const state={target,api,defaults:baseline,defaultRules:api.rules.defaults(),memory:new Map(),unpersisted:new Set(),warnings:[],storageAvailable:true,
-      mode:same(baseline,external)?'original':'custom',config:external,rules:api.rules.defaults(),stage:null,
-      sourceFingerprint:fingerprint(external),selectedPresetId:null,listeners:new Set(),pauseTokens:new Set(),pauseSequence:0,leaving:false};
+      mode:same(withoutWaveIds(baseline),withoutWaveIds(external))?'original':'custom',config:external,rules:api.rules.defaults(),stage:null,
+      sourceFingerprint:fingerprint(withoutWaveIds(external)),selectedPresetId:null,listeners:new Set(),pauseTokens:new Set(),pauseSequence:0,leaving:false};
     const saved=read(state,SESSION_KEY);
     if (saved) try {
       const session=parse(saved,LIMIT+8192); object(session,['schemaVersion','mode','config','rules','stage','selectedPresetId','sourceFingerprint'],'session');
@@ -113,7 +127,10 @@
       if (session.selectedPresetId !== null && session.selectedPresetId !== undefined) {
         if (typeof session.selectedPresetId!=='string' || !/^preset-[a-z0-9-]+$/.test(session.selectedPresetId)) fail('invalid selected preset id');
       }
-      if (session.sourceFingerprint!==undefined && session.sourceFingerprint!==state.sourceFingerprint)
+      // v0.3.0 source fingerprints predate internal wave IDs. Do not mistake
+      // deterministic ID normalization for a user's external JSON edit.
+      const matchesSource=session.sourceFingerprint===state.sourceFingerprint || session.sourceFingerprint===fingerprint(external);
+      if (session.sourceFingerprint!==undefined && !matchesSource)
         warn(state,'外置 JSON 配置已变更，已使用新配置；已保存预设仍然保留。');
       else Object.assign(state,{mode:session.mode,config:selected.config,rules:selected.rules,stage:selectedStage,selectedPresetId:session.selectedPresetId||null});
     } catch (error) { warn(state,'已忽略损坏的本机规则会话：'+error.message); }
@@ -155,11 +172,30 @@
       } catch (error) { warn(state,'预设库无法读取，原始数据未删除：'+error.message); throw error; }
     }
     const metadata=record=>({id:record.id,name:record.name,updatedAt:record.updatedAt});
+    function battleStatus() {
+      const value=game(),runtimeRunning=!!target.ZTPRuntime?.getStatus().running;
+      const people=entries(value.bbpeople),zombies=entries(value.bbzombies),converted=entries(value.bbpombies);
+      const editorPauseCount=state.pauseTokens.size,editorPaused=editorPauseCount>0,gamePaused=value.bbmainState===6;
+      const lastReport=state.lastWaveBattleToken===value.bbztp?state.lastWaveReport:null;
+      return {isBattle:battle(),stage:battle()?value.bbdifficulty+1:state.stage||1,
+        mainState:value.bbmainState,runtimeRunning,editorPaused,editorPauseCount,gamePaused,
+        battleRunning:runtimeRunning && value.bbmainState===2 && !editorPaused,
+        automaticSpawning:state.rules.automaticSpawning,
+        buildings:(value.bbbuildings||[]).map(building=>({id:building.bbtype,built:value.bbztp?.bbbuildingcount[building.bbtype]||0,
+          queued:building.bborders,maximum:building.bbmaximum})),
+        waveProgress:state.api.config.getWaveProgress?state.api.config.getWaveProgress(target):null,
+        wavePending:lastReport?.deferred?.slice()||[],waveNotes:lastReport?.notes?.slice()||[],
+        entities:{people:people.filter(body=>body.bbunit?.bbtype!==5).length,zombies:zombies.filter(body=>body.bbunit?.bbtype!==37).length,
+          converted:converted.length,total:people.length+zombies.length+converted.length}};
+    }
     function snapshot() {
       let presets=[]; try { presets=presetRecords().map(metadata); } catch (_) {}
+      const status=battleStatus();
       return {mode:state.mode,isCustom:state.mode==='custom',isBattle:battle(),stage:battle()?game().bbdifficulty+1:state.stage||1,
         config:current(),rules:plain(state.rules),defaults:plain(state.defaults),defaultRules:plain(state.defaultRules),
-        presets,selectedPresetId:state.selectedPresetId,storageAvailable:state.storageAvailable,warnings:state.warnings.slice(),paused:state.pauseTokens.size>0};
+        presets,selectedPresetId:state.selectedPresetId,storageAvailable:state.storageAvailable,warnings:state.warnings.slice(),paused:state.pauseTokens.size>0,
+        battleStatus:status,waveProgress:status.waveProgress,runtimeRunning:status.runtimeRunning,editorPaused:status.editorPaused,
+        gamePaused:status.gamePaused,battleRunning:status.battleRunning};
     }
     function notify() { for (const listener of state.listeners) try { listener(snapshot()); } catch (error) { target.console?.error(error); } }
     function reload() {
@@ -191,10 +227,37 @@
       const promoted=promote();
       const result=state.api.config.updateLive(target,validated,{healthPolicy:options.healthPolicy||'ratio',preserveTimerProgress:true});
       state.config=validated;state.stage=game().bbdifficulty+1;
-      return {...result,promoted};
+      return {...synchronizeWaves(validated,result),promoted};
+    }
+    function synchronizeWaves(configuration,report) {
+      const stage=game().bbdifficulty+1,path='$.levels['+(stage-1)+'].waves';
+      const progress=state.api.config.getWaveProgress?.(target)||null;
+      const known=new Set(progress?.knownIds||[]),waves=configuration.levels.find(level=>level.id===stage).waves;
+      const missingIdentity=waves.some(wave=>wave.id?.startsWith('legacy-untracked-') && !known.has(wave.id));
+      let waveReport;
+      if (missingIdentity || !state.api.config.applyLiveWaves) {
+        const reason=missingIdentity?'这套旧规则没有本局可核对的波次身份，出怪计划需新开一局。':'本局波次进度不可用，出怪计划需新开一局。';
+        waveReport={applied:[],deferred:[path],notes:[reason],requiresNewBattle:true,reason,progress};
+      } else waveReport=state.api.config.applyLiveWaves(target,configuration);
+      const otherStages=[...new Set((report.deferred||[]).flatMap(field=>{
+        const match=field.match(/^\$\.levels\[(\d+)\]\.waves(?:$|\.)/);return match && Number(match[1])!==stage-1?[Number(match[1])+1]:[];
+      }))];
+      waveReport={...waveReport,stage,otherStages,notes:[...(waveReport.notes||[])]};
+      if (otherStages.length) waveReport.notes.push('当前战斗为第 '+stage+' 关；第 '+otherStages.join('、')+' 关的波次修改将在下次开始对应关卡时生效。');
+      state.lastWaveReport=waveReport;state.lastWaveBattleToken=game().bbztp;
+      const deferred=(report.deferred||[]).filter(field=>field!==path && !field.startsWith(path+'.'));
+      return {...report,applied:[...new Set([...(report.applied||[]),...(waveReport.applied||[])])],
+        deferred:[...new Set([...deferred,...(waveReport.deferred||[])])],waveReport};
+    }
+    function runtimeTransaction(action) {
+      const runtime=target.ZTPRuntime,wasRunning=!!runtime?.getStatus().running;
+      if (wasRunning) { runtime.stop();runtime.advance(0); }
+      try { return action(); }
+      finally { if (wasRunning && !state.leaving) { runtime.useRealtime();runtime.start(); } }
     }
     const controller={
       getState:snapshot,
+      getBattleStatus:battleStatus,
       getDraft:()=>({config:current(),rules:plain(state.rules)}),
       validateDraft:input=>spec(state,input),
       listPresets:()=>{ try { return presetRecords().map(metadata); } catch (_) { return []; } },
@@ -244,9 +307,9 @@
       },
       applyLive(configuration,options={}) {
         if (!battle()) fail('请先开始一局游戏');
-        const validated=state.api.config.validate(plain(configuration));
+        const validated=state.api.config.validate(identifyLegacyWaves(plain(configuration)));
         if (!['ratio','new-only',undefined].includes(options.healthPolicy)) fail('unsupported health policy');
-        const result=applyValidatedConfiguration(validated,options);
+        const result=runtimeTransaction(()=>applyValidatedConfiguration(validated,options));
         persist(); notify(); return result;
       },
       applyDraft(input,options={}) {
@@ -255,8 +318,12 @@
         // the authoritative config/rule integer and range checks belong here.
         const checked=spec(state,input);
         if (!['ratio','new-only',undefined].includes(options.healthPolicy)) fail('unsupported health policy');
-        const result=applyValidatedConfiguration(checked.config,options);
-        state.api.rules.update(target,checked.rules);state.rules=checked.rules;
+        if (!battle()) fail('请先开始一局游戏');
+        const result=runtimeTransaction(()=>{
+          const report=applyValidatedConfiguration(checked.config,options);
+          state.api.rules.update(target,checked.rules);state.rules=checked.rules;
+          return report;
+        });
         // Publish and persist only the complete pair, never an intermediate
         // new-config/old-rules state to UI subscribers or the next startup.
         persist();notify();return {...result,rules:plain(checked.rules)};
@@ -285,20 +352,17 @@
         notify(); return {type,count,positions};
       },
       applyUpcomingWaves(configuration) {
-        const value=customBattle(), checked=state.api.config.validate(plain(configuration));
-        const waves=checked.levels.find(level=>level.id===value.bbdifficulty+1).waves.filter(wave=>wave.enabled!==false);
-        // Only the selected stage's schedule changes here; unrelated draft
-        // health/economy/ability edits must not leak through this button.
+        const value=customBattle(),checked=state.api.config.validate(identifyLegacyWaves(plain(configuration)));
+        // Compatibility alias: use the same tracked-progress synchronization
+        // as ordinary Apply, never prepend the active group and replay row 1.
+        // Unrelated draft health/economy/ability fields remain untouched.
         const schedule=current();
         schedule.levels.find(level=>level.id===value.bbdifficulty+1).waves=plain(checked.levels.find(level=>level.id===value.bbdifficulty+1).waves);
-        state.api.config.updateLive(target,schedule,{healthPolicy:'new-only',preserveTimerProgress:true});
-        const mob=port.bb_ZombieMob, first=entries(mob.bbqueue)[0]||null, ticks=mob.bbticks;
-        const replacement=waves.map(wave=>new mob().bbZombieMob_new(wave.type,wave.count,wave.delay|0));
-        mob.bbqueue.bbClear(); if (first) mob.bbqueue.bbAddLast(first);
-        for (const wave of replacement) mob.bbqueue.bbAddLast(wave);
-        mob.bbticks=ticks;
-        state.config=schedule;
-        persist(); notify(); return {retainedCurrent:!!first,upcomingGroups:replacement.length,totalUpcoming:replacement.reduce((sum,wave)=>sum+(wave.bbtype===0?0:wave.bbcount),0)};
+        const result=runtimeTransaction(()=>{
+          const report=state.api.config.updateLive(target,schedule,{healthPolicy:'new-only',preserveTimerProgress:true});
+          state.config=schedule;return synchronizeWaves(schedule,report).waveReport;
+        });
+        persist();notify();return result;
       },
       pauseForEditor() {
         if (state.leaving) fail('game is changing mode');
@@ -327,7 +391,7 @@
     return active;
   }
   const api={prepare,attach,ready,constants:Object.freeze({ORIGINAL_STORAGE,CUSTOM_STORAGE,PRESETS_KEY,SESSION_KEY,MAX_PRESETS,MAX_IMPORT_BYTES:LIMIT})};
-  for (const name of ['getState','getDraft','validateDraft','listPresets','loadPreset','savePreset','deletePreset','exportPreset','importPreset','startCustomBattle','restoreOriginal','applyLive','applyDraft','applyRules','spawnZombie','applyUpcomingWaves','pauseForEditor','resumeFromEditor','subscribe'])
+  for (const name of ['getState','getBattleStatus','getDraft','validateDraft','listPresets','loadPreset','savePreset','deletePreset','exportPreset','importPreset','startCustomBattle','restoreOriginal','applyLive','applyDraft','applyRules','spawnZombie','applyUpcomingWaves','pauseForEditor','resumeFromEditor','subscribe'])
     api[name]=function () { if (!active) fail('game is not ready'); return active[name].apply(active,arguments); };
   return Object.freeze(api);
 });

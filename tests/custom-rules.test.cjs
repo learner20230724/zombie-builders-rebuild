@@ -152,6 +152,58 @@ test('custom salvage income and interval are consumed by the real economy leaf',
   g.bbztp.bbcash=2147483646;g.bbAddWealth(20);assert.equal(g.bbztp.bbcash,2147483647);
 });
 
+test('constant-time default payouts retain original integer input and remainder semantics',()=>{
+  const original=fixture(undefined,false),wrapped=fixture();
+  for(const coins of [-600,-1,0,1,599])for(const cash of [0,100,100000]) {
+    original.game.bbcoins=wrapped.game.bbcoins=coins;original.game.bbztp.bbcash=wrapped.game.bbztp.bbcash=cash;
+    for(const amount of [-2.9,0,1.9,7.75,600,100000,13.1]) {
+      original.game.bbAddWealth(amount);wrapped.game.bbAddWealth(amount);
+      assert.equal(wrapped.game.bbcoins,original.game.bbcoins);
+      assert.equal(wrapped.game.bbztp.bbcash,original.game.bbztp.bbcash);
+    }
+  }
+});
+
+test('payout settlement is constant work even with extreme income and protects signed cash',()=>{
+  const h=fixture();let cash=0,reads=0,writes=0;
+  Object.defineProperty(h.game.bbztp,'bbcash',{configurable:true,get(){reads++;return cash;},set(value){writes++;cash=value;}});
+  h.game.bbAddWealth(100000.9);
+  assert.equal(cash,8300);assert.equal(h.game.bbcoins,400);assert.equal(reads,1);assert.equal(writes,1);
+  change(h,r=>{r.economy.salvageIntervalTicks=1;r.economy.salvagePayout=1000000;});
+  h.game.bbcoins=0;cash=0;reads=writes=0;h.game.bbAddWealth(100000);
+  assert.equal(cash,2147483647);assert.equal(h.game.bbcoins,0);assert.equal(reads,1);assert.equal(writes,1);
+  h.game.bbcoins=599;cash=0;reads=writes=0;h.game.bbAddWealth(2147483647);
+  assert.equal(cash,2147483647);assert.equal(h.game.bbcoins,0);assert.equal(reads,1);assert.equal(writes,1);
+});
+
+test('unlimited salvage yards beyond the old five-yard limit produce actual income',()=>{
+  const c=config();Object.assign(c.buildings[1],{maximum:0,cost:0,buildTicks:1});
+  const h=fixture(undefined,true,c);change(h,r=>r.automaticSpawning=false);
+  const yard=h.game.bbbuildings[1];for(let i=0;i<5;i++)h.game.bbBuyBuilding(yard);
+  h.ticks(5);assert.equal(h.game.bbztp.bbbuildingcount[1],6);
+  h.game.bbcoins=0;const cash=h.game.bbztp.bbcash;h.ticks(100);
+  assert.equal(h.game.bbztp.bbcash,cash+50);assert.equal(h.game.bbcoins,0);
+});
+
+test('unlimited and high-count trailers contribute their real population beyond visual slots',()=>{
+  const c=config();Object.assign(c.buildings[0],{maximum:0,cost:0,buildTicks:1});
+  const h=fixture(undefined,true,c);change(h,r=>{r.automaticSpawning=false;r.economy.populationPerTrailer=1000;});
+  const trailer=h.game.bbbuildings[0];for(let i=0;i<20;i++)h.game.bbBuyBuilding(trailer);
+  h.ticks(20);assert.equal(h.game.bbztp.bbbuildingcount[0],21);assert.equal(h.game.bbztp.bbmaxforce,21000);
+  const finite=config();Object.assign(finite.buildings[0],{maximum:100000,cost:0,buildTicks:1});
+  GameConfig.updateLive(h.target,finite);h.game.bbztp.bbbuildingcount[0]=99999;h.game.bbBuyBuilding(trailer);h.ticks();
+  assert.equal(h.game.bbztp.bbbuildingcount[0],100000);assert.equal(h.game.bbztp.bbmaxforce,100000000);
+  assert.ok(Number.isInteger(h.game.bbztp.bbmaxforce));
+});
+
+test('one hundred thousand real yards settle every tick without an int32 wrap',()=>{
+  const c=config();c.buildings[1].maximum=0;
+  const h=fixture(undefined,true,c);change(h,r=>{r.automaticSpawning=false;r.economy.salvageIntervalTicks=1;r.economy.salvagePayout=1000000;});
+  h.game.bbztp.bbbuildingcount[1]=100000;h.game.bbztp.bbcash=0;h.game.bbcoins=0;
+  h.ticks();assert.equal(h.game.bbztp.bbcash,2147483647);assert.equal(h.game.bbcoins,0);
+  h.ticks();assert.equal(h.game.bbztp.bbcash,2147483647);assert.equal(h.game.bbcoins,0);
+});
+
 test('custom trailer capacity applies immediately, survives ticks and affects actual purchasing',()=>{
   const h=fixture();change(h,r=>{r.economy.populationPerTrailer=17;r.automaticSpawning=false;});
   const g=h.game;assert.equal(g.bbztp.bbmaxforce,17);g.bbztp.bbbuildingcount[0]=3;h.ticks();assert.equal(g.bbztp.bbmaxforce,51);
