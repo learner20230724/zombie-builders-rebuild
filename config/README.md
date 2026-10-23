@@ -29,6 +29,14 @@ Applied in-game rules can be remembered between runs. The saved session's `sourc
 - A unit's `dependency` is its required building ID. For buildings, `dependency: 0` means no prerequisite; other values are building IDs.
 - `name`, stage `title` and `description` are display text. Keep descriptions on the five recruitable units and six buildings; bases do not have recruitment descriptions.
 
+## Health bounds and errors
+
+`units[].health` and `zombies[].health` accept integers **1–2,147,483,647**, including both bases. The old 100,000,000 limit was a configuration guard, not an original gameplay rule. The ceiling now follows signed 32-bit combat arithmetic; **0 is death, not invincibility**. Every stage must also satisfy `zombies[0..4].health × truncate(zombieHealthMultiplier) <= 2,147,483,647`. Enemy-base health is not multiplied. Large kill rewards saturate accumulated XP at 2,147,483,647 instead of wrapping negative; power spending still works normally.
+
+`GameConfig $.units[5].health` identifies the **player base's health** (zero-based index 5, the sixth entry); `$.zombies[5].health` identifies the enemy base. Messages retain the JSON path and add Chinese field context. A validation failure leaves the current battle unchanged.
+
+中文：生命为整数 **1–2,147,483,647**；旧的一亿上限是配置校验，不是原版规则。新边界用于防止 32 位溢出，0 不是无敌。每关普通僵尸基础生命乘截整数后的生命倍率也要满足此范围。`$.units[5].health` 是己方基地，`$.zombies[5].health` 是敌方基地。累计 XP 到边界后保顶，不会溢出负数，之后仍可正常消费。
+
 ## Building limits
 
 `buildings[].maximum` accepts integers **0–100,000**. **0 removes the gameplay cap**; a positive value sets the cap. There is still a separate engine safety ceiling of 100,000 per type. Original defaults are unchanged: Trailer 15, Salvage Yard 5, and each other type 1.
@@ -91,3 +99,7 @@ Use **F2** for the non-modal editor. It pauses by default, but **继续战斗** 
 Old imported waves without a trusted identity require starting a new custom battle before live wave editing; other valid attributes can still apply now. The panel reports actual queued/spawned/consumed counts separately from draft rows. See the development guide for count reduction, disabled/deleted groups, delay changes, and compatibility-API details.
 
 Spawning/ability switches, income rules, Trailer population capacity, Harvester damage/range, and the named-preset wrapper are separate from these five entity documents. Their schema, live-apply boundaries, and storage keys are documented in the [development guide](../docs/DEVELOPMENT.md#presets-rules-and-sandbox) / [二次开发指南](../docs/DEVELOPMENT.zh-CN.md#预设规则与沙盒). New character types and entirely new mechanics require code rather than extra arbitrary JSON fields.
+
+**一键杀死己方小兵 / 一键杀死敌方小兵** are immediate actions in an active custom battle, not JSON fields. They clear current non-base troops only, including converted allies on the friendly side, without XP/kill credit. Bases, paid orders, future waves, reinforcement queues, and existing projectiles/power effects remain; the buttons do not disable subsequent spawning.
+
+中文：两个清场按钮是自定义局即时操作，不是可保存的 JSON 属性；只清当前对应阵营的小兵（己方含转化僵尸），不清基地，不刷 XP／击杀，不取消已付订单、不改未来出怪，也不移除已发出的投射物或技能效果。

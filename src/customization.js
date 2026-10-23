@@ -255,6 +255,63 @@
       try { return action(); }
       finally { if (wasRunning && !state.leaving) { runtime.useRealtime();runtime.start(); } }
     }
+    function clearTroops(side) {
+      const value=customBattle(),isBase=body=>body===value.bbpeoplebase || body===value.bbzombiebase || [5,37].includes(body?.bbunit?.bbtype);
+      const groups=(side==='friendly'?[['people',value.bbpeople],['converted',value.bbpombies]]:[['zombies',value.bbzombies]])
+        .map(([kind,list])=>({kind,list,bodies:[...new Set(entries(list))].filter(body=>!isBase(body))}));
+      const result={side,count:0,people:0,converted:0,zombies:0},bodies=new Set();
+      let releasedPopulation=0;
+      const writable=(owner,key)=>{
+        const property=Object.getOwnPropertyDescriptor(owner,key);
+        if (property ? !Object.prototype.hasOwnProperty.call(property,'value') || !property.writable : !Object.isExtensible(owner))
+          fail('无法清场：运行时状态不可写，未修改本局');
+      };
+      // Snapshot first: list removal mutates the enumerator's linked nodes.
+      // Preflight all ordinary data writes before touching even the first unit.
+      for (const group of groups) {
+        if (typeof group.list?.bbRemove!=='function') fail('无法清场：单位列表不可用');
+        if (group.bodies.length) {
+          // bbRemove rewires each removed node's predecessor and successor;
+          // the last removal also writes the sentinel. Check every node in
+          // both friendly lists before killing anyone, not only actor fields.
+          const head=group.list.bb_head,seen=new Set();let node=head;
+          do {
+            if (!node || seen.has(node) || seen.size>100000) fail('无法清场：单位列表损坏');
+            seen.add(node);writable(node,'bb_succ');writable(node,'bb_pred');
+            if (!node.bb_succ || !node.bb_pred || node.bb_succ.bb_pred!==node || node.bb_pred.bb_succ!==node)
+              fail('无法清场：单位列表损坏');
+            node=node.bb_succ;
+          } while (node!==head);
+        }
+        for (const body of group.bodies) {
+          if (!body || !body.bbunit || !Number.isFinite(body.bbhealth)) fail('无法清场：单位状态无效');
+          writable(body,'bbhealth');writable(body,'bbmode');
+          if (bodies.has(body)) continue;
+          bodies.add(body);result[group.kind]++;result.count++;
+          // This is the original Person removal refund, not a recalculation of
+          // the whole army: paid production still reserves its population, and
+          // angry mobs / converted zombies never reserved those slots.
+          if (group.kind==='people' && body.bbwaszombie===0 && body.bbisangry===0) {
+            if (!Number.isInteger(body.bbunit.bbpeople) || body.bbunit.bbpeople<0) fail('无法清场：单位人口无效');
+            releasedPopulation+=body.bbunit.bbpeople;
+          }
+        }
+      }
+      if (releasedPopulation) {
+        if (!Number.isFinite(value.bbztp?.bbforce)) fail('无法清场：人口状态无效');
+        writable(value.bbztp,'bbforce');
+      }
+      runtimeTransaction(()=>{
+        // Sandbox execution is deliberately not a damage hit or a GameTick:
+        // jumping / immune actors still die immediately, even while paused,
+        // without XP, kill/loss statistics, explosions, RNG or a timer advance.
+        // Existing projectiles/corpses and future production/spawn plans stay.
+        for (const body of bodies) { body.bbhealth=0;body.bbmode=15; }
+        for (const group of groups) for (const body of group.bodies) group.list.bbRemove(body);
+        if (releasedPopulation) value.bbztp.bbforce=Math.max(0,value.bbztp.bbforce-releasedPopulation);
+      });
+      notify();return result;
+    }
     const controller={
       getState:snapshot,
       getBattleStatus:battleStatus,
@@ -351,6 +408,8 @@
         // editor releases its frozen clock.
         notify(); return {type,count,positions};
       },
+      clearFriendlyTroops:()=>clearTroops('friendly'),
+      clearEnemyTroops:()=>clearTroops('enemy'),
       applyUpcomingWaves(configuration) {
         const value=customBattle(),checked=state.api.config.validate(identifyLegacyWaves(plain(configuration)));
         // Compatibility alias: use the same tracked-progress synchronization
@@ -391,7 +450,7 @@
     return active;
   }
   const api={prepare,attach,ready,constants:Object.freeze({ORIGINAL_STORAGE,CUSTOM_STORAGE,PRESETS_KEY,SESSION_KEY,MAX_PRESETS,MAX_IMPORT_BYTES:LIMIT})};
-  for (const name of ['getState','getBattleStatus','getDraft','validateDraft','listPresets','loadPreset','savePreset','deletePreset','exportPreset','importPreset','startCustomBattle','restoreOriginal','applyLive','applyDraft','applyRules','spawnZombie','applyUpcomingWaves','pauseForEditor','resumeFromEditor','subscribe'])
+  for (const name of ['getState','getBattleStatus','getDraft','validateDraft','listPresets','loadPreset','savePreset','deletePreset','exportPreset','importPreset','startCustomBattle','restoreOriginal','applyLive','applyDraft','applyRules','spawnZombie','clearFriendlyTroops','clearEnemyTroops','applyUpcomingWaves','pauseForEditor','resumeFromEditor','subscribe'])
     api[name]=function () { if (!active) fail('game is not ready'); return active[name].apply(active,arguments); };
   return Object.freeze(api);
 });

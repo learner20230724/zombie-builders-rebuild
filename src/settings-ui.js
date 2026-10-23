@@ -1,7 +1,7 @@
 /* Game customization editor. Runtime operations are delegated to Customization. */
 (function (root, factory) {
   'use strict';
-  const api = factory();
+  const api = factory(typeof module === 'object' && module.exports ? require('./game-config.js') : root.GameConfig);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else {
     root.SettingsUI = api;
@@ -10,8 +10,9 @@
       api.mount(controller && typeof controller.getState === 'function' ? controller : root.Customization);
     });
   }
-})(typeof globalThis === 'object' ? globalThis : this, function () {
+})(typeof globalThis === 'object' ? globalThis : this, function (GameConfig) {
   'use strict';
+  const HEALTH_SAFETY_LIMIT = GameConfig.HEALTH_SAFETY_LIMIT;
   const ZOMBIES = ['普通僵尸', '跳跃食尸鬼', '快速僵尸', '肥胖僵尸', '投尸僵尸'];
   const NAMES = {
     units: ['铲工', '愤怒农夫', '生存专家', '燃烧瓶投手', '牧师', '我方基地'],
@@ -23,7 +24,7 @@
   const TABS = [['sandbox', '沙盒 / 刷怪'], ['units', '兵种'], ['zombies', '僵尸'], ['buildings', '建筑'], ['powers', '技能'], ['levels', '关卡 / 出怪']];
   const FIELDS = {
     name: ['名称', '文字', '立即'], title: ['关卡标题', '文字', '下局'], description: ['说明', '文字', '立即'],
-    cost: ['招募 / 建造费用', '现金', '立即'], health: ['最大生命', 'HP', '按生命策略'], damage: ['攻击伤害', '伤害', '立即'],
+    cost: ['招募 / 建造费用', '现金', '立即'], health: ['最大生命', 'HP；正整数', '按生命策略'], damage: ['攻击伤害', '伤害', '立即'],
     projectileDamage: ['投射物伤害', '伤害', '新投射物'], moveSpeed: ['移动速度', '距离 / 战斗 tick', '立即'],
     buildTicks: ['生产 / 蓄力时间', '战斗 tick', '保留进度'], cooldownTicks: ['冷却时间', '战斗 tick', '保留进度'],
     dependency: ['所需建筑 ID', '0–5（见建筑页）', '下局'], people: ['占用人口', '人', '下局'], maximum: ['最大建筑数', '0 = 不设上限', '立即'],
@@ -90,7 +91,7 @@
     let opened = false, pauseToken, pollTimer, previousFocus = null, draft, baseline, baselineSaved = false, selectedPresetId = '', activeTab = 'sandbox', lastBattleStage = null, waveSequence = 0;
     let selection = {units: 0, zombies: 0, buildings: 0, powers: 0, levels: 0}, wavePage = 0, reinforcementPage = 0, reinforcementIndex = 0;
     const undo = [], invalid = new Map(), cleanups = [], consumedKeys = new Set();
-    let disposed = false;
+    let disposed = false, clearingTroops = false;
     function node(tag, className, text) {
       const el = doc.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = String(text); return el;
     }
@@ -258,7 +259,11 @@
     function makeInput(path, value, label) {
       let input;
       if (typeof value === 'boolean') { input = node('input'); input.type = 'checkbox'; input.checked = value; }
-      else if (typeof value === 'number') { input = node('input'); input.type = 'number'; input.step = 'any'; input.value = String(value); input.inputMode = 'decimal'; if (path.endsWith('.maximum')) { input.min = '0'; input.max = '100000'; input.step = '1'; } }
+      else if (typeof value === 'number') {
+        input = node('input'); input.type = 'number'; input.step = 'any'; input.value = String(value); input.inputMode = 'decimal';
+        if (path.endsWith('.maximum')) { input.min = '0'; input.max = '100000'; input.step = '1'; }
+        if (path.endsWith('.health')) { input.min = '1'; input.max = String(HEALTH_SAFETY_LIMIT); input.step = '1'; input.inputMode = 'numeric'; input.setAttribute('aria-describedby', 'ztps-health-help'); }
+      }
       else { input = node(path.endsWith('description') ? 'textarea' : 'input'); if (input.tagName === 'INPUT') input.type = 'text'; input.value = value; input.maxLength = path.endsWith('description') ? 2000 : 120; }
       input.dataset.path = path; input.setAttribute('aria-label', label); input.addEventListener('change', () => {
         try {
@@ -301,6 +306,10 @@
       const status = content.querySelector('[data-battle-status]');
       if (status) status.textContent = s.isCustom && s.isBattle ? '自定义战局 · 第 ' + s.stage + ' 关' + (ownsPause ? ' · 设置暂停中' : ' · 设置与游戏可同时操作') : s.isBattle ? '原版战局：应用本局后转为自定义，不计入原版成绩。' : '先选择关卡，开始自定义战局。';
       for (const b of content.querySelectorAll('[data-spawn]')) b.disabled = !(s.isCustom && s.isBattle);
+      for (const b of content.querySelectorAll('[data-clear-troops]')) {
+        const method = b.dataset.clearTroops === 'friendly' ? 'clearFriendlyTroops' : 'clearEnemyTroops';
+        b.disabled = clearingTroops || !(s.isCustom && s.isBattle) || typeof controller[method] !== 'function';
+      }
       const editing = content.querySelector('[data-editing-stage]');
       if (editing) { const other = Number(editing.dataset.editingStage); editing.textContent = s.isBattle && s.stage !== other ? '当前正在第 ' + s.stage + ' 关；你正在编辑第 ' + other + ' 关。此关波次下一次开该关时才生效。' : s.isBattle ? '正在编辑当前第 ' + s.stage + ' 关；应用本局会同步未完成的波次。' : '正在编辑第 ' + other + ' 关，开始该关自定义战局后生效。'; editing.classList.toggle('ztps-warning', !!(s.isBattle && s.stage !== other)); }
       const buildingStatus = content.querySelector('[data-building-status]');
@@ -341,7 +350,11 @@
       if (kind === 'levels') { const editing = node('p', 'ztps-editing-stage'); editing.dataset.editingStage = String(entity.id); content.appendChild(editing); }
       if (kind === 'buildings') { const actual = node('p', 'ztps-building-status'); actual.dataset.buildingStatus = String(entity.id); content.appendChild(actual); }
       content.appendChild(parameterTable(entity, original, 'config.' + kind + '.' + index));
-      if (kind === 'units' || kind === 'zombies') content.appendChild(node('p', 'ztps-help', '伤害与射程 / 动画命中规则不同；攻击频率由原状态机决定。投射物改值只影响修改后发出的投射物。'));
+      if (kind === 'units' || kind === 'zombies') {
+        const healthHelp = node('p', 'ztps-help', '最大生命可填 1–' + HEALTH_SAFETY_LIMIT.toLocaleString('en-US') + ' 的正整数（约 21.47 亿）；这是运行时整数安全范围，不是原版玩法上限。0 代表死亡，不代表无敌。僵尸生命乘以关卡倍率后的结果也须处于此范围。');
+        healthHelp.id = 'ztps-health-help'; content.appendChild(healthHelp);
+        content.appendChild(node('p', 'ztps-help', '伤害与射程 / 动画命中规则不同；攻击频率由原状态机决定。投射物改值只影响修改后发出的投射物。'));
+      }
       if (kind === 'buildings') content.appendChild(node('p', 'ztps-help', '最大建筑数 0 表示不设玩法上限，或输入任意正整数。应用本局立即生效；降低上限不会拆除已有建筑或取消已付费订单，只限制继续新建。'));
       if (kind === 'levels') {
         content.appendChild(node('p', 'ztps-help', '生命倍率先取整（1.75 与 1 相同）；近战伤害最终取整，尸弹不受伤害倍率影响。开局现金 / XP 下局生效。'));
@@ -423,6 +436,27 @@
         const b = button('', () => action(async () => { await controller.spawnZombie(type, 1); notice('已生成 1 只' + name + (pauseToken !== undefined ? '，点击“继续战斗”即可行动。' : '。')); }), 'ztps-spawn'); b.dataset.spawn = String(type);
         const icon = node('span', 'ztps-zombie-icon ztps-zombie-' + type); icon.setAttribute('aria-hidden', 'true'); b.appendChild(icon); b.appendChild(node('strong', '', name)); b.appendChild(node('small', '', '＋ 1 只')); cards.appendChild(b);
       }); spawn.appendChild(cards); content.appendChild(spawn);
+      const clear = node('section', 'ztps-section'); clear.appendChild(node('h2', '', '清理当前小兵'));
+      const clearHelp = node('p', 'ztps-help', '点击立即清理当前场上对应阵营的全部小兵，己方包含已转化的僵尸。不伤害基地，不取消排队招募，不改变后续波次，也不增加击杀统计或经验。');
+      clearHelp.id = 'ztps-clear-troops-help'; clear.appendChild(clearHelp);
+      const clearActions = node('div', 'ztps-clear-actions');
+      for (const [side, label, method] of [['friendly', '己方', 'clearFriendlyTroops'], ['enemy', '敌方', 'clearEnemyTroops']]) {
+        const b = button('一键杀死' + label + '小兵', () => action(async () => {
+          const s = state();
+          if (!s.isCustom || !s.isBattle) throw new Error('请先开始自定义战局，再清理当前场上的小兵。');
+          if (clearingTroops) return;
+          if (typeof controller[method] !== 'function') throw new Error('当前版本尚不支持清理小兵，请更新后重试。');
+          clearingTroops = true; renderBattleState();
+          try {
+            const result = await controller[method]();
+            const after = typeof controller.getBattleStatus === 'function' ? controller.getBattleStatus() : state();
+            const pausedView = after.gamePaused ? ' 原游戏画面暂停中，请在原游戏菜单继续后刷新。' : pauseToken !== undefined ? ' 当前画面暂停，点击“继续战斗”刷新。' : after.editorPaused || after.paused || after.runtimeRunning === false ? ' 当前画面暂停，恢复战斗后刷新。' : '';
+            notice('已清理当前场上 ' + result.count + ' 个' + label + '小兵。基地、招募排队与后续波次未改变。' + pausedView);
+          } finally { clearingTroops = false; renderBattleState(); }
+        }, true), 'ztps-danger');
+        b.dataset.clearTroops = side; b.setAttribute('aria-label', '一键杀死当前场上的所有' + label + '小兵'); b.setAttribute('aria-describedby', clearHelp.id); clearActions.appendChild(b);
+      }
+      clear.appendChild(clearActions); content.appendChild(clear);
       const rules = node('section', 'ztps-section'); rules.appendChild(node('h2', '', '出怪与能力规则'));
       rules.appendChild(node('p', 'ztps-help', '开关先改草稿；点击底部“应用本局”生效，或保存供下次使用。关闭自动波次也暂停基地受伤增援；尸弹额外生成受独立开关控制。'));
       const grid = node('div', 'ztps-rule-grid');

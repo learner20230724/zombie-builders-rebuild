@@ -64,6 +64,12 @@ The [configuration reference](../config/README.md) covers all fields and reinfor
 
 Units, zombies, and buildings use IDs **0–5**; unit and zombie ID **5** is the corresponding base. Powers use IDs **0–2**, and levels use IDs **1–4**.
 
+### Health values and validation messages
+
+`units[].health` and `zombies[].health` accept integers **1–2,147,483,647**. The earlier 100,000,000 ceiling was a configuration guard, not a gameplay rule. The new ceiling matches the existing signed 32-bit combat representation; do not remove it without replacing the relevant integer arithmetic. Health `0` is death, not an invincibility flag.
+
+An error path such as `$.units[5].health` points to the sixth JSON entry: the player base. `$.zombies[5].health` is the enemy base. Errors retain this machine-readable path and include readable Chinese field context. For each stage and non-base zombie, `health × truncate(zombieHealthMultiplier)` must also remain at or below **2,147,483,647**; enemy-base health is not multiplied. Validation occurs before applying changes, and an invalid draft does not partially mutate a battle. High-health enemy kill rewards saturate accumulated XP at the same signed 32-bit ceiling rather than wrapping negative; later power spending still deducts XP normally.
+
 ### Example: stronger Shovel Men
 
 In `units.json`, find `shovel-man` and change these values within its existing entry:
@@ -245,12 +251,15 @@ F2 toggles the dock globally. Esc closes it when focus is inside settings; form 
 | `applyLive(config, {healthPolicy})` | Promote an active original run to custom and apply supported values |
 | `applyRules(rules)` | Apply behavior switches in a custom battle |
 | `spawnZombie(type, count = 1)` | Immediately create zombie type 0–4 in a custom battle; count 1–20 |
+| `clearFriendlyTroops()`, `clearEnemyTroops()` | Immediately clear current non-base troops on one side in an active custom battle; preserve pause and queues |
 | `applyUpcomingWaves(config)` | Compatibility wave-only alias for safe tracked-current-stage synchronization; does not apply other draft attributes |
 | `getBattleStatus()` | Read running/editor/game pause states, building counts, entity counts, and actual wave progress |
 | `restoreOriginal()` | Reload original mode; does not delete saved presets |
 | `pauseForEditor()`, `resumeFromEditor(token)` | Pause the editor safely without catch-up simulation on close |
 
 Use `applyDraft` for a complete player-edited draft rather than chaining `applyLive` and `applyRules`: an invalid rule must not leave a valid configuration half-applied. Validation failures leave the mode, stored data, and live configuration unchanged.
+
+The troop-clearing methods work while running or paused and do not advance simulation. Friendly clearing includes normal survivors, Angry Mob summons, and converted zombies. Selected actors are removed from their combat lists immediately, with health `0` and death mode `15`; bases are excluded. They return `{side, count, people, converted, zombies}` and release population only for ordinary recruited survivors, once per removal. Clearing an empty side again returns count `0`. They do not award XP, kills, losses, or cash, create death effects, remove existing corpses/projectiles/power effects, cancel paid orders, alter timers, or change wave/reinforcement queues. Automatic spawning remains enabled unless separately switched off. These are immediate sandbox actions, not saved preset flags.
 
 ### Current-battle wave reconciliation
 

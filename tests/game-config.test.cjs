@@ -110,6 +110,40 @@ test('strict validation reports JSON paths for malformed or inconsistent configu
   assert.throws(()=>GameConfig.validate({...defaults(),schemaVersion:2}),/\$\.schemaVersion/);
 });
 
+test('health accepts the actual signed-int32 storage boundary with contextual Chinese errors',()=>{
+  const c=defaults(),limit=GameConfig.HEALTH_SAFETY_LIMIT;
+  assert.equal(limit,2147483647);
+  for(const level of c.levels)level.zombieHealthMultiplier=1;
+  for(const kind of ['units','zombies'])for(const unit of c[kind])unit.health=limit;
+  const compiled=GameConfig.compile(c);
+  for(const kind of ['units','zombies'])for(const unit of compiled.config[kind])assert.equal(unit.health,limit);
+  assert.equal(compiled.raw.bb_data_unitdata[53],limit);
+  assert.equal(compiled.raw.bb_data_zombiedata[53],limit);
+  for(const value of [0,-1,2147483648,1e12]){
+    const invalid=defaults();invalid.units[5].health=value;
+    assert.throws(()=>GameConfig.validate(invalid),error=>{
+      assert.match(error.message,/GameConfig \$\.units\[5\]\.health: must be between 1 and 2147483647/);
+      assert.match(error.message,/己方基地生命值/);assert.match(error.message,/32 位整数安全上限/);return true;
+    });
+  }
+  for(const value of [NaN,Infinity,1.5,'100']){
+    const invalid=defaults();invalid.zombies[5].health=value;
+    assert.throws(()=>GameConfig.validate(invalid),/\$\.zombies\[5\]\.health: expected a finite integer.*敌方基地生命值/);
+  }
+});
+
+test('large zombie health still checks each stage integer multiplier before int32 storage',()=>{
+  const c=defaults(),limit=GameConfig.HEALTH_SAFETY_LIMIT;
+  for(const level of c.levels)level.zombieHealthMultiplier=3.9;
+  c.zombies[0].health=Math.floor(limit/3);c.zombies[5].health=limit;
+  assert.equal(GameConfig.validate(c).zombies[0].health,715827882);
+  c.zombies[0].health++;
+  assert.throws(()=>GameConfig.validate(c),error=>{
+    assert.match(error.message,/\$\.levels\[0\]\.zombieHealthMultiplier: effective health overflows signed int32/);
+    assert.match(error.message,/第 1 关：普通僵尸生命值/);assert.match(error.message,/降低生命值或关卡倍率/);return true;
+  });
+});
+
 test('configured costs, exact ticks, speed, starting economy, bases and health UI take effect',()=>{
   const c=defaults();
   Object.assign(c.units[0],{cost:19,buildTicks:29,moveSpeed:1.25,health:91,damage:22});

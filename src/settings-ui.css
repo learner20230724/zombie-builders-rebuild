@@ -73,6 +73,7 @@ body.ztps-docked main{right:var(--ztps-dock-width);height:auto}
 .ztps-spawn{display:flex;align-items:center;flex-direction:column;gap:5px;padding:13px 8px;background:#1c2b35;min-height:125px}
 .ztps-spawn strong{font-size:13px}
 .ztps-spawn small{font-size:12px;color:#a5be99}
+.ztps-clear-actions{display:flex;gap:9px;flex-wrap:wrap}.ztps-clear-actions .ztps-button{flex:1;white-space:normal;min-width:150px}.ztps-danger{border-color:#a26661;background:#3a292c;color:#ffcec6}.ztps-danger:hover:not(:disabled){border-color:#dc9b90;background:#533339}
 .ztps-zombie-icon{display:grid;place-items:center;height:55px;width:76px;line-height:1}
 /* The first packed frame of each existing local sprite atlas. No new asset. */
 .ztps-zombie-icon::before{content:"";display:block;background-repeat:no-repeat;background-position:0 0}

@@ -78,7 +78,9 @@ function fixture({custom=false,battle=false}={}) {
     applyRules(rules){CustomRules.validate(rules);calls.push(['rules',clone(rules)]);current.rules=clone(rules);notify();},
     applyDraft(spec,options){GameConfig.validate(spec.config);CustomRules.validate(spec.rules);calls.push(['applyDraft',clone(spec),options]);current.config=clone(spec.config);current.rules=clone(spec.rules);current.isCustom=true;notify();return {applied:['$.zombies[3].health'],deferred:[],...(current.applyReport||{})};},
     applyUpcomingWaves(config){GameConfig.validate(config);calls.push(['waves',clone(config)]);return {retainedCurrent:true,upcomingGroups:config.levels[0].waves.filter(w=>w.enabled!==false).length};},
-    spawnZombie(type,count){calls.push(['spawn',type,count]);return {count,type,positions:[1500]};}
+    spawnZombie(type,count){calls.push(['spawn',type,count]);return {count,type,positions:[1500]};},
+    clearFriendlyTroops(){calls.push(['clearFriendly']);return {side:'friendly',count:3,people:2,converted:1,zombies:0};},
+    clearEnemyTroops(){calls.push(['clearEnemy']);return {side:'enemy',count:5,people:0,converted:0,zombies:5};}
   };
   const handle=UI.mount(controller,{document:doc,window:win,canvas});
   const findText=text=>doc.body.querySelectorAll('button').find(b=>b.textContent===text);
@@ -116,6 +118,32 @@ test('F2/Escape consumed on close never reach game; unhandled Escape keyup remai
 test('spawn controls require custom battle and call exactly one chosen zombie',async()=>{
   const f=fixture();f.handle.open();let fat=f.doc.body.querySelectorAll('[data-spawn]').find(b=>b.dataset.spawn==='3');assert.equal(fat.disabled,true);await fat.click();assert.equal(f.calls.filter(c=>c[0]==='spawn').length,0);
   await f.findText('开始自定义战局').click();fat=f.doc.body.querySelectorAll('[data-spawn]').find(b=>b.dataset.spawn==='3');assert.equal(fat.disabled,false);await fat.click();await fat.click();assert.deepEqual(f.calls.filter(c=>c[0]==='spawn'),[['spawn',3,1],['spawn',3,1]]);f.handle.destroy();
+});
+test('clear troop buttons need an active custom battle and never run on open or mode changes',async()=>{
+  for(const flags of [{},{battle:true},{custom:true}]){
+    const f=fixture(flags);f.handle.open();const buttons=f.doc.body.querySelectorAll('[data-clear-troops]');assert.equal(buttons.length,2);assert.ok(buttons.every(b=>b.disabled));for(const b of buttons)await b.click();assert.equal(f.calls.some(c=>c[0].startsWith('clear')),false);
+    await f.findText('开始自定义战局').click();assert.ok(buttons.every(b=>!b.disabled));assert.equal(f.calls.some(c=>c[0].startsWith('clear')),false);f.handle.destroy();
+  }
+});
+test('explicit clear clicks call only their side and report counts without closing or changing pause',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();const friendly=f.byLabel('一键杀死当前场上的所有己方小兵'),enemy=f.byLabel('一键杀死当前场上的所有敌方小兵');
+  assert.equal(friendly.getAttribute('aria-describedby'),'ztps-clear-troops-help');assert.match(f.doc.getElementById('ztps-clear-troops-help').textContent,/己方包含已转化.*不伤害基地.*不取消排队招募.*不改变后续波次/);
+  await friendly.click();assert.deepEqual(f.calls.filter(c=>c[0].startsWith('clear')),[['clearFriendly']]);assert.match(f.doc.body.querySelector('.ztps-message').textContent,/已清理当前场上 3 个己方小兵.*基地、招募排队与后续波次未改变.*当前画面暂停.*继续战斗/);assert.equal(f.handle.isOpen(),true);assert.equal(f.current.paused,true);
+  await f.findText('继续战斗').click();await enemy.click();assert.deepEqual(f.calls.filter(c=>c[0].startsWith('clear')),[['clearFriendly'],['clearEnemy']]);assert.match(f.doc.body.querySelector('.ztps-message').textContent,/已清理当前场上 5 个敌方小兵/);assert.doesNotMatch(f.doc.body.querySelector('.ztps-message').textContent,/画面暂停/);assert.equal(f.handle.isOpen(),true);assert.equal(f.current.paused,false);assert.equal(f.calls.filter(c=>c[0]==='pause').length,1);f.handle.destroy();
+});
+test('clear success explains original-game pause rather than promising the editor resume will redraw',async()=>{
+  const f=fixture({custom:true,battle:true});f.current.gamePaused=true;f.handle.open();await f.findText('一键杀死敌方小兵').click();assert.match(f.doc.body.querySelector('.ztps-message').textContent,/原游戏画面暂停中，请在原游戏菜单继续后刷新/);assert.equal(f.current.gamePaused,true);assert.equal(f.current.paused,true);f.handle.destroy();
+});
+test('clearing current troops does not apply or validate the unfinished parameter draft',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();const health=f.byPath('rules.abilities.harvesterDamagePerTick');health.value='';await health.emit('change');
+  await f.findText('一键杀死敌方小兵').click();assert.deepEqual(f.calls.filter(c=>c[0].startsWith('clear')),[['clearEnemy']]);assert.equal(f.calls.some(c=>['apply','applyDraft','save','rules'].includes(c[0])),false);assert.match(f.doc.body.querySelector('.ztps-message').textContent,/已清理当前场上 5 个敌方小兵/);f.handle.destroy();
+});
+test('clear action locks duplicate clicks, reports controller failure and restores enabled controls',async()=>{
+  const f=fixture({custom:true,battle:true});let reject;f.controller.clearEnemyTroops=()=>{f.calls.push(['clearEnemy']);return new Promise((_,no)=>{reject=no;});};f.handle.open();const enemy=f.findText('一键杀死敌方小兵'),friendly=f.findText('一键杀死己方小兵');const pending=enemy.click();assert.equal(enemy.disabled,true);assert.equal(friendly.disabled,true);await enemy.click();await friendly.click();assert.deepEqual(f.calls.filter(c=>c[0].startsWith('clear')),[['clearEnemy']]);
+  reject(new Error('当前没有可操作的战局'));await pending;assert.equal(enemy.disabled,false);assert.equal(friendly.disabled,false);const message=f.doc.body.querySelector('.ztps-message');assert.equal(message.getAttribute('role'),'alert');assert.match(message.textContent,/当前没有可操作的战局/);assert.doesNotMatch(message.textContent,/已清理/);assert.equal(f.current.paused,true);f.handle.destroy();
+});
+test('clear controls refresh when a battle ends or the API is unavailable',()=>{
+  const f=fixture({custom:true,battle:true});delete f.controller.clearEnemyTroops;f.handle.open();assert.equal(f.findText('一键杀死敌方小兵').disabled,true);assert.equal(f.findText('一键杀死己方小兵').disabled,false);f.current.isBattle=false;f.notify();assert.equal(f.findText('一键杀死己方小兵').disabled,true);assert.equal(f.calls.some(c=>c[0].startsWith('clear')),false);f.handle.destroy();
 });
 test('attribute edits remain draft only; save and apply are separate, original promotion explicit',async()=>{
   const f=fixture({battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-zombies').click();const pick=f.byLabel('选择僵尸');pick.value='3';await pick.emit('change');
@@ -195,6 +223,11 @@ test('current stage is selected first; other-stage edits are clearly marked and 
 test('building maximum shows zero-as-unlimited and live built counts without original cap input bounds',async()=>{
   const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-buildings').click();const maximum=f.byPath('config.buildings.0.maximum');assert.equal(maximum.min,'0');assert.equal(maximum.max,'100000');assert.match(UI.fieldInfo('maximum')[1],/0.*不设/);assert.equal(UI.fieldInfo('maximum')[2],'立即');
   maximum.value='0';await maximum.emit('change');await f.findText('应用本局').click();assert.equal(f.current.config.buildings[0].maximum,0);assert.match(f.doc.body.querySelector('[data-building-status]').textContent,/实际已建 1.*不设上限/);f.handle.destroy();
+});
+test('health fields expose the runtime safety range and allow base HP above the old one-hundred-million cap',async()=>{
+  const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-units').click();const pick=f.byLabel('选择兵种');pick.value='5';await pick.emit('change');const health=f.byPath('config.units.5.health');
+  assert.equal(health.min,'1');assert.equal(health.max,String(GameConfig.HEALTH_SAFETY_LIMIT));assert.equal(health.step,'1');assert.equal(health.getAttribute('aria-describedby'),'ztps-health-help');assert.match(f.doc.getElementById('ztps-health-help').textContent,/1–2,147,483,647.*运行时整数安全范围.*0 代表死亡，不代表无敌/);
+  health.value='1000000000';await health.emit('change');await f.findText('应用本局').click();assert.equal(f.current.config.units[5].health,1000000000);assert.equal(f.calls.filter(c=>c[0]==='applyDraft').length,1);f.handle.destroy();
 });
 test('new wave rows get unique stable IDs and moving them never creates duplicate IDs',async()=>{
   const f=fixture({custom:true,battle:true});f.handle.open();await f.doc.getElementById('ztps-tab-levels').click();const before=f.handle.getDraft().config.levels[0].waves.length;

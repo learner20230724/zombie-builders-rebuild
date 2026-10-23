@@ -97,6 +97,74 @@ test('HP ratio never resurrects corpses and respects original integer level-heal
   assert.equal(g.bbZombieHealthMultiplier,2.9);assert.equal(g.bbZombieDamageMultiplier,2.3);
 });
 
+test('signed-int32 maximum health remains positive on real spawns, hits, live ratios and base bars',()=>{
+  const c=defaults(),limit=GameConfig.HEALTH_SAFETY_LIMIT;
+  for(const level of c.levels)level.zombieHealthMultiplier=1;
+  for(const kind of ['units','zombies'])for(const unit of c[kind])unit.health=limit;
+  const h=fixture(c),g=h.game;
+  assert.equal(g.bbpeoplebase.bbhealth,limit);assert.equal(g.bbzombiebase.bbhealth,limit);
+  for(let id=0;id<5;id++){
+    const person=g.bbAddPerson(g.bbunits[id]),zombie=g.bbAddZombie(g.bbzunits[id]);
+    assert.equal(person.bbhealth,limit);assert.equal(zombie.bbhealth,limit);
+    person.bbInfect(10);zombie.bbSmack(10,1);
+    assert.equal(person.bbhealth,limit-10);assert.equal(zombie.bbhealth,limit-10);
+  }
+  const next=plain(c);next.units[5].health=1000000000;next.zombies[5].health=1000000000;
+  g.bbpeoplebase.bbhealth=Math.floor(limit/2);g.bbzombiebase.bbhealth=Math.floor(limit/2);
+  GameConfig.updateLive(h.target,next);
+  assert.equal(g.bbpeoplebase.bbhealth,500000000);assert.equal(g.bbzombiebase.bbhealth,500000000);
+  const bars=[];g.bbblitrect4=(...args)=>bars.push(args);g.bbDrawHealth();
+  assert.equal(bars[1][3],110);assert.equal(bars[3][3],110);
+  GameConfig.updateLive(h.target,c);
+  assert.equal(g.bbpeoplebase.bbhealth,1073741824);assert.equal(g.bbzombiebase.bbhealth,1073741824);
+  const before=snapshot(h),invalid=plain(c);invalid.units[5].health=limit+1;
+  assert.throws(()=>GameConfig.updateLive(h.target,invalid),/己方基地生命值.*32 位整数安全上限/);
+  assert.deepEqual(snapshot(h),before,'out-of-range HP leaves the complete live state unchanged');
+});
+
+test('ordinary enemy XP awards, converted ally deaths and later skill spending keep their original semantics',()=>{
+  const c=defaults(),rules=CustomRules.defaults();rules.automaticSpawning=false;
+  c.powers[0].xp=25;c.powers[0].unlockAfterStage=0;
+  const h=fixture(c,true,rules),g=h.game;
+  g.bbztp.bbxp=100;
+  const killed=g.bbAddZombie(g.bbzunits[0]);killed.bbSmack(killed.bbhealth,1);h.ticks();
+  assert.equal(g.bbztp.bbxp,125);assert.equal(g.bbzombieskilled,1);
+  const converted=g.bbAddZombie(g.bbzunits[3]);g.bbzombies.bbRemove(converted);g.bbpombies.bbAddLast(converted);converted.bbTurn();
+  converted.bbSmack(converted.bbhealth,1);h.ticks();
+  assert.equal(g.bbztp.bbxp,125);assert.equal(g.bbzombieskilled,1);assert.ok(!items(g.bbpombies).includes(converted));
+  g.bbBuyPower(g.bbpowers[0]);assert.equal(g.bbztp.bbxp,100);
+});
+
+test('huge-health enemy rewards saturate after every death, including multiple deaths per tick and later spending',()=>{
+  const c=defaults(),rules=CustomRules.defaults(),limit=GameConfig.HEALTH_SAFETY_LIMIT;
+  rules.automaticSpawning=false;
+  for(const level of c.levels)level.zombieHealthMultiplier=1;
+  c.zombies[0].health=limit;c.powers[0].xp=25;c.powers[0].unlockAfterStage=0;
+  const h=fixture(c,true,rules),g=h.game;
+  function kill(){const zombie=g.bbAddZombie(g.bbzunits[0]);zombie.bbSmack(zombie.bbhealth,1);return zombie;}
+  g.bbztp.bbxp=0;kill();h.ticks();assert.equal(g.bbztp.bbxp,limit,'one maximum reward is exactly representable');
+  g.bbBuyPower(g.bbpowers[0]);assert.equal(g.bbztp.bbxp,limit-25,'saturation does not lock XP or block spending');
+  kill();h.ticks();assert.equal(g.bbztp.bbxp,limit,'the next positive reward cannot wrap XP negative');
+  g.bbztp.bbxp=10;const killed=[kill(),kill(),kill()];h.ticks();
+  assert.equal(g.bbztp.bbxp,limit);assert.equal(g.bbzombieskilled,5);
+  assert.ok(killed.every(z=>!items(g.bbzombies).includes(z)),'saturation preserves normal enemy cleanup');
+  h.ticks();assert.equal(g.bbztp.bbxp,limit,'a later frame does not re-award settled deaths');
+  const converted=g.bbAddZombie(g.bbzunits[0]);g.bbzombies.bbRemove(converted);g.bbpombies.bbAddLast(converted);converted.bbTurn();
+  g.bbztp.bbxp=123;converted.bbSmack(converted.bbhealth,1);h.ticks();
+  assert.equal(g.bbztp.bbxp,123,'even a maximum-health converted ally never awards XP');
+});
+
+test('XP overflow protection is scoped to original tick enemy awards and unwinds after exceptions',()=>{
+  const h=fixture(),g=h.game;
+  const zombie=g.bbAddZombie(g.bbzunits[0]);zombie.bbmode=15;
+  g.bbztp.bbxp=-17;g.bbBlowZombie(zombie);assert.equal(g.bbztp.bbxp,-17,'manual blow effects are not XP awards');
+  const original=g.bbzombiebase.bbUpdate;g.bbzombiebase.bbUpdate=()=>{throw Error('fixture XP guard cleanup');};
+  g.bbztp.bbxp=1;assert.throws(()=>h.ticks(),/fixture XP guard cleanup/);g.bbzombiebase.bbUpdate=original;
+  g.bbztp.bbxp=-19;g.bbBlowZombie(zombie);assert.equal(g.bbztp.bbxp,-19,'a failed tick leaves no award scope behind');
+  g.bbztp.bbxp=1;const later=g.bbAddZombie(g.bbzunits[0]);later.bbSmack(later.bbhealth,1);h.ticks();
+  assert.equal(g.bbztp.bbxp,26,'the next normal tick still awards correctly');
+});
+
 test('new-only keeps individual max HP and base bars, later ratio uses the true old maximum',()=>{
   const h=fixture(),g=h.game,c=defaults();
   const person=g.bbAddPerson(g.bbunits[0]);person.bbhealth=20;

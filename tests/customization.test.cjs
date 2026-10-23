@@ -312,6 +312,135 @@ test('manual spawning cannot alter original mode or exceed batch/entity safety l
   assert.throws(()=>h.controller.spawnZombie(3),/1000/);
 });
 
+function clearFixture() {
+  const h=fixture({custom:true}),g=h.game;
+  g.bbztp.bbbuildingcount[0]=100;g.bbztp.bbcash=1000000;
+  // Use the real purchase/production path so population is genuinely reserved.
+  for(const unit of g.bbunits.slice(0,5)) {g.bbBuyUnit(unit);unit.bbbusy=1;}
+  g.bbGameTick(0);
+  for(let type=0;type<5;type++)h.controller.spawnZombie(type);
+  const converted=entries(g.bbzombies).filter(body=>[32,35].includes(body.bbunit.bbtype));
+  for(const body of converted) {g.bbzombies.bbRemove(body);g.bbpombies.bbAddLast(body);body.bbTurn();}
+  g.bbAddPower(g.bbpowers[0]); // Sixteen angry people do not reserve population.
+  const former=g.bbAddPerson(g.bbunits[0]);former.bbwaszombie=1;
+  g.bbBuyUnit(g.bbunits[0]);g.bbBuyUnit(g.bbunits[1]);
+  h.target.ZTPGamePort.bb_ZombieMob.bbSpawn(4,3,2); // Pending reinforcement, not a live enemy.
+  g.bbAddBottle(0,300,200,4,-4,0);g.bbAddFling(0,200,200);
+  g.bbAddDeath(g.bbshoveldeathsheet,0,250,200);
+  return h;
+}
+function unchangedBattle(h) {
+  const g=h.game,mob=h.target.ZTPGamePort.bb_ZombieMob;
+  return {state:g.bbmainState,ticks:g.bbgameticks,updates:g.bbupdates,seed:h.target.ZTPGamePort.state.bb_std_random_Seed,
+    cash:g.bbztp.bbcash,xp:g.bbztp.bbxp,kills:g.bbzombieskilled,losses:g.bbkinlost,
+    bases:[g.bbpeoplebase,g.bbzombiebase].map(body=>({health:body.bbhealth,mode:body.bbmode})),zombieHealth:g.bbzombiehealth,
+    units:g.bbunits.map(unit=>({orders:unit.bborders,busy:unit.bbbusy})),
+    buildings:g.bbbuildings.map(building=>({orders:building.bborders,busy:building.bbbusy})),
+    powers:g.bbpowers.map(power=>({orders:power.bborders,busy:power.bbbusy,cooldown:power.bbcooldown})),
+    queue:entries(mob.bbqueue).map(node=>({type:node.bbtype,count:node.bbcount,delay:node.bbdelay,time:node.bbtime})),mobTicks:mob.bbticks,
+    effects:['bbbottles','bbflinglist','bbdeathlist','bbbodyparts','bbexplosions','bbpowerups'].map(key=>entries(g[key])),
+    config:h.controller.getDraft(),storage:[...h.storage]};
+}
+
+test('clear buttons require a custom active battle, including when called through the public facade',()=>{
+  const h=fixture(),actions=['clearFriendlyTroops','clearEnemyTroops'];
+  for(const action of actions)assert.throws(()=>h.controller[action](),/先开始/);
+  h.game.bbPlayGame(1);const original=unchangedBattle(h),calls=h.runtimeCalls.slice();
+  for(const action of actions)assert.throws(()=>h.controller[action](),/先应用/);
+  assert.deepEqual(unchangedBattle(h),original);assert.deepEqual(h.runtimeCalls,calls);
+  h.controller.applyDraft(h.controller.getDraft());
+  for(const state of [1,3,4,5,7]) {
+    h.game.bbmainState=state;
+    for(const action of actions)assert.throws(()=>Customization[action](),/先开始/);
+  }
+});
+
+test('friendly clear immediately kills all five troops, angry mobs and converted zombies, but preserves every pending plan',()=>{
+  const h=clearFixture(),g=h.game,people=entries(g.bbpeople).filter(body=>body!==g.bbpeoplebase),converted=entries(g.bbpombies),enemies=entries(g.bbzombies);
+  const pending=people.find(body=>body.bbisangry===0 && body.bbwaszombie===0);pending.bbhealth=0;pending.bbmode=14;
+  const reserved=g.bbunits.reduce((sum,unit)=>sum+unit.bborders*unit.bbpeople,0),before=unchangedBattle(h),token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice();
+  const seen=[];h.controller.subscribe(state=>seen.push(state.battleStatus.entities));
+  const result=h.controller.clearFriendlyTroops();
+  assert.deepEqual(result,{side:'friendly',count:24,people:22,converted:2,zombies:0});
+  for(const body of [...people,...converted]) {assert.equal(body.bbhealth,0);assert.equal(body.bbmode,15);}
+  assert.deepEqual(entries(g.bbpeople),[g.bbpeoplebase]);assert.deepEqual(entries(g.bbpombies),[]);assert.deepEqual(entries(g.bbzombies),enemies);
+  assert.equal(g.bbztp.bbforce,reserved);assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+  assert.equal(h.controller.getBattleStatus().editorPaused,true);assert.equal(seen.length,1);assert.equal(seen[0].people,0);assert.equal(seen[0].converted,0);
+  assert.deepEqual(h.controller.clearFriendlyTroops(),{side:'friendly',count:0,people:0,converted:0,zombies:0});assert.equal(g.bbztp.bbforce,reserved);
+  h.controller.resumeFromEditor(token);
+  // A genuine queued recruit is still produced after resuming, not canceled.
+  g.bbunits[0].bbbusy=1;g.bbGameTick(0);
+  assert.equal(entries(g.bbpeople).filter(body=>body!==g.bbpeoplebase).length,1);assert.equal(g.bbztp.bbforce,reserved);
+});
+
+test('enemy clear removes every real type, even a leaping ghoul, with no XP or score farming and no damage to either side base',()=>{
+  const h=fixture({custom:true}),g=h.game;
+  for(let type=0;type<5;type++)h.controller.spawnZombie(type);
+  const enemies=entries(g.bbzombies).filter(body=>body!==g.bbzombiebase),ghoul=enemies.find(body=>body.bbunit.bbtype===33);ghoul.bbmode=7;ghoul.bbypos=-60;
+  const person=g.bbAddPerson(g.bbunits[0]);g.bbztp.bbforce=person.bbunit.bbpeople;
+  const converted=g.bbAddZombie(g.bbzunits[0]);g.bbzombies.bbRemove(converted);g.bbpombies.bbAddLast(converted);converted.bbTurn();
+  const people=entries(g.bbpeople),friends=entries(g.bbpombies),before=unchangedBattle(h),population=g.bbztp.bbforce,calls=h.runtimeCalls.length;
+  assert.deepEqual(h.controller.clearEnemyTroops(),{side:'enemy',count:5,people:0,converted:0,zombies:5});
+  for(const body of enemies) {assert.equal(body.bbhealth,0);assert.equal(body.bbmode,15);}
+  assert.deepEqual(entries(g.bbzombies),[g.bbzombiebase]);assert.deepEqual(entries(g.bbpeople),people);assert.deepEqual(entries(g.bbpombies),friends);
+  assert.equal(g.bbztp.bbforce,population);assert.deepEqual(unchangedBattle(h),before);
+  assert.deepEqual(h.runtimeCalls.slice(calls),['stop','advance:0','realtime','start']);assert.equal(h.controller.getBattleStatus().battleRunning,true);
+  assert.equal(h.controller.clearEnemyTroops().count,0);assert.deepEqual(unchangedBattle(h),before);
+  h.controller.spawnZombie(3);assert.equal(h.controller.clearEnemyTroops().count,1);assert.equal(g.bbztp.bbxp,before.xp);assert.equal(g.bbzombieskilled,before.kills);
+  // Future scheduled spawns still happen: clear is not automatic-spawn off.
+  dispatch(h);assert.equal(entries(g.bbzombies).length,2);assert.equal(h.controller.getState().rules.automaticSpawning,true);
+});
+
+test('clearing while the native pause menu is open keeps its pause state and supports empty/repeated actions',()=>{
+  const h=clearFixture(),g=h.game;g.bbmainState=6;const before=unchangedBattle(h);
+  const result=h.controller.clearEnemyTroops();assert.equal(result.count,3);assert.equal(g.bbmainState,6);
+  assert.equal(h.controller.getBattleStatus().gamePaused,true);assert.equal(h.controller.getBattleStatus().battleRunning,false);
+  assert.deepEqual(unchangedBattle(h),before);assert.equal(h.controller.clearEnemyTroops().count,0);
+  assert.equal(h.controller.clearFriendlyTroops().count,24);assert.equal(g.bbmainState,6);
+});
+
+test('clear preflights all selected writable actors before any unit or population changes',()=>{
+  const h=fixture({custom:true}),g=h.game;
+  h.controller.spawnZombie(0);h.controller.spawnZombie(3);
+  const enemies=entries(g.bbzombies).filter(body=>body!==g.bbzombiebase),firstHealth=enemies[0].bbhealth;
+  Object.freeze(enemies[1]);const before=unchangedBattle(h),calls=h.runtimeCalls.slice();
+  assert.throws(()=>h.controller.clearEnemyTroops(),/不可写/);
+  assert.equal(enemies[0].bbhealth,firstHealth);assert.deepEqual(entries(g.bbzombies).slice(1),enemies);
+  assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+});
+
+test('clear rejects a frozen enemy list sentinel before killing or unlinking its first actor',()=>{
+  const h=fixture({custom:true}),g=h.game;h.controller.spawnZombie(0);h.controller.spawnZombie(1);
+  const actors=entries(g.bbzombies),health=actors.map(body=>body.bbhealth),modes=actors.map(body=>body.bbmode),before=unchangedBattle(h),calls=h.runtimeCalls.slice();
+  Object.freeze(g.bbzombies.bb_head);
+  assert.throws(()=>h.controller.clearEnemyTroops(),/不可写/);
+  assert.deepEqual(entries(g.bbzombies),actors);assert.deepEqual(actors.map(body=>body.bbhealth),health);assert.deepEqual(actors.map(body=>body.bbmode),modes);
+  assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+});
+
+test('both friendly lists are preflighted before population, regular troops or converted zombies can change',()=>{
+  for(const freeze of [list=>Object.freeze(list.bb_head),list=>Object.defineProperty(list.bb_head.bb_succ,'bb_pred',{writable:false})]) {
+    const h=clearFixture(),g=h.game,people=entries(g.bbpeople),converted=entries(g.bbpombies),population=g.bbztp.bbforce;
+    const actors=[...people,...converted],health=actors.map(body=>body.bbhealth),modes=actors.map(body=>body.bbmode),before=unchangedBattle(h),calls=h.runtimeCalls.slice();
+    freeze(g.bbpombies);
+    assert.throws(()=>h.controller.clearFriendlyTroops(),/不可写/);
+    assert.deepEqual(entries(g.bbpeople),people);assert.deepEqual(entries(g.bbpombies),converted);assert.equal(g.bbztp.bbforce,population);
+    assert.deepEqual(actors.map(body=>body.bbhealth),health);assert.deepEqual(actors.map(body=>body.bbmode),modes);
+    assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+  }
+});
+
+test('a frozen list shell with mutable linked nodes does not prevent a safe clear',()=>{
+  const h=fixture({custom:true}),g=h.game;h.controller.spawnZombie(0);Object.freeze(g.bbzombies);
+  assert.equal(h.controller.clearEnemyTroops().count,1);assert.deepEqual(entries(g.bbzombies),[g.bbzombiebase]);
+});
+
+test('clear handles duplicate list references once and never turns population negative',()=>{
+  const h=fixture({custom:true}),g=h.game,person=g.bbAddPerson(g.bbunits[0]);g.bbpeople.bbAddLast(person);g.bbztp.bbforce=0;
+  assert.equal(h.controller.clearFriendlyTroops().count,1);assert.equal(g.bbztp.bbforce,0);assert.deepEqual(entries(g.bbpeople),[g.bbpeoplebase]);
+  assert.equal(h.controller.clearFriendlyTroops().count,0);assert.equal(g.bbztp.bbforce,0);
+});
+
 test('wave-only compatibility apply synchronizes tracked current progress without leaking unrelated draft values',()=>{
   const h=fixture({custom:true}),mob=h.target.ZTPGamePort.bb_ZombieMob;
   dispatch(h,2);const first=entries(mob.bbqueue)[0];first.bbtime=1.5;mob.bbticks=42;

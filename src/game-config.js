@@ -9,6 +9,13 @@
   const KINDS = ['units', 'zombies', 'buildings', 'powers', 'levels'];
   // A zero maximum removes the gameplay cap, not the engine's numeric guard.
   const BUILDING_SAFETY_LIMIT = 100000;
+  // Recovered health fields are signed ActionScript int values. Unlike the
+  // generic configuration default, this is the actual storage boundary.
+  const HEALTH_SAFETY_LIMIT = 2147483647;
+  const HEALTH_LABELS = {
+    units:['铲兵','霰弹枪兵','机枪皮卡','燃烧瓶兵','牧师','己方基地'],
+    zombies:['普通僵尸','跳跃僵尸','快速僵尸','肥胖僵尸','投尸僵尸','敌方基地']
+  };
   // These original table cells have no gameplay consumer. They are deliberately
   // not JSON options. Keeping them here makes the default raw tables lossless.
   const UNIT_ROWS = [
@@ -38,6 +45,12 @@
     if (value < min || value > max) fail(path, 'must be between ' + min + ' and ' + max);
   }
   function integer(value, path, min = 0, max = 100000000) { number(value, path, min, max, true); }
+  function health(value, path, label) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value))
+      fail(path, 'expected a finite integer（' + label + '生命值须为有限整数；0 表示死亡，不是无敌）');
+    if (value < 1 || value > HEALTH_SAFETY_LIMIT)
+      fail(path, 'must be between 1 and ' + HEALTH_SAFETY_LIMIT + '（' + label + '生命值：1～2,147,483,647；这是 32 位整数安全上限，避免溢出变成负数；0 表示死亡，不是无敌）');
+  }
   function string(value, path, max = 2000) {
     if (typeof value !== 'string' || !value.trim() || value.length > max) fail(path, 'expected a nonempty string of at most ' + max + ' characters');
   }
@@ -88,7 +101,7 @@
       if ((human && item.id === 3) || (!human && item.id === 4)) required.push('projectileDamage');
       object(item, path, required);
       identity(item, path, item.id + (human ? 0 : 32));
-      integer(item.health, path + '.health', 1);
+      health(item.health, path + '.health', HEALTH_LABELS[kind][item.id]);
       integer(item.hitRadius, path + '.hitRadius', 0, 10000);
       integer(item.hitOffset, path + '.hitOffset', -10000, 10000);
       if (!base) number(item.moveSpeed, path + '.moveSpeed', 0, 100, false);
@@ -166,8 +179,9 @@
         entry.calls.forEach((w,j) => wave(w, p + '.calls[' + j + ']', false));
       });
       for (const zombie of input.zombies.filter(z => z.id < 5)) {
-        if (zombie.health * Math.trunc(item.zombieHealthMultiplier) > 2147483647)
-          fail(path + '.zombieHealthMultiplier', 'effective health overflows signed int32 for zombie id ' + zombie.id);
+        if (zombie.health * Math.trunc(item.zombieHealthMultiplier) > HEALTH_SAFETY_LIMIT)
+          fail(path + '.zombieHealthMultiplier', 'effective health overflows signed int32 for zombie id ' + zombie.id +
+            '（第 ' + item.id + ' 关：' + HEALTH_LABELS.zombies[zombie.id] + '生命值 × 关卡倍率的整数部分须 ≤ 2,147,483,647；请降低生命值或关卡倍率）');
         if ('damage' in zombie && zombie.damage * item.zombieDamageMultiplier > 2147483647)
           fail(path + '.zombieDamageMultiplier', 'effective damage overflows signed int32 for zombie id ' + zombie.id);
       }
@@ -327,8 +341,27 @@
     // Bottle.Update outside them cannot leave a tag for an unrelated explosion.
     for (const method of ['bbGameTick','bbUpdateAttract']) wrap(port.bb_Zomba.prototype, method, original => function () {
       state.bottleLoopDepth = (state.bottleLoopDepth || 0) + 1;
+      const previousXpFrame = state.xpAwardFrame;
+      if (method === 'bbGameTick') state.xpAwardFrame = {game:this,
+        eligible:Number.isInteger(this.bbztp.bbxp) && this.bbztp.bbxp >= 0 && this.bbztp.bbxp <= HEALTH_SAFETY_LIMIT};
       try { return original.apply(this,arguments); }
-      finally { state.bottleLoopDepth--; state.explodingBottle = null; }
+      finally {
+        state.bottleLoopDepth--; state.explodingBottle = null;
+        state.xpAwardFrame = previousXpFrame;
+      }
+    });
+    // The recovered tick adds a dead enemy's BASE health to XP, casts to int,
+    // and immediately calls this leaf before processing the next enemy. With
+    // two nonnegative int32 operands an overflowing sum is always negative.
+    // Repair only that scoped award (not manual effects or converted allies),
+    // preserving normal rewards and later spending while avoiding wrapped XP.
+    wrap(port.bb_Zomba.prototype, 'bbBlowZombie', original => function (zombie) {
+      const frame = state.xpAwardFrame;
+      if (frame && frame.game === this && frame.eligible && this.bbztp.bbxp < 0 &&
+          zombie && zombie.bbmode === 15 && zombie.bbunit && zombie.bbunit.bbtype !== 37 &&
+          zombie.bbunit.bbhealth > 0 && listItems(this.bbzombies).includes(zombie))
+        this.bbztp.bbxp = HEALTH_SAFETY_LIMIT;
+      return original.apply(this,arguments);
     });
     // Both loops call bbUpdate then immediately bbExplodeBottle on bbexplode.
     // Carry that explicit leaf source across the existing synchronous boundary.
@@ -780,5 +813,5 @@
     target.bb_Init = port.bb_Init = state.initializer;
     return compiled;
   }
-  return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive,getWaveProgress,applyLiveWaves,BUILDING_SAFETY_LIMIT});
+  return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive,getWaveProgress,applyLiveWaves,BUILDING_SAFETY_LIMIT,HEALTH_SAFETY_LIMIT});
 });

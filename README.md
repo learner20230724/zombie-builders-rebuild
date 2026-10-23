@@ -12,7 +12,7 @@ A desktop and browser version of **Zombie Trailer Park (建筑工大战僵尸)**
 - Survivor units, zombie types, and special powers with distinct roles.
 - Bundled graphics and audio, plus local progress and records.
 - Editable JSON configuration for units, zombies, buildings, powers, and levels.
-- In-game custom presets, live balance changes, wave editing, and one-click zombie spawning.
+- In-game custom presets, live balance changes, wave editing, one-click zombie spawning, and troop-clearing buttons.
 - Side-by-side settings: keep the game visible and choose whether to pause or play while editing.
 
 ## Default game parameters
@@ -121,6 +121,8 @@ Click **⚙ 自定义** or press **F2** to toggle settings. The game stays besid
 
 The six tabs cover sandbox/spawning, survivors, zombies, buildings, powers, and stages/waves. Each field shows its default, edited value, unit, and application timing. **Editing or resuming gameplay does not automatically apply the draft**: use **应用本局**. Saving a preset remains a separate action.
 
+Health accepts integers **1–2,147,483,647**, including bases. `$.units[5].health` means **your base's health**, not the fifth recruitable unit. The former 100,000,000 limit was editor validation, not an original game rule. The new ceiling prevents signed 32-bit overflow; for zombies, base health × the integer-truncated stage multiplier must also fit. **0 means death, not invincibility.**
+
 | Action | Result |
 | --- | --- |
 | Save rules (`保存规则`) | Saves a named rule set; does not change the battle |
@@ -132,6 +134,8 @@ The six tabs cover sandbox/spawning, survivors, zombies, buildings, powers, and 
 | Export JSON (`导出 JSON`) | Downloads a JSON file for backup or sharing |
 
 **Try one-click spawning:** open **沙盒 / 刷怪**, select a stage and **开始自定义战局**. Open F2 again, choose **继续战斗**, and click **肥胖僵尸** once to add one while watching the game beside it. Spawning requires an active custom battle.
+
+The same sandbox has **一键杀死己方小兵** and **一键杀死敌方小兵**. They immediately clear the selected side's current non-base troops, even while paused. Friendly clearing includes converted zombies and Angry Mob summons. Bases, paid recruitment/building orders, future waves, and queued reinforcements are kept; automatic spawning can still produce new enemies. Clearing grants no XP or kill credit, and leaves existing projectiles and power effects in play.
 
 ### What changes immediately?
 

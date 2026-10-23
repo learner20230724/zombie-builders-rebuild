@@ -165,13 +165,18 @@ async function run(options) {
         if (iterator) while (iterator.bbHasNext()) values.push(iterator.bbNextObject());
         return values;
       }
-      const entity = value => ({type: value.bbunit?.bbtype, x: value.bbxpos, y: value.bbypos, health: value.bbhealth, speed: value.bbwalkspeed, mode: value.bbmode});
+      const entity = value => value ? ({type: value.bbunit?.bbtype, x: value.bbxpos, y: value.bbypos, health: value.bbhealth, speed: value.bbwalkspeed,
+        mode: value.bbmode, angry: value.bbisangry, wasZombie: value.bbwaszombie, direction: value.bbdirection, people: value.bbunit?.bbpeople}) : null;
       return {
         mainState: g.bbmainState, ticks: g.bbgameticks, cash: g.bbztp?.bbcash, coins: g.bbcoins,
         force: g.bbztp?.bbforce, maxForce: g.bbztp?.bbmaxforce, xp: g.bbztp?.bbxp, difficulty: g.bbdifficulty,
         buildings: g.bbztp?.bbbuildingcount?.slice(),
         buildingOrders: g.bbbuildings.map(building => ({maximum: building.bbmaximum, orders: building.bborders, busy: building.bbbusy, enabled: building.bbenabled})),
-        records: [...g.bbrecords], people: entries(g.bbpeople).map(entity), zombies: entries(g.bbzombies).map(entity),
+        records: [...g.bbrecords], people: entries(g.bbpeople).map(entity), zombies: entries(g.bbzombies).map(entity), converted: entries(g.bbpombies).map(entity),
+        bases: {friendly: entity(g.bbpeoplebase), enemy: entity(g.bbzombiebase)},
+        kills: g.bbzombieskilled, lost: g.bbkinlost, randomSeed: ZTPGamePort.state.bb_std_random_Seed,
+        powers: g.bbpowers.map(power => ({busy: power.bbbusy, cooldown: power.bbcooldown, enabled: power.bbenabled, locked: power.bblocked})),
+        effects: Object.fromEntries(['bbbottles', 'bbexplosions', 'bbsmokelist', 'bbflinglist', 'bbbodyparts', 'bbdeathlist', 'bbpowerups'].map(name => [name, entries(g[name]).length])),
         units: g.bbunits.map(unit => ({cost: unit.bbcost, health: unit.bbhealth, orders: unit.bborders, busy: unit.bbbusy})),
         waves: entries(ZTPGamePort.bb_ZombieMob.bbqueue).map(wave => ({type: wave.bbtype, count: wave.bbcount, delay: wave.bbdelay, time: wave.bbtime})),
         waveTicks: ZTPGamePort.bb_ZombieMob.bbticks,
@@ -676,6 +681,106 @@ async function run(options) {
       const eightBefore = await state(); await step(60); const eightAfter = await save('06-buildings-unlimited'), eightExpected = expectedIncome(eightBefore, eightAfter.ticks, 8);
       assert.equal(eightAfter.cash, eightExpected.cash); assert.equal(eightAfter.coins, eightExpected.coins); assert.equal(eightAfter.buildings[1], 8);
       return {cappedCount: 5, liveLimit: 6, unlimitedCount: 8, six: {before: sixBefore, after: sixAfter, expected: sixExpected}, eight: {before: eightBefore, after: eightAfter, expected: eightExpected}};
+    });
+
+    await check('CLEAR-FIELD-TROOPS', 'Real paused friendly/enemy one-click buttons remove only on-field troops, retain both bases/orders/waves/XP/records, release only used friendly population, are idempotent, and allow queued recruits and future waves to continue.', async () => {
+      const fixture = await page.evaluate(() => {
+        const draft = Customization.getDraft();
+        draft.config.levels[0].startingCash = 10000;
+        draft.config.levels[0].waves = [{id: 'qa-clear-future', type: 1, count: 3, delay: 5, enabled: true}];
+        Object.assign(draft.config.units[0], {cost: 1, buildTicks: 50, dependency: 0, people: 1});
+        draft.rules.automaticSpawning = true; draft.rules.baseReinforcements = false; draft.rules.corpseSpawnOnImpact = false;
+        draft.rules.zombieTypesEnabled = [true, true, true, true, true];
+        return {schemaVersion: 1, name: 'Clear on-field troops fixture', ...draft};
+      });
+      await importAndStart(fixture, 'clear-field-troops.json');
+      await canvasClick(40, 90);
+      for (let n = 0; n < 80 && !(await state()).people.some(person => person.type === 0); n++) await step(1);
+      assert.equal((await state()).people.filter(person => person.type === 0).length, 1, 'Recruit one real shovel worker through the canvas');
+      await canvasClick(40, 90);
+      assert.equal((await state()).units[0].orders, 1, 'A paid second recruit remains queued at clear time');
+      await openEditor(); await page.locator('#ztps-tab-sandbox').click();
+      await page.locator('[data-spawn="0"]').click(); await page.locator('[data-spawn="3"]').click();
+      // The recruited worker and enemies above use actual canvas/UI controls.
+      // Additional converted/angry members are explicitly synthetic fixtures,
+      // built with the original methods and exact conversion list transfer.
+      // This exercises cleanup coverage, not natural preacher/skill activation.
+      await page.evaluate(() => {
+        const g = ZTPGamePort.state.bb_Game, iterator = g.bbzombies.bbObjectEnumerator();
+        let converted;
+        while (iterator.bbHasNext()) { const member = iterator.bbNextObject(); if (member.bbunit.bbtype === 32) { converted = member; break; } }
+        if (!converted) throw new Error('Missing real spawned zombie conversion fixture');
+        g.bbzombies.bbRemove(converted); g.bbpombies.bbAddLast(converted); converted.bbTurn();
+        const angry = g.bbAddPerson(g.bbunits[0]); angry.bbAnger();
+      });
+      evidence.syntheticFixtures.push({name: 'Clear-button converted/angry coverage', synthetic: true, notNaturalConversionOrSkill: true,
+        method: 'Transfer a real UI-spawned normal zombie with original bbRemove/bbAddLast/bbTurn; create an angry worker with original bbAddPerson/bbAnger. Other soldier recruited through real canvas.'});
+      const before = await state(), stored = await storage();
+      assert.equal(before.customization.paused, true); assert.equal(before.runtime.running, false);
+      assert.equal(before.converted.length, 1); assert.equal(before.people.filter(person => person.angry === 1).length, 1);
+      assert.equal(before.people.filter(person => person.type !== 5 && !person.angry).length, 1);
+      assert.equal(before.force, 2, 'One living recruit and one paid order reserve population; angry/converted do not');
+      function invariant(snapshot) {
+        return {ticks: snapshot.ticks, cash: snapshot.cash, coins: snapshot.coins, xp: snapshot.xp, records: snapshot.records,
+          kills: snapshot.kills, lost: snapshot.lost, randomSeed: snapshot.randomSeed, bases: snapshot.bases,
+          buildingOrders: snapshot.buildingOrders, units: snapshot.units, powers: snapshot.powers, effects: snapshot.effects,
+          waves: snapshot.waves, waveTicks: snapshot.waveTicks, waveProgress: snapshot.waveProgress, runtime: snapshot.runtime,
+          customization: snapshot.customization};
+      }
+      await page.locator('[data-clear-troops="friendly"]').click();
+      const friendly = await state();
+      assert.match(await page.locator('.ztps-message').textContent(), /3.*己方/);
+      assert.deepEqual(friendly.people, [before.bases.friendly]); assert.deepEqual(friendly.converted, []);
+      assert.deepEqual(friendly.zombies, before.zombies, 'Friendly clear may not affect enemy troops');
+      assert.equal(friendly.force, 1, 'Only the living recruited worker releases population; the paid order remains reserved');
+      assert.deepEqual(invariant(friendly), invariant(before)); assert.deepEqual(await storage(), stored);
+      await page.locator('[data-clear-troops="friendly"]').click(); const repeatedFriendly = await state();
+      assert.match(await page.locator('.ztps-message').textContent(), /0.*己方/); assert.deepEqual(repeatedFriendly, friendly);
+      await page.locator('[data-clear-troops="enemy"]').click(); const enemy = await save('07-cleared-field-troops');
+      assert.match(await page.locator('.ztps-message').textContent(), /1.*敌方/);
+      assert.deepEqual(enemy.zombies, [before.bases.enemy]); assert.deepEqual(enemy.people, friendly.people); assert.deepEqual(enemy.converted, []);
+      assert.equal(enemy.force, 1); assert.deepEqual(invariant(enemy), invariant(before)); assert.deepEqual(await storage(), stored);
+      await page.locator('[data-clear-troops="enemy"]').click(); const repeatedEnemy = await state();
+      assert.match(await page.locator('.ztps-message').textContent(), /0.*敌方/); assert.deepEqual(repeatedEnemy, enemy);
+      // Release only this editor pause, then step the real original queue and
+      // construction update. Clearing a field must not disable future spawns.
+      await page.locator('[data-editor-playback]').click(); await freeze();
+      assert.equal((await state()).customization.paused, false);
+      for (let n = 0; n < 500 && (!(await state()).people.some(person => person.type === 0) || !(await state()).zombies.some(zombie => zombie.type === 32)); n++) await step(1);
+      const resumed = await save('07a-clear-resumed-orders-and-waves');
+      assert.equal(resumed.units[0].orders, 0); assert.equal(resumed.people.filter(person => person.type === 0).length, 1);
+      assert.ok(resumed.zombies.some(zombie => zombie.type === 32), 'The untouched future wave must still generate real enemies');
+      assert.equal(resumed.force, 1); assert.equal(resumed.xp, before.xp); assert.deepEqual(resumed.records, before.records);
+      assert.deepEqual(resumed.bases, before.bases);
+      await page.evaluate(() => { ZTPRuntime.useRealtime(); ZTPRuntime.start(); });
+      await page.locator('[data-clear-troops="enemy"]').click(); const realtime = await state();
+      assert.equal(realtime.customization.paused, false); assert.equal(realtime.runtime.running, true, 'Clearing while playing must restore the actual realtime clock');
+      assert.deepEqual(realtime.zombies, [before.bases.enemy]); assert.equal(realtime.xp, before.xp);
+      assert.equal(realtime.kills, before.kills); assert.equal(realtime.lost, before.lost); assert.deepEqual(realtime.records, before.records);
+      await page.waitForTimeout(100); assert.ok((await state()).ticks > realtime.ticks, 'Real battle keeps advancing with the settings dock still open');
+      await page.locator('[data-editor-playback]').click(); assert.equal((await state()).customization.paused, true);
+      return {before, friendly, enemy, resumed, realtime};
+    });
+
+    await check('LARGE-HEALTH-AND-READABLE-ERROR', 'An actual friendly-base health edit above the old 100M guard applies live and survives starting a new battle; values beyond int32 are rejected visibly with the named base and unchanged battle/storage.', async () => {
+      await page.locator('#ztps-tab-units').click(); await page.getByLabel('选择兵种', {exact: true}).selectOption('5');
+      const before = await state();
+      await field('config.units.5.health', 200000000); await clickButton('应用本局');
+      const live = await state(); assert.equal(live.units[5].health, 200000000); assert.equal(live.bases.friendly.health, 200000000);
+      assert.equal(live.ticks, before.ticks); assert.equal(live.customization.paused, true);
+      const stored = await storage(), effective = await page.evaluate(() => Customization.getDraft());
+      await field('config.units.5.health', 2147483648); await clickButton('应用本局');
+      const message = await page.locator('.ztps-message.ztps-error').textContent();
+      assert.match(message, /(?:己方|我方)基地/); assert.match(message, /生命/); assert.match(message.replace(/,/g, ''), /2147483647/);
+      assert.deepEqual(await state(), live); assert.deepEqual(await storage(), stored);
+      assert.deepEqual(await page.evaluate(() => Customization.getDraft()), effective);
+      await page.screenshot({path: artifact('08a-large-base-health-readable-error.png')});
+      await field('config.units.5.health', 200000000); await page.locator('#ztps-tab-sandbox').click();
+      await Promise.all([page.waitForEvent('domcontentloaded'), clickButton('开始自定义战局')]);
+      await ready(); await page.waitForFunction(() => Customization.getState().isBattle); await freeze();
+      const restarted = await save('08-large-base-health-new-battle');
+      assert.equal(restarted.units[5].health, 200000000); assert.equal(restarted.bases.friendly.health, 200000000);
+      return {liveHealth: live.bases.friendly.health, newBattleHealth: restarted.bases.friendly.health, invalidMessage: message};
     });
 
     await page.evaluate(() => { WriteInt('ZTPBestScores', '0', 9876); FlushInts(); });
