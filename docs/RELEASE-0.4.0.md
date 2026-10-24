@@ -1,6 +1,6 @@
 # v0.4.0 verification / 验收记录
 
-状态：**实现、自动回归、构建、网页及最终 Electron／EXE 验收通过；本地发行包与快捷方式已就绪，公开发布待完成。** 下表区分自动回归与最终交付验收，不提前宣称发布。旧版验收记录不改写。
+状态：**实现、自动回归、构建、网页及最终 Electron／EXE 验收通过；已同步仓库并发布 v0.4.0，本地发行包与桌面快捷方式已就绪。** 下表区分自动回归与最终交付验收，不提前宣称发布。旧版验收记录不改写。
 
 ## Scope / 本次范围
 
@@ -36,7 +36,7 @@
 - **原生验收隔离**：仅使用自建 QA profile／进程；原生窗口缩放／全屏检查后，将自有窗口设为透明且忽略鼠标以避免遮挡，不将 Electron 的焦点元数据当作产品行为证据。全部行为与截图仍由实际发行 renderer 产生，未使用替身页面。14 个自有 PID 已退出、QA profile 无残留进程：`output/acceptance-v040-process-cleanup.json`。
 - **许可证与最终文件复核通过**：完整 ZIP CRC、335／336 份发行源文件逐一 SHA-256 对照；桌面包 `LICENSE` 与 `LICENSES.chromium.html` 对照缓存官方 Electron 45.0.0 ZIP 字节一致。复核脚本：`output/verify-v040.py`。原生成逻辑 `src/generated-game.js` SHA-256 仍为 `9ac747685871fa237dacb9a469cb78dbf7b635f21c3c593aa033da3d4cc5239b`。
 - **本地交付**：`output/desktop-v0.4.0/ZombieBuilders.exe` 的 ProductVersion 为 0.4.0；现有桌面“建筑工大战僵尸”快捷方式已由 0.3.2 更新指向它。未启动／关闭用户游戏，也未修改用户存档。请先关闭旧窗口再启动新版。
-- **Release、资产上传、公开下载验证：待发布／补充证据。** 本文档不在发行运行文件集合内，后续补充验收记录不改变已冻结的包内文档或程序。
+- **公开发布已完成**：[v0.4.0 Release](https://github.com/learner20230724/zombie-builders-rebuild/releases/tag/v0.4.0)，代码标签对应 `74277e43b15cfb98b552299d142586876f686094`；桌面 ZIP、Web ZIP 与 `SHA256SUMS.txt` 三个资产全部上传。匿名访问确认 Release 可见且为 latest；资产字节数与 GitHub 服务端 SHA-256 均匹配本地文件，公开校验清单完整下载后逐字节一致。证据：`output/releases/v0.4.0/published.json`、`output/releases/v0.4.0/public-download-verification.json`。未重复完整下载约 205 MB／43 MB 的公开 ZIP；ZIP 完整 CRC／源文件检查在本地完成，不将服务端摘要核对描述成全量公开 ZIP 回下载。本文档不在发行运行文件集合内，补充记录不改变已验收程序。
 
 | 本地发行包 | 字节 | 文件数 | 匹配源文件 | CRC | SHA-256 |
 | --- | ---: | ---: | ---: | --- | --- |
@@ -47,4 +47,4 @@
 
 报告区分真实画面操作与合成夹具。网页视觉、真实 Electron 和实际发行 EXE 分别验收；本地 ZIP 校验不等于公开下载验证。没有宣称自然通关四关、穷尽全部战斗／动画组合、原生 Flash 等价，或验证干净机器、代码签名与 SmartScreen。
 
-English: v0.4.0 covers immediate editing, five-type queued Angry Mob summons, power-effect cancellation, species-wide multipliers, independent-rate queues for all twenty camp/species combinations, faction-aware combat and clearing, live troop counts, direct base HP, newest-first wave display, independent scripted-wave pause, and F2-internal time controls. Verified: 430 tests, 56 recovered-data checks, 7,200 simulation frames, 215 economy assertions, 83 combat cases, build/105 asset hashes, browser smoke/16-step journey, source Chromium visual checks, and local archive CRC/source hashes. Final source Electron 35/35 and packaged EXE 37/37 passed, including ZIP relocation and native screenshots; the desktop shortcut now targets 0.4.0. Public publication/download verification remains pending. No natural four-stage completion is claimed.
+English: v0.4.0 covers immediate editing, five-type queued Angry Mob summons, power-effect cancellation, species-wide multipliers, independent-rate queues for all twenty camp/species combinations, faction-aware combat and clearing, live troop counts, direct base HP, newest-first wave display, independent scripted-wave pause, and F2-internal time controls. Verified: 430 tests, 56 recovered-data checks, 7,200 simulation frames, 215 economy assertions, 83 combat cases, build/105 asset hashes, browser smoke/16-step journey, source Chromium visual checks, and local archive CRC/source hashes. Final source Electron 35/35 and packaged EXE 37/37 passed, including ZIP relocation and native screenshots; the desktop shortcut now targets 0.4.0. v0.4.0 is published and anonymously verified as latest; asset sizes/server SHA-256 and a full public checksum-manifest download match local files. Large public ZIPs were not downloaded again; their complete local CRC/source-hash verification is recorded separately. No natural four-stage completion is claimed.
