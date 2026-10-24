@@ -63,6 +63,10 @@ test('desktop routes serve exact declared assets, custom config and immutable de
   const get=(url,options={})=>handler(new Request('ztp://game'+url,options));
   assert.equal((await get('/')).status,200);
   assert.equal((await get('/src/settings-ui.js')).status,200);
+  assert.equal((await get('/src/time-controls.js')).status,200);
+  assert.equal((await get('/src/time-controls.css')).status,200);
+  assert.equal((await get('/src/factions.js')).status,200);
+  assert.equal((await get('/src/spawn-queue.js')).status,200);
   assert.equal((await get('/assets/images/test.png')).status,200);
   assert.equal((await get('/public/assets/images/test.png')).status,200);
   assert.deepEqual(await (await get('/config/units.json')).json(),{source:'user'});

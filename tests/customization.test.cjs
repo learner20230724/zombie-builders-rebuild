@@ -6,6 +6,8 @@ const path=require('node:path');
 const vm=require('node:vm');
 const GameConfig=require('../src/game-config.js');
 const CustomRules=require('../src/custom-rules.js');
+const Factions=require('../src/factions.js');
+const SpawnQueue=require('../src/spawn-queue.js');
 const Customization=require('../src/customization.js');
 const root=path.resolve(__dirname,'..');
 const read=file=>fs.readFileSync(path.join(root,file),'utf8');
@@ -45,7 +47,8 @@ function fixture({storage=new Map(),external=baseline(),custom=false,throwStorag
   vm.runInContext(read('src/generated-game.js'),target);
   const prepared=Customization.prepare(baseline(),external,target);
   namespace=prepared.storageKey;
-  GameConfig.install(target,prepared.configuration);CustomRules.install(target,prepared.rules);
+  GameConfig.install(target,prepared.configuration,{multipliers:prepared.rules.multipliers});CustomRules.install(target,prepared.rules);
+  target.Factions=Factions;Factions.install(target);target.SpawnQueue=SpawnQueue;SpawnQueue.install(target);
   target.bb_Init();target.bb_Main();
   const device=target.ZTPGamePort.state.bb_mojo_app_device;device.OnCreate();device.OnUpdate();
   const controller=Customization.attach(target,{prepared}),game=target.ZTPGamePort.state.bb_Game;
@@ -296,7 +299,7 @@ test('manual buttons create all five real types while automatic spawning is disa
     const before=entries(h.game.bbzombies).length,result=h.controller.spawnZombie(type);
     const zombie=entries(h.game.bbzombies).at(-1);
     assert.equal(entries(h.game.bbzombies).length,before+1);assert.equal(zombie.bbunit.bbtype,32+type);
-    assert.equal(zombie.bbhealth,h.game.bbzunits[type].bbhealth);assert.equal(result.count,1);assert.ok(zombie.bbxpos>=1440&&zombie.bbxpos<1600);
+    assert.equal(zombie.bbhealth,h.game.bbzunits[type].bbhealth);assert.equal(result.count,1);assert.equal(zombie.bbxpos,1600);assert.ok(zombie.bbxpos>h.game.bbzombiebase.bbxpos);
   }
   const fat=entries(h.game.bbzombies).find(z=>z.bbunit.bbtype===35);assert.ok(fat.bbskin);assert.equal(fat.bbhealth,1000);
   const x=fat.bbxpos;h.game.bbGameTick(0);assert.ok(fat.bbxpos<x);
@@ -305,7 +308,7 @@ test('manual buttons create all five real types while automatic spawning is disa
 test('manual spawning cannot alter original mode or exceed batch/entity safety limits',()=>{
   const h=fixture();h.game.bbPlayGame(1);assert.throws(()=>h.controller.spawnZombie(3),/先应用/);
   h.controller.applyLive(h.controller.getDraft().config);
-  for(const args of [[-1,1],[5,1],[3,0],[3,21],[3,1.5]])assert.throws(()=>h.controller.spawnZombie(...args),/0–4/);
+  for(const args of [[-1,1],[5,1],[3,0],[3,999],[3,1.5]])assert.throws(()=>h.controller.spawnZombie(...args),/0–4/);
   const originalAdd=h.game.bbzombies.bbAddLast;
   // Use harmless shared entities to reach the cap without 1000 sprite constructors.
   for(let i=0;i<998;i++)originalAdd.call(h.game.bbzombies,{bbunit:{bbtype:32}});
@@ -547,4 +550,435 @@ test('state subscriptions unsubscribe cleanly and snapshots do not mutate live c
   assert.equal(h.controller.getState().config.zombies[0].health,25);
   const record=h.controller.savePreset('one',h.controller.getDraft());assert.deepEqual(seen,['original']);
   unsubscribe();h.controller.deletePreset(record.id);assert.deepEqual(seen,['original']);
+});
+
+
+test('settings commit immediately changes abilities while playing or editor-paused, preserving a single coherent persisted pair',()=>{
+  const h=fixture();h.game.bbPlayGame(1);const ticks=h.game.bbgameticks,draft=h.controller.getDraft(),seen=[];
+  h.controller.subscribe(state=>seen.push({mode:state.mode,health:state.config.zombies[0].health,impact:state.rules.corpseSpawnOnImpact}));
+  draft.config.zombies[0].health=42;draft.rules.corpseSpawnOnImpact=false;
+  const report=Customization.commitSettings(draft);
+  assert.equal(report.staged,false);assert.equal(report.promoted,true);assert.equal(h.namespace,constants.CUSTOM_STORAGE);
+  assert.equal(h.game.bbzunits[0].bbhealth,42);assert.equal(CustomRules.snapshot(h.target).corpseSpawnOnImpact,false);
+  assert.deepEqual(seen,[{mode:'custom',health:42,impact:false}]);assert.equal(h.game.bbgameticks,ticks);assert.equal(h.reloads,0);
+  const token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice();draft.rules.corpseSpawnOnImpact=true;
+  h.controller.commitSettings(draft);assert.deepEqual(h.runtimeCalls,calls);assert.equal(h.controller.getBattleStatus().editorPaused,true);
+  assert.equal(CustomRules.snapshot(h.target).corpseSpawnOnImpact,true);
+  const session=JSON.parse(h.storage.get(constants.SESSION_KEY));assert.equal(session.config.zombies[0].health,42);assert.equal(session.rules.corpseSpawnOnImpact,true);
+  h.controller.resumeFromEditor(token);
+});
+
+test('menu commits stage templates and rules without starting or reloading, then the next genuine battle uses them',()=>{
+  const h=fixture(),draft=h.controller.getDraft(),originalState=h.game.bbmainState;
+  draft.config.units[0].health=100;draft.config.levels[0].waves[0].count=7;draft.rules.automaticSpawning=false;
+  const report=h.controller.commitSettings(draft);
+  assert.equal(report.staged,true);assert.equal(report.promoted,true);assert.equal(h.game.bbmainState,originalState);assert.equal(h.controller.getState().isBattle,false);
+  assert.equal(h.reloads,0);assert.equal(h.game.bbunits[0].bbhealth,100);assert.equal(h.controller.getState().bases,null);
+  assert.equal(JSON.parse(h.storage.get(constants.SESSION_KEY)).stage,null);
+  const restarted=fixture({storage:h.storage});assert.equal(restarted.controller.getState().isBattle,false);assert.equal(restarted.game.bbunits[0].bbhealth,100);
+  restarted.game.bbPlayGame(1);assert.equal(entries(restarted.target.ZTPGamePort.bb_ZombieMob.bbqueue)[0].bbcount,7);
+  assert.equal(restarted.controller.getState().rules.automaticSpawning,false);
+});
+
+test('immediate commit rejects either invalid half, bad options, and composed multiplier overflow before any mutation or namespace promotion',()=>{
+  for(const invalid of ['config','rules','composition','options']) {
+    const h=fixture();h.game.bbPlayGame(1);const draft=h.controller.getDraft(),before=h.controller.getState(),storage=[...h.storage],calls=h.runtimeCalls.slice();
+    draft.config.units[0].cost=99;draft.rules.automaticSpawning=false;
+    if(invalid==='config')draft.config.zombies[0].health=-1;
+    if(invalid==='rules')draft.rules.abilities.harvesterRange=-1;
+    if(invalid==='composition'){draft.config.units[0].health=2147483647;draft.rules.multipliers.units.health=2;}
+    assert.throws(()=>h.controller.commitSettings(draft,invalid==='options'?{healthPolicy:'replace'}:{}));
+    assert.deepEqual(h.controller.getState(),before);assert.deepEqual([...h.storage],storage);assert.deepEqual(h.runtimeCalls,calls);assert.equal(h.namespace,constants.ORIGINAL_STORAGE);
+  }
+});
+
+test('multipliers apply once across immediate commits, compatibility rule updates, wave edits, session reload and menu staging',()=>{
+  const h=fixture({custom:true}),g=h.game,draft=h.controller.getDraft(),person=g.bbAddPerson(g.bbunits[0]);
+  draft.rules.multipliers.units={health:1.5,moveSpeed:1.5,damage:1.5};draft.rules.multipliers.zombies={health:2,moveSpeed:1.5,damage:2};
+  h.controller.commitSettings(draft);assert.equal(g.bbunits[0].bbhealth,75);assert.equal(person.bbhealth,75);assert.equal(g.bbunits[0].bbdamage,15);
+  const originalCurrent=h.controller.getDraft();assert.equal(originalCurrent.config.units[0].health,50);assert.equal(originalCurrent.rules.multipliers.units.health,1.5);
+  h.controller.commitSettings(originalCurrent);h.controller.applyRules(originalCurrent.rules);
+  assert.equal(person.bbhealth,75);assert.equal(g.bbunits[0].bbhealth,75);assert.equal(g.bbunits[0].bbdamage,15);
+  const waves=h.controller.getDraft().config;waves.levels[0].waves[0].count=9;h.controller.applyUpcomingWaves(waves);assert.equal(g.bbunits[0].bbhealth,75);
+  const restored=fixture({storage:h.storage});assert.equal(restored.game.bbunits[0].bbhealth,75);assert.equal(restored.controller.getDraft().config.units[0].health,50);
+  const m=fixture(),menu=m.controller.getDraft();menu.rules.multipliers.units.health=1.5;m.controller.commitSettings(menu);
+  m.game.bbPlayGame(1);assert.equal(m.game.bbAddPerson(m.game.bbunits[0]).bbhealth,75);
+});
+
+test('batch manual spawns use the original far-right origin and preflight capacity without consuming RNG or partially spawning',()=>{
+  const h=fixture({custom:true}),g=h.game,rules=h.controller.getDraft().rules;rules.automaticSpawning=false;rules.zombieTypesEnabled.fill(false);h.controller.applyRules(rules);
+  const result=h.controller.spawnZombie(3,100);
+  assert.equal(result.count,100);assert.equal(result.positions.length,100);assert.ok(result.positions.every(p=>p.x===1600 && p.x>g.bbzombiebase.bbxpos));
+  assert.equal(entries(g.bbzombies).filter(body=>body.bbunit.bbtype===35).length,100);
+  const before=entries(g.bbzombies),seed=h.target.ZTPGamePort.state.bb_std_random_Seed;
+  assert.throws(()=>h.controller.spawnZombie(0,899),/1000/);assert.deepEqual(entries(g.bbzombies),before);assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,seed);
+  h.controller.clearEnemyTroops();assert.equal(h.controller.spawnZombie(0,998).count,998);
+  assert.equal(h.controller.getBattleStatus().entities.total,1000);assert.throws(()=>h.controller.spawnZombie(0),/1000/);
+});
+
+test('typed friendly clear kills only the selected human type and releases only its actual reserved population',()=>{
+  for(let type=0;type<5;type++) {
+    const h=clearFixture(),g=h.game,actors=entries(g.bbpeople),selected=actors.filter(body=>body.bbunit.bbtype===type),remaining=actors.filter(body=>body.bbunit.bbtype!==type);
+    const converted=entries(g.bbpombies),enemies=entries(g.bbzombies),before=unchangedBattle(h),force=g.bbztp.bbforce;
+    const refund=selected.filter(body=>body.bbwaszombie===0 && body.bbisangry===0).reduce((n,body)=>n+body.bbunit.bbpeople,0);
+    const result=h.controller.clearFriendlyTroops(type%2?{kind:'unit',type}:type);
+    assert.equal(result.people,selected.length);assert.equal(result.converted,0);assert.equal(result.zombies,0);
+    assert.deepEqual(entries(g.bbpeople),remaining);assert.deepEqual(entries(g.bbpombies),converted);assert.deepEqual(entries(g.bbzombies),enemies);
+    assert.equal(g.bbztp.bbforce,Math.max(0,force-refund));assert.deepEqual(unchangedBattle(h),before);
+    assert.equal(h.controller.clearFriendlyTroops(type).count,0);
+  }
+});
+
+test('typed enemy and converted clears keep opposite-side and other-type actors, both bases and future plans',()=>{
+  const h=fixture({custom:true}),g=h.game;for(let type=0;type<5;type++)h.controller.spawnZombie(type,2);
+  const converted=[];for(const body of entries(g.bbzombies).filter(body=>body!==g.bbzombiebase).filter((_,i)=>i%2===0)) {
+    g.bbzombies.bbRemove(body);g.bbpombies.bbAddLast(body);body.bbTurn();converted.push(body);
+  }
+  const person=g.bbAddPerson(g.bbunits[0]);g.bbztp.bbforce=person.bbunit.bbpeople;
+  const before=unchangedBattle(h),force=g.bbztp.bbforce;
+  for(let type=0;type<5;type++) {
+    const enemy=entries(g.bbzombies).find(body=>body.bbunit.bbtype===32+type),friend=converted.find(body=>body.bbunit.bbtype===32+type);
+    assert.equal(h.controller.clearEnemyTroops({kind:'zombie',type}).zombies,1);assert.equal(enemy.bbhealth,0);assert.equal(friend.bbhealth>0,true);
+    assert.equal(h.controller.clearFriendlyTroops(type%2?{kind:'converted',type}:'converted-'+type).converted,1);assert.equal(friend.bbhealth,0);
+    assert.deepEqual(entries(g.bbpeople),[g.bbpeoplebase,person]);assert.equal(g.bbztp.bbforce,force);assert.deepEqual(unchangedBattle(h),before);
+  }
+  assert.deepEqual(entries(g.bbzombies),[g.bbzombiebase]);assert.deepEqual(entries(g.bbpombies),[]);
+});
+
+test('invalid typed clears are atomic and a frozen unselected actor does not block a correctly scoped clear',()=>{
+  const h=fixture({custom:true}),g=h.game;h.controller.spawnZombie(0);h.controller.spawnZombie(3);const original=entries(g.bbzombies);
+  for(const selection of [-1,5,1.5,'normal',{kind:'converted',type:1},{kind:'zombie',type:5},{kind:'zombie',type:0,extra:true}]) {
+    const before=h.controller.getState(),calls=h.runtimeCalls.slice();assert.throws(()=>h.controller.clearEnemyTroops(selection));
+    assert.deepEqual(entries(g.bbzombies),original);assert.deepEqual(h.controller.getState(),before);assert.deepEqual(h.runtimeCalls,calls);
+  }
+  Object.freeze(original.find(body=>body.bbunit.bbtype===35));assert.equal(h.controller.clearEnemyTroops(0).count,1);
+  assert.deepEqual(entries(g.bbzombies),original.filter(body=>body.bbunit.bbtype!==32));
+});
+
+test('current base HP changes immediately without modifying maxima, clocks, RNG, troops, queues, population or editor pause',()=>{
+  const h=clearFixture(),g=h.game,before=unchangedBattle(h),people=entries(g.bbpeople),zombies=entries(g.bbzombies),force=g.bbztp.bbforce,token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice();
+  const draft=h.controller.getDraft(),maxima=[draft.config.units[5].health,draft.config.zombies[5].health];
+  assert.deepEqual(Customization.setBaseHealth('friendly',1),{side:'friendly',current:1,maximum:maxima[0],ended:false});
+  assert.deepEqual(h.controller.setBaseHealth('enemy',123),{side:'enemy',current:123,maximum:maxima[1],ended:false});
+  assert.deepEqual(h.controller.getBattleStatus().bases,{friendly:{current:1,maximum:maxima[0]},enemy:{current:123,maximum:maxima[1]}});
+  assert.deepEqual(h.controller.getState().bases,h.controller.getBattleStatus().bases);
+  assert.deepEqual(h.controller.getDraft(),draft);assert.deepEqual(entries(g.bbpeople),people);assert.deepEqual(entries(g.bbzombies),zombies);assert.equal(g.bbztp.bbforce,force);
+  const after=unchangedBattle(h),original={...before};delete after.bases;delete original.bases;
+  // The only other tracked enemy value is the previous-tick baseline, which is
+  // intentionally retained so real threshold crossings trigger on next tick.
+  assert.deepEqual(after,original);assert.deepEqual(h.runtimeCalls,calls);assert.equal(h.controller.getBattleStatus().editorPaused,true);
+  h.controller.setBaseHealth('friendly',maxima[0]);h.controller.setBaseHealth('enemy',maxima[1]);h.controller.resumeFromEditor(token);
+});
+
+test('base HP bounds and readonly state reject atomically; max changes retain ratio and recorded new-only maximum',()=>{
+  const h=fixture({custom:true}),g=h.game;const before=h.controller.getState(),calls=h.runtimeCalls.slice();
+  for(const [side,hp] of [['other',2],['friendly',-1],['friendly',1.5],['enemy',16001],['enemy',NaN]])assert.throws(()=>h.controller.setBaseHealth(side,hp));
+  assert.deepEqual(h.controller.getState(),before);assert.deepEqual(h.runtimeCalls,calls);
+  h.controller.setBaseHealth('friendly',2000);const draft=h.controller.getDraft();draft.config.units[5].health=8000;h.controller.commitSettings(draft);
+  assert.deepEqual(h.controller.getBattleStatus().bases.friendly,{current:4000,maximum:8000});
+  draft.config.units[5].health=12000;h.controller.commitSettings(draft,{healthPolicy:'new-only'});
+  assert.deepEqual(h.controller.getBattleStatus().bases.friendly,{current:4000,maximum:8000});assert.throws(()=>h.controller.setBaseHealth('friendly',10000),/0–8000/);
+  Object.freeze(g.bbzombiebase);assert.throws(()=>h.controller.setBaseHealth('enemy',0),/不可写/);assert.equal(g.bbzombiebase.bbhealth,16000);assert.equal(g.bbmainState,2);
+});
+
+test('setting a base current HP to zero follows normal win or loss immediately, isolates custom scores and never revives ended games',()=>{
+  for(const side of ['friendly','enemy']) {
+    const h=fixture({custom:true}),g=h.game,token=h.controller.pauseForEditor(),original=[...h.storage].filter(([k])=>k.startsWith(constants.ORIGINAL_STORAGE+'/'));
+    g.bbgameticks=123;const selected=side==='friendly'?g.bbpeoplebase:g.bbzombiebase,other=side==='friendly'?g.bbzombiebase:g.bbpeoplebase,otherHP=other.bbhealth;
+    const result=h.controller.setBaseHealth(side,0);assert.equal(result.ended,true);assert.equal(selected.bbhealth,0);assert.equal(selected.bbmode,14);
+    assert.equal(g.bbmainState,side==='friendly'?4:3);assert.equal(other.bbhealth,otherHP);assert.equal(g.bbgameticks,123);
+    assert.equal(entries(g.bbpeople).includes(g.bbpeoplebase),false);assert.equal(entries(g.bbzombies).includes(g.bbzombiebase),false);
+    assert.equal(h.controller.getState().bases,null);assert.throws(()=>h.controller.setBaseHealth(side,10),/先开始/);
+    assert.deepEqual([...h.storage].filter(([k])=>k.startsWith(constants.ORIGINAL_STORAGE+'/')),original);
+    assert.equal(h.storage.get(constants.CUSTOM_STORAGE+'/shared/ZTPBestScores/0'),side==='enemy'?'123':undefined);
+    assert.equal(h.controller.getBattleStatus().editorPaused,true);h.controller.resumeFromEditor(token);assert.equal(g.bbmainState,side==='friendly'?4:3);
+  }
+});
+
+
+test('a v0.3.2 session and preset without faction multipliers upgrade with identity factors and preserve edits and source fingerprint',()=>{
+  const original=baseline(),selected=plain(original),oldRules=plain(CustomRules.defaults());delete oldRules.multipliers;
+  selected.units[0].health=77;oldRules.corpseSpawnOnImpact=false;
+  const timestamp='2026-10-23T00:00:00.000Z',id='preset-legacy-032';
+  const storage=new Map([
+    [constants.SESSION_KEY,JSON.stringify({schemaVersion:1,mode:'custom',config:selected,rules:oldRules,stage:null,selectedPresetId:id,sourceFingerprint:oldSourceFingerprint(original)})],
+    [constants.PRESETS_KEY,JSON.stringify({schemaVersion:1,presets:[{id,name:'旧版规则',updatedAt:timestamp,config:selected,rules:oldRules}]})]
+  ]);
+  const h=fixture({storage,external:original}),state=h.controller.getState();
+  assert.equal(state.mode,'custom');assert.equal(state.config.units[0].health,77);assert.equal(state.rules.corpseSpawnOnImpact,false);
+  assert.deepEqual(state.rules.multipliers,{units:{health:1,moveSpeed:1,damage:1},zombies:{health:1,moveSpeed:1,damage:1}});
+  assert.equal(state.warnings.some(message=>message.includes('外置 JSON')),false);assert.equal(state.selectedPresetId,id);
+  const loaded=h.controller.loadPreset(id);assert.equal(loaded.config.units[0].health,77);assert.equal(loaded.rules.multipliers.units.health,1);
+  h.controller.commitSettings(loaded);assert.equal(h.game.bbunits[0].bbhealth,77);assert.equal(h.controller.getState().isBattle,false);
+  const next=fixture({storage,external:original});assert.equal(next.controller.getState().config.units[0].health,77);assert.equal(next.controller.getState().rules.corpseSpawnOnImpact,false);
+});
+
+
+test('a manually added fat zombie approaches and attacks soldiers fighting the enemy base instead of materializing behind them',()=>{
+  const h=fixture({custom:true}),g=h.game,draft=h.controller.getDraft();draft.rules.automaticSpawning=false;
+  draft.config.units[0].health=1000;h.controller.commitSettings(draft);
+  const person=g.bbAddPerson(g.bbunits[0]);person.bbxpos=1420;g.bbztp.bbforce=1;
+  // Let the actual attack state machine lock onto the enemy base first.
+  for(let tick=0;tick<30;tick++)g.bbGameTick(0);
+  assert.equal(person.bbmode,1);const initialHealth=person.bbhealth,baseHealth=g.bbzombiebase.bbhealth;
+  h.controller.spawnZombie(3);const fat=entries(g.bbzombies).at(-1);assert.equal(fat.bbxpos,1600);assert.ok(fat.bbxpos>person.bbxpos);
+  let attacked=false;
+  for(let tick=0;tick<500;tick++) {g.bbGameTick(0);if(person.bbhealth<initialHealth){attacked=true;break;}}
+  assert.equal(attacked,true,'the fat zombie must hit the currently engaged soldier');
+  assert.ok(fat.bbxpos>person.bbxpos,'the fat zombie stays in front, not behind the friendly line');
+  assert.ok(g.bbzombiebase.bbhealth<baseHealth,'the soldier continues to attack the base while the new enemy approaches');
+});
+
+
+test('readonly config, wave, rule-sync and promotion targets reject immediate commits before mode, namespace, raw data, actors or settings mutate',()=>{
+  for(const custom of [false,true])for(const frozen of ['unit','wave','population','coins','records','power']) {
+    const h=fixture({custom});if(!custom)h.game.bbPlayGame(1);
+    const g=h.game,mob=h.target.ZTPGamePort.bb_ZombieMob,draft=h.controller.getDraft();
+    draft.config.units[0].cost=99;draft.config.levels[0].waves[0].count=9;draft.rules.corpseSpawnOnImpact=false;draft.rules.economy.salvageIntervalTicks=500;
+    if(frozen==='unit')Object.freeze(g.bbunits[0]);
+    if(frozen==='wave')Object.freeze(entries(mob.bbqueue)[0]);
+    if(frozen==='population')Object.defineProperty(g.bbztp,'bbmaxforce',{writable:false});
+    if(frozen==='coins')Object.defineProperty(g,'bbcoins',{writable:false});
+    if(frozen==='records')Object.freeze(g.bbrecords);
+    if(frozen==='power')Object.defineProperty(g.bbpowers[0],'bblocked',{writable:false});
+    const before=unchangedBattle(h),namespace=h.namespace,calls=h.runtimeCalls.slice(),state=h.controller.getState();
+    // Frozen records and unlock flags are only touched when promoting an
+    // original battle; an already custom battle need not rewrite them.
+    if(custom && ['records','power'].includes(frozen))continue;
+    assert.throws(()=>h.controller.commitSettings(draft),/writable|不可写/);
+    assert.deepEqual(unchangedBattle(h),before);assert.equal(h.namespace,namespace);assert.deepEqual(h.controller.getState(),state);assert.deepEqual(h.runtimeCalls,calls);
+  }
+});
+
+test('preflight uses the proposed multiplier pair, allowing valid coordinated raw-health and factor changes without false rejection',()=>{
+  const h=fixture({custom:true}),first=h.controller.getDraft();first.rules.multipliers.units.health=2;h.controller.commitSettings(first);
+  const next=h.controller.getDraft();next.config.units[0].health=2147483647;next.rules.multipliers.units.health=1;
+  assert.doesNotThrow(()=>h.controller.commitSettings(next));assert.equal(h.game.bbunits[0].bbhealth,2147483647);
+  assert.equal(h.controller.getDraft().config.units[0].health,2147483647);assert.equal(h.controller.getDraft().rules.multipliers.units.health,1);
+});
+
+
+test('fractional global zombie health factors can safely offset large raw HP and all preset and compatibility paths validate the complete composition',()=>{
+  const h=fixture({custom:true}),draft=h.controller.getDraft();draft.config.zombies[0].health=1000000000;draft.rules.multipliers.zombies.health=0.5;
+  assert.doesNotThrow(()=>h.controller.commitSettings(draft));assert.equal(h.game.bbzunits[0].bbhealth,500000000);
+  assert.doesNotThrow(()=>h.controller.applyLive(draft.config));assert.doesNotThrow(()=>h.controller.applyUpcomingWaves(draft.config));
+  const saved=h.controller.savePreset('大血量低倍率',draft),loaded=h.controller.loadPreset(saved.id);
+  const imported=h.controller.importPreset(h.controller.exportPreset(loaded));assert.equal(imported.config.zombies[0].health,1000000000);
+  const next=fixture({storage:h.storage});assert.equal(next.controller.getState().rules.multipliers.zombies.health,0.5);assert.equal(next.game.bbzunits[0].bbhealth,500000000);
+});
+
+
+test('friendly batch sandbox creates all five real troop types with current normal stats at the original left origin, without costs, population, anger or queues',()=>{
+  const h=fixture({custom:true}),g=h.game,draft=h.controller.getDraft();draft.rules.multipliers.units={health:1.5,moveSpeed:1.5,damage:1.5};
+  h.controller.commitSettings(draft);const before=unchangedBattle(h),force=g.bbztp.bbforce;
+  for(let type=0;type<5;type++) {
+    const old=entries(g.bbpeople).length,result=Customization.spawnFriendlyUnit(type,3),created=entries(g.bbpeople).slice(old);
+    assert.equal(result.type,type);assert.equal(result.count,3);assert.equal(created.length,3);assert.ok(result.positions.every(position=>position.x===0));
+    for(const person of created) {
+      assert.equal(person.bbunit,g.bbunits[type]);assert.equal(person.bbhealth,g.bbunits[type].bbhealth);
+      assert.equal(person.bbwalkspeed,draft.config.units[type].moveSpeed*1.5);assert.equal(person.bbisangry,0);assert.equal(person.bbwaszombie,1);
+      assert.ok(person.bbskin);assert.equal(person.bbxpos,0);
+    }
+    assert.equal(g.bbztp.bbforce,force);const after=unchangedBattle(h),expected={...before};delete after.seed;delete expected.seed;assert.deepEqual(after,expected);
+  }
+});
+
+test('free friendly actors never refund paid reserved population on typed clear or original natural death',()=>{
+  const h=fixture({custom:true}),g=h.game;g.bbztp.bbcash=100000;g.bbztp.bbbuildingcount[0]=100;
+  g.bbBuyUnit(g.bbunits[0]);g.bbBuyUnit(g.bbunits[1]);const force=g.bbztp.bbforce,orders=g.bbunits.map(unit=>unit.bborders),cash=g.bbztp.bbcash;
+  h.controller.spawnFriendlyUnit(0,5);h.controller.spawnFriendlyUnit(1,5);
+  assert.equal(h.controller.clearFriendlyTroops(0).people,5);assert.equal(g.bbztp.bbforce,force);
+  const free=entries(g.bbpeople).filter(person=>person!==g.bbpeoplebase);assert.equal(free.length,5);
+  for(const person of free) {person.bbhealth=0;person.bbmode=15;}
+  g.bbGameTick(0);assert.equal(entries(g.bbpeople).length,1);assert.equal(g.bbztp.bbforce,force);
+  assert.deepEqual(g.bbunits.map(unit=>unit.bborders),orders);assert.equal(g.bbztp.bbcash,cash);
+  h.controller.spawnFriendlyUnit(2,1);assert.equal(h.controller.clearFriendlyTroops().people,1);assert.equal(g.bbztp.bbforce,force);
+});
+
+test('friendly batch guards original mode, invalid types/counts and total capacity before creating actors or consuming RNG, and preserves pause',()=>{
+  const original=fixture();original.game.bbPlayGame(1);assert.throws(()=>original.controller.spawnFriendlyUnit(0),/先应用/);
+  const h=fixture({custom:true}),g=h.game,before=h.controller.getState(),seed=h.target.ZTPGamePort.state.bb_std_random_Seed;
+  for(const args of [[-1,1],[5,1],[0,0],[0,999],[0,1.5]])assert.throws(()=>h.controller.spawnFriendlyUnit(...args),/0–4/);
+  assert.deepEqual(h.controller.getState(),before);assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,seed);
+  const token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice();assert.equal(h.controller.spawnFriendlyUnit(4,998).count,998);
+  assert.equal(h.controller.getBattleStatus().entities.total,1000);const fullSeed=h.target.ZTPGamePort.state.bb_std_random_Seed;
+  assert.throws(()=>h.controller.spawnFriendlyUnit(2),/1000/);assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,fullSeed);
+  assert.deepEqual(h.runtimeCalls,calls);assert.equal(h.controller.getBattleStatus().editorPaused,true);
+  assert.equal(h.controller.clearFriendlyTroops(4).count,998);assert.equal(g.bbztp.bbforce,0);h.controller.resumeFromEditor(token);
+});
+
+test('free friendly troop speed stays non-angry through subsequent global multiplier hot edits',()=>{
+  const h=fixture({custom:true}),g=h.game;h.controller.spawnFriendlyUnit(0);const person=entries(g.bbpeople).at(-1),draft=h.controller.getDraft();
+  draft.rules.multipliers.units.moveSpeed=2;draft.config.powers[0].effect.angerSpeedMultiplier=4;h.controller.commitSettings(draft);
+  assert.equal(person.bbisangry,0);assert.equal(person.bbwalkspeed,draft.config.units[0].moveSpeed*2);
+  assert.equal(h.controller.clearFriendlyTroops(0).count,1);assert.equal(g.bbztp.bbforce,0);
+});
+
+
+test('generic sandbox creates every human and zombie species on both true factions and typed-clears each without touching other actors or paid plans',()=>{
+  const h=fixture({custom:true}),g=h.game,draft=h.controller.getDraft();draft.rules.multipliers.units={health:1.5,moveSpeed:1.5,damage:1.5};
+  draft.rules.multipliers.zombies={health:2,moveSpeed:2,damage:2};h.controller.commitSettings(draft);
+  g.bbztp.bbcash=100000;g.bbBuyUnit(g.bbunits[0]);const before=unchangedBattle(h),force=g.bbztp.bbforce,created=[];
+  for(const side of ['friendly','enemy'])for(const kind of ['unit','zombie'])for(let type=0;type<5;type++) {
+    const old=new Set(Factions.list(h.target,{includeBases:true})),result=Customization.spawnFactionUnit(side,{kind,type},2);
+    const actors=Factions.list(h.target,{side,kind,type}).filter(body=>!old.has(body));assert.equal(actors.length,2);
+    assert.deepEqual(Object.keys(result).sort(),['count','kind','positions','side','type']);assert.equal(result.count,2);assert.equal(result.side,side);assert.equal(result.kind,kind);assert.equal(result.type,type);
+    for(const body of actors) {
+      assert.equal(Factions.getSide(h.target,body),side);assert.equal(body.bbunit.bbtype,type+(kind==='zombie'?32:0));
+      assert.equal(body.bbxpos,side==='friendly'?0:1600);assert.equal(body.bbhealth,g[kind==='unit'?'bbunits':'bbzunits'][type].bbhealth);
+      assert.equal(body.bbwalkspeed,draft.config[kind==='unit'?'units':'zombies'][type].moveSpeed*(kind==='unit'?1.5:2));
+      if(kind==='unit')assert.equal(body.bbisangry||0,0);
+    }
+    created.push({side,kind,type,actors});const after=unchangedBattle(h),expected={...before};delete after.seed;delete expected.seed;
+    assert.deepEqual(after,expected);assert.equal(g.bbztp.bbforce,force);
+  }
+  assert.deepEqual(h.controller.getBattleStatus().factions,{friendly:{units:10,zombies:10},enemy:{units:10,zombies:10}});
+  assert.equal(h.controller.getBattleStatus().entities.total,42);
+  for(const fixture of created) {
+    const remaining=Factions.list(h.target,{includeBases:true}).filter(body=>!fixture.actors.includes(body));
+    const result=h.controller[fixture.side==='friendly'?'clearFriendlyTroops':'clearEnemyTroops']({kind:fixture.kind,type:fixture.type});
+    assert.equal(result.count,2);assert.equal(result[fixture.kind==='unit'?'people':fixture.side==='friendly'?'converted':'zombies'],2);
+    for(const body of fixture.actors){assert.equal(body.bbhealth,0);assert.equal(body.bbmode,15);}
+    assert.deepEqual(new Set(Factions.list(h.target,{includeBases:true})),new Set(remaining));assert.equal(g.bbztp.bbforce,force);
+  }
+  assert.deepEqual(h.controller.getBattleStatus().factions,{friendly:{units:0,zombies:0},enemy:{units:0,zombies:0}});
+  const after=unchangedBattle(h),expected={...before};delete after.seed;delete expected.seed;assert.deepEqual(after,expected);
+});
+
+test('generic faction spawn guards all inputs and live capacity before any list, namespace, clock, record or RNG changes',()=>{
+  const h=fixture({custom:true}),before=unchangedBattle(h),calls=h.runtimeCalls.slice();
+  for(const [side,selection,count] of [
+    ['invalid',{kind:'unit',type:0},1],['friendly',{kind:'base',type:0},1],['enemy',{kind:'unit',type:5},1],
+    ['enemy',{kind:'zombie',type:0,unknown:1},1],['friendly',{kind:'unit',type:1},0],['enemy',{kind:'unit',type:1},999],
+    ['friendly',{kind:'zombie',type:1},1.5]
+  ])assert.throws(()=>h.controller.spawnFactionUnit(side,selection,count));
+  assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+  h.controller.spawnFactionUnit('enemy',{kind:'unit',type:2},998);assert.equal(h.controller.getBattleStatus().entities.total,1000);
+  const full=unchangedBattle(h);assert.throws(()=>h.controller.spawnFactionUnit('friendly',{kind:'zombie',type:4},1),/1000/);assert.deepEqual(unchangedBattle(h),full);
+  assert.equal(h.controller.clearEnemyTroops({kind:'unit',type:2}).count,998);assert.equal(h.controller.getBattleStatus().entities.total,2);
+});
+
+
+test('cancel selected or all skill effects immediately clears only skill provenance and pending dispatch, never ordinary armies, orders, waves, refunds or clocks',()=>{
+  const h=fixture({custom:true}),g=h.game,draft=h.controller.getDraft();draft.config.powers[0].effect.shovelCount=2000;h.controller.commitSettings(draft);
+  h.controller.spawnFriendlyUnit(0,2);h.controller.spawnZombie(3);g.bbztp.bbcash=100000;g.bbBuyUnit(g.bbunits[0]);
+  const regular=entries(g.bbpeople),enemies=entries(g.bbzombies),force=g.bbztp.bbforce;
+  for(const power of [g.bbpowers[2],g.bbpowers[1],g.bbpowers[0]])g.bbAddPower(power);
+  g.bbAddBottle(0,500,-100,0,0,0);const ordinaryBottle=entries(g.bbbottles).at(-1);
+  g.bbAddBottle(0,600,-100,0,0,1);const airBottle=entries(g.bbbottles).at(-1);
+  for(const power of g.bbpowers)power.bbbusy=7;
+  const token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice(),before=unchangedBattle(h),cooldowns=g.bbpowers.map(power=>power.bbcooldown);
+  const progress=h.controller.getBattleStatus().powerProgress;assert.ok(progress.pendingTotal>0);assert.ok(progress.activeTotal>0);assert.equal(progress.byPower.length,3);
+  assert.deepEqual(h.controller.getState().powerProgress,progress);
+  const mob=Customization.cancelPowerEffects(0);assert.ok(mob.pending>0);assert.ok(mob.actors>0);assert.equal(mob.charging,1);
+  assert.deepEqual(entries(g.bbpeople),regular);assert.deepEqual(entries(g.bbzombies),enemies);assert.equal(g.bbztp.bbforce,force);
+  assert.equal(entries(g.bbpowerups).length,4);assert.ok(entries(g.bbbottles).includes(airBottle));assert.ok(entries(g.bbbottles).includes(ordinaryBottle));
+  const harvest=h.controller.cancelPowerEffects(1);assert.equal(harvest.powerups,1);assert.equal(harvest.charging,1);assert.equal(entries(g.bbpowerups).length,3);
+  const air=h.controller.cancelPowerEffects(2);assert.equal(air.powerups,3);assert.equal(air.projectiles,1);assert.equal(air.charging,1);
+  assert.deepEqual(entries(g.bbpowerups),[]);assert.deepEqual(entries(g.bbbottles),[ordinaryBottle]);assert.equal(h.controller.getBattleStatus().powerProgress.pendingTotal,0);
+  assert.deepEqual(h.controller.cancelPowerEffects(),{pending:0,actors:0,powerups:0,projectiles:0,explosions:0,charging:0});
+  assert.deepEqual(g.bbpowers.map(power=>power.bbcooldown),cooldowns);assert.equal(h.controller.getBattleStatus().editorPaused,true);assert.deepEqual(h.runtimeCalls,calls);
+  const after=unchangedBattle(h),expected={...before};delete after.effects;delete expected.effects;delete after.powers;delete expected.powers;
+  assert.deepEqual(after,expected);h.controller.resumeFromEditor(token);
+});
+
+test('skill cancellation invalid selection and readonly host reject before any partial effect removal, runtime pause, persistence or score namespace change',()=>{
+  const original=fixture();original.game.bbPlayGame(1);assert.throws(()=>original.controller.cancelPowerEffects(),/先应用/);
+  const h=fixture({custom:true}),g=h.game;g.bbAddPower(g.bbpowers[0]);g.bbAddPower(g.bbpowers[1]);
+  for(const bad of [-1,3,0.5,null,'0','bad']) {
+    const before=unchangedBattle(h),calls=h.runtimeCalls.slice();assert.throws(()=>h.controller.cancelPowerEffects(bad));
+    assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+  }
+  const people=entries(g.bbpeople),actor=people.find(body=>body!==g.bbpeoplebase);Object.freeze(actor);
+  const before=unchangedBattle(h),status=h.controller.getState(),calls=h.runtimeCalls.slice();
+  assert.throws(()=>h.controller.cancelPowerEffects('all'),/writable|不可写/);
+  assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(entries(g.bbpeople),people);assert.deepEqual(h.controller.getState(),status);assert.deepEqual(h.runtimeCalls,calls);
+});
+
+
+test('queued batches accept 1000 then another request immediately, materialize independently at per-job game-second rates, and preserve all ordinary plans on submission',()=>{
+  const h=fixture({custom:true}),g=h.game,before=unchangedBattle(h),token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice();
+  const slow=Customization.enqueueSpawn('enemy',{kind:'zombie',type:3},1000,{rate:0.1});
+  const fast=h.controller.enqueueSpawn('friendly',{kind:'unit',type:0},1000,{rate:2});
+  assert.notEqual(slow.id,fast.id);assert.equal(slow.rate,0.1);assert.equal(fast.rate,2);
+  assert.equal(h.controller.getState().spawnQueue.totalPending,2000);assert.equal(h.controller.getBattleStatus().spawnQueue.pendingJobs,2);
+  assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);assert.equal(h.controller.getState().spawnQueue.paused,true);
+  h.controller.resumeFromEditor(token);for(let tick=0;tick<120;tick++)g.bbGameTick(0);
+  let progress=h.controller.getState().spawnQueue;assert.equal(progress.jobs.find(job=>job.id===slow.id).spawned,0);assert.equal(progress.jobs.find(job=>job.id===fast.id).spawned,2);
+  assert.equal(h.controller.getBattleStatus().factions.friendly.units,2);assert.equal(h.controller.getBattleStatus().factions.enemy.zombies,0);
+  h.controller.setSpawnJobRate(slow.id,1);for(let tick=0;tick<120;tick++)g.bbGameTick(0);
+  progress=h.controller.getState().spawnQueue;assert.equal(progress.jobs.find(job=>job.id===slow.id).spawned,1);assert.equal(progress.jobs.find(job=>job.id===fast.id).spawned,4);
+  assert.equal(progress.jobs.find(job=>job.id===fast.id).rate,2);assert.equal(progress.jobs.find(job=>job.id===slow.id).firstSpawn.x,1600);
+  const beforeRate=progress.jobs.map(job=>[job.id,job.rate]);SpawnQueue.setDefaultRate(h.target,50);
+  const later=h.controller.enqueueSpawn('enemy',{kind:'unit',type:2},1000);assert.equal(later.rate,50);
+  assert.deepEqual(h.controller.getState().spawnQueue.jobs.slice(0,2).map(job=>[job.id,job.rate]),beforeRate);
+  h.controller.setSpawnJobRate(fast.id,0);const savedFast=h.controller.getState().spawnQueue.jobs.find(job=>job.id===fast.id).spawned;
+  for(let tick=0;tick<120;tick++)g.bbGameTick(0);assert.equal(h.controller.getState().spawnQueue.jobs.find(job=>job.id===fast.id).spawned,savedFast);
+});
+
+test('queue cancellation removes only selected pending work, leaves materialized actors and skill/wave/recruit plans, and resets on a new battle',()=>{
+  const h=fixture({custom:true}),g=h.game;
+  const first=h.controller.enqueueSpawn('friendly',{kind:'unit',type:0},1000,{rate:120}),second=h.controller.enqueueSpawn('enemy',{kind:'unit',type:1},2000,{rate:0});
+  g.bbGameTick(0);const actors=Factions.list(h.target),before=unchangedBattle(h),calls=h.runtimeCalls.slice();
+  const result=h.controller.cancelSpawnJob(first.id);assert.equal(result.length,1);assert.equal(result[0].cancelledCount,999);
+  assert.equal(h.controller.getState().spawnQueue.jobs.length,1);assert.equal(h.controller.getState().spawnQueue.jobs[0].id,second.id);
+  assert.deepEqual(Factions.list(h.target),actors);assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+  const all=h.controller.cancelAllSpawnJobs();assert.equal(all.length,1);assert.equal(all[0].cancelledCount,2000);assert.equal(h.controller.getState().spawnQueue.totalPending,0);
+  h.controller.enqueueSpawn('enemy',{kind:'zombie',type:4},2147483647,{rate:0});assert.equal(h.controller.getState().spawnQueue.totalPending,2147483647);
+  g.bbPlayGame(2);assert.equal(h.controller.getState().spawnQueue.jobs.length,0);assert.equal(h.controller.getState().spawnQueue.totalPending,0);assert.deepEqual(Factions.list(h.target),[]);
+});
+
+test('queued spawning covers all twenty faction/species combinations and invalid operations are atomic before RNG or clocks change',()=>{
+  const h=fixture({custom:true}),g=h.game;
+  for(const side of ['friendly','enemy'])for(const kind of ['unit','zombie'])for(let type=0;type<5;type++)h.controller.enqueueSpawn(side,{kind,type},1,{rate:120});
+  assert.equal(h.controller.getState().spawnQueue.pendingJobs,20);g.bbGameTick(0);assert.equal(h.controller.getState().spawnQueue.pendingJobs,0);
+  for(const side of ['friendly','enemy'])for(const kind of ['unit','zombie'])for(let type=0;type<5;type++)assert.equal(Factions.list(h.target,{side,kind,type}).length,1);
+  const before=unchangedBattle(h),status=h.controller.getState().spawnQueue,calls=h.runtimeCalls.slice();
+  for(const bad of [
+    ()=>h.controller.enqueueSpawn('bad',{kind:'unit',type:0},1,{rate:1}),
+    ()=>h.controller.enqueueSpawn('friendly',{kind:'unit',type:5},1,{rate:1}),
+    ()=>h.controller.enqueueSpawn('friendly',{kind:'unit',type:0},0,{rate:1}),
+    ()=>h.controller.enqueueSpawn('enemy',{kind:'zombie',type:0},2147483648,{rate:1}),
+    ()=>h.controller.enqueueSpawn('enemy',{kind:'zombie',type:0},1000,{rate:-1}),
+    ()=>h.controller.setSpawnJobRate('bad',1),()=>h.controller.cancelSpawnJob('bad')
+  ])assert.throws(bad);
+  assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.controller.getState().spawnQueue,status);assert.deepEqual(h.runtimeCalls,calls);
+});
+
+
+test('real-time troop counts report all twenty live camp/species combinations and follow actual conversions while deduplicating list entries',()=>{
+  const h=fixture({custom:true}),g=h.game;
+  for(const camp of ['friendly','enemy'])for(const kind of ['unit','zombie'])for(let type=0;type<5;type++)h.controller.spawnFactionUnit(camp,{kind,type},2);
+  const initial={friendly:{units:[2,2,2,2,2],zombies:[2,2,2,2,2],total:20},enemy:{units:[2,2,2,2,2],zombies:[2,2,2,2,2],total:20}};
+  assert.deepEqual(h.controller.getBattleStatus().troopCounts,initial);assert.deepEqual(h.controller.getState().troopCounts,initial);
+  const human=Factions.list(h.target,{side:'enemy',kind:'unit',type:2})[0];assert.equal(Factions.convert(h.target,human,'friendly'),true);
+  let counts=h.controller.getBattleStatus().troopCounts;assert.equal(counts.friendly.units[2],3);assert.equal(counts.enemy.units[2],1);assert.equal(counts.friendly.total,21);assert.equal(counts.enemy.total,19);
+  const zombie=Factions.list(h.target,{side:'enemy',kind:'zombie',type:3})[0];assert.equal(Factions.convert(h.target,zombie,'friendly'),true);
+  counts=h.controller.getBattleStatus().troopCounts;assert.equal(counts.friendly.zombies[3],3);assert.equal(counts.enemy.zombies[3],1);assert.equal(counts.friendly.total,22);assert.equal(counts.enemy.total,18);
+  // Same reference may occur twice in a malformed list or both friendly lists;
+  // counts remain per real actor rather than per linked node.
+  const actor=Factions.list(h.target,{side:'friendly',kind:'unit',type:0})[0];g.bbpeople.bbAddLast(actor);g.bbpombies.bbAddLast(actor);
+  assert.deepEqual(h.controller.getBattleStatus().troopCounts,counts);
+  const before=unchangedBattle(h),calls=h.runtimeCalls.slice();const copy=h.controller.getState().troopCounts;copy.friendly.units[0]=999;
+  assert.deepEqual(h.controller.getBattleStatus().troopCounts,counts);assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+});
+
+test('troop counts exclude dead-but-not-unlinked actors immediately and ignore bases, recruitment, queued sandbox batches and pending or vehicle skills',()=>{
+  const h=fixture({custom:true}),g=h.game,draft=h.controller.getDraft();draft.config.powers[0].effect.shovelCount=2000;h.controller.commitSettings(draft);
+  h.controller.spawnFriendlyUnit(0,998);g.bbztp.bbcash=100000;g.bbBuyUnit(g.bbunits[0]);
+  h.controller.enqueueSpawn('enemy',{kind:'zombie',type:3},1000,{rate:0});for(const power of g.bbpowers)g.bbAddPower(power);
+  assert.ok(h.controller.getState().powerProgress.pendingTotal>=2000);assert.equal(h.controller.getState().spawnQueue.totalPending,1000);
+  let counts=h.controller.getBattleStatus().troopCounts;assert.deepEqual(counts,{friendly:{units:[998,0,0,0,0],zombies:[0,0,0,0,0],total:998},enemy:{units:[0,0,0,0,0],zombies:[0,0,0,0,0],total:0}});
+  const bodies=entries(g.bbpeople).filter(body=>body!==g.bbpeoplebase);bodies[0].bbhealth=0;bodies[1].bbmode=14;bodies[2].bbmode=15;
+  counts=h.controller.getState().troopCounts;assert.equal(counts.friendly.units[0],995);assert.equal(counts.friendly.total,995);assert.equal(entries(g.bbpeople).length,999);
+  g.bbmainState=6;assert.deepEqual(h.controller.getBattleStatus().troopCounts,counts);
+  g.bbPlayGame(1);assert.deepEqual(h.controller.getBattleStatus().troopCounts,{friendly:{units:[0,0,0,0,0],zombies:[0,0,0,0,0],total:0},enemy:{units:[0,0,0,0,0],zombies:[0,0,0,0,0],total:0}});
+});
+
+test('troop counts are zero in menus but retain real surviving armies on ended-match screens until reset',()=>{
+  const menu=fixture(),zero={friendly:{units:[0,0,0,0,0],zombies:[0,0,0,0,0],total:0},enemy:{units:[0,0,0,0,0],zombies:[0,0,0,0,0],total:0}};
+  assert.deepEqual(menu.controller.getState().troopCounts,zero);
+  const h=fixture({custom:true}),g=h.game;h.controller.spawnFactionUnit('friendly',{kind:'zombie',type:4},2);h.controller.spawnFactionUnit('enemy',{kind:'unit',type:3},1);
+  const counts=h.controller.getState().troopCounts;h.controller.setBaseHealth('enemy',0);assert.equal(g.bbmainState,3);assert.deepEqual(h.controller.getState().troopCounts,counts);
+  g.bbmainState=1;assert.deepEqual(h.controller.getState().troopCounts,zero);
 });

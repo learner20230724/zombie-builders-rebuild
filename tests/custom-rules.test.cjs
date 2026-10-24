@@ -44,6 +44,12 @@ function view(h) {
 }
 function change(h, edit) { const rules=CustomRules.snapshot(h.target);edit(rules);CustomRules.update(h.target,rules); }
 function readyWave(h,type=1,count=1) { const mob=h.port.bb_ZombieMob;mob.bbInit([type,count,0]);mob.bbticks=60; }
+function fillEntityBudget(h) {
+  // Large skill requests dispatch bounded batches rather than freezing one
+  // event handler. Let the actual game ticks fill all available live slots.
+  for(let i=0;i<100 && CustomRules.getEntityCapacity(h.target)>0;i++)h.ticks();
+  assert.equal(CustomRules.getEntityCapacity(h.target),0);
+}
 function flingAtImpact(h,x=500) {
   h.game.bbAddFling(2,x+7.5,0);
   const fling=entries(h.game.bbflinglist).at(-1);fling.bbfling=fling.bbanimrate*13-1;
@@ -60,9 +66,55 @@ test('defaults and snapshots are independent validated copies in CommonJS and br
 });
 
 test('early schemaVersion 1 rules gain only newly introduced default fields',()=>{
-  const legacy=CustomRules.defaults();delete legacy.economy;delete legacy.abilities.harvesterDamagePerTick;delete legacy.abilities.harvesterRange;delete legacy.abilities.ghoulLongLeap;
+  const legacy=CustomRules.defaults();delete legacy.economy;delete legacy.multipliers;delete legacy.abilities.harvesterDamagePerTick;delete legacy.abilities.harvesterRange;delete legacy.abilities.ghoulLongLeap;
   assert.deepEqual(CustomRules.validate(legacy),CustomRules.defaults());
   legacy.abilities.ghoulLongLeap=false;assert.equal(CustomRules.validate(legacy).abilities.ghoulLongLeap,false);
+});
+
+test('army-wide multipliers are independent fractional validated preset values',()=>{
+  const rules=CustomRules.defaults();
+  rules.multipliers.units={health:1.5,moveSpeed:0,damage:2.25};
+  rules.multipliers.zombies={health:0.5,moveSpeed:1.5,damage:0};
+  const value=CustomRules.validate(rules);
+  assert.deepEqual(value.multipliers,rules.multipliers);
+  value.multipliers.units.health=3;
+  assert.equal(rules.multipliers.units.health,1.5);
+  assert.equal(CustomRules.defaults().multipliers.units.health,1);
+  const h=fixture(rules);assert.deepEqual(CustomRules.snapshot(h.target).multipliers,rules.multipliers);
+  change(h,r=>r.multipliers.units.health=2.5);
+  assert.equal(CustomRules.snapshot(h.target).multipliers.units.health,2.5);
+});
+
+test('army multiplier schema rejects unknown, nonfinite, nonpositive health and inherited fields',()=>{
+  for(const change of [
+    m=>m.units.health=0,m=>m.units.health=-1,m=>m.units.moveSpeed=-1,m=>m.zombies.damage=-1,
+    m=>m.units.health=Infinity,m=>m.units.health=NaN,m=>m.units.health='1.5',
+    m=>m.zombies.damage=2147483648,m=>m.units.attack=2,m=>delete m.zombies.health,
+    m=>m.units=[],m=>m.extra={health:1,moveSpeed:1,damage:1},
+    m=>Object.setPrototypeOf(m.units,{inherited:1}),
+    m=>Object.defineProperty(m.zombies,'health',{get(){throw Error('accessor invoked');},enumerable:true}),
+    m=>Object.defineProperty(m.units,'__proto__',{value:{bad:true},enumerable:true})
+  ]) {
+    const rules=CustomRules.defaults();change(rules.multipliers);
+    assert.throws(()=>CustomRules.validate(rules),/CustomRules \$\.multipliers/);
+  }
+  const h=fixture(),rules=CustomRules.snapshot(h.target);rules.multipliers.units.damage=NaN;
+  assert.throws(()=>CustomRules.update(h.target,rules),/multipliers/);
+  assert.deepEqual(CustomRules.snapshot(h.target),CustomRules.defaults());
+});
+
+test('live entity capacity is shared with bounded configuration-driven spawns',()=>{
+  const h=fixture();
+  assert.equal(CustomRules.getEntityCapacity(h.target),CustomRules.ENTITY_LIMIT-2);
+  assert.equal(h.port.getEntityCapacity(),CustomRules.getEntityCapacity(h.target));
+  const zombie=h.game.bbAddZombie(h.game.bbzunits[3]);
+  assert.equal(CustomRules.getEntityCapacity(h.target),CustomRules.ENTITY_LIMIT-3);
+  h.game.bbzombies.bbRemove(zombie);
+  assert.equal(h.port.getEntityCapacity(),CustomRules.ENTITY_LIMIT-2);
+  const filler={};for(let i=0;i<998;i++)h.game.bbpeople.bbAddLast(i===0?filler:{});
+  assert.equal(h.port.getEntityCapacity(),0);
+  h.game.bbpeople.bbRemove(filler);
+  assert.equal(h.port.getEntityCapacity(),1);
 });
 
 test('strict schema rejects unknown, sparse, inherited, accessors and pollution fields atomically',()=>{
@@ -344,7 +396,7 @@ test('large automatic wave and corpse impact respect entity safety ceiling witho
 
 test('entity list ceiling also covers oversized mob skills without touching effect or wave lists',()=>{
   const c=config();c.powers[0].effect.shovelCount=1000;c.powers[0].effect.shotgunCount=1000;
-  const h=fixture(undefined,true,c);h.game.bbAddPower(h.game.bbpowers[0]);
+  const h=fixture(undefined,true,c);h.game.bbAddPower(h.game.bbpowers[0]);fillEntityBudget(h);
   assert.equal(entries(h.game.bbpeople).length+entries(h.game.bbzombies).length+entries(h.game.bbpombies).length,CustomRules.ENTITY_LIMIT);
   const other=new h.port.bb_std_list_List().bbList_new();
   for(let i=0;i<1001;i++)other.bbAddLast(i);
@@ -367,7 +419,7 @@ test('entity list ceiling covers training completion and still permits converted
 
 test('a real purchased training order waits at the ceiling and finishes when a slot opens',()=>{
   const c=config();c.powers[0].effect.shovelCount=1000;c.powers[0].effect.shotgunCount=0;
-  const h=fixture(undefined,true,c);change(h,r=>r.automaticSpawning=false);h.game.bbAddPower(h.game.bbpowers[0]);
+  const h=fixture(undefined,true,c);change(h,r=>r.automaticSpawning=false);h.game.bbAddPower(h.game.bbpowers[0]);fillEntityBudget(h);
   const unit=h.game.bbunits[0];h.game.bbBuyUnit(unit);const cash=h.game.bbztp.bbcash,force=h.game.bbztp.bbforce;
   assert.equal(unit.bborders,1);unit.bbbusy=1;
   h.ticks(3);assert.equal(unit.bborders,1);assert.equal(unit.bbbusy,1);assert.equal(h.game.bbztp.bbcash,cash);assert.equal(h.game.bbztp.bbforce,force);

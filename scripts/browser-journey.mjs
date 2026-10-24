@@ -140,6 +140,74 @@ try {
   await page.reload({waitUntil:'domcontentloaded'});await page.waitForFunction(()=>window.gameReady,null,{timeout:60000});await menu();
   fixture.readBack=(await save('12-synthetic-save-reload')).records;assert.deepEqual(fixture.readBack,fixture.values);fixture.passed=true;evidence.syntheticFixtures.push(fixture);
 
+  // Additive custom-editor coverage, after all unchanged original-game checks.
+  // No pre-existing browser profile is loaded by this ephemeral context.
+  const settleEditor=()=>page.waitForFunction(()=>!document.querySelector('.ztps-dirty')?.textContent.includes('正在生效'));
+  async function edit(path,value,commit='enter'){
+    const input=page.locator(`[data-path="${path}"]`);
+    if(typeof value==='boolean')await input.setChecked(value);
+    else{await input.fill(String(value));if(commit==='blur')await input.blur();else await input.press('Enter');}
+    await settleEditor();
+  }
+  async function queuedBatch(){
+    await page.locator('[data-spawn-rate]').fill('1000000');
+    const before=await snapshot(),seed=await page.evaluate(()=>ZTPGamePort.state.bb_std_random_Seed);
+    await page.locator('[data-spawn-batch]').click();
+    const job=await page.evaluate(()=>Customization.getState().spawnQueue.jobs.at(-1));assert.ok(job);assert.equal(job.spawned,0);
+    const enqueued=await snapshot();for(const key of ['ticks','cash','coins','force','units','people','zombies'])assert.deepEqual(enqueued[key],before[key]);
+    assert.equal(await page.evaluate(()=>ZTPGamePort.state.bb_std_random_Seed),seed);
+    await page.locator('[data-time-pause]').click();await page.evaluate(()=>{ZTPRuntime.useRealtime();ZTPRuntime.start();});
+    await page.waitForFunction(id=>!Customization.getState().spawnQueue.jobs.some(job=>job.id===id),job.id,{timeout:15000});
+    await page.locator('[data-time-pause]').click();await page.evaluate(()=>stopRuntime());
+    const done=await page.evaluate(id=>Customization.getState().spawnQueue.recent.find(job=>job.id===id),job.id);
+    assert.equal(done.spawned,job.count);assert.equal(done.remaining,0);return done;
+  }
+  assert.equal(await page.locator('.ztps-entry').count(),0);
+  assert.equal(await page.locator('[data-time-controls]').isVisible(),false);
+  await page.keyboard.press('F2');await page.locator('#ztps-panel').waitFor({state:'visible'});
+  assert.equal(await page.getByRole('button',{name:'应用本局',exact:true}).count(),0);
+  await page.locator('#ztps-tab-units').click();await edit('config.units.0.cost',25);
+  assert.equal(await page.evaluate(()=>Customization.getState().mode),'custom');
+  assert.equal((await snapshot()).state,1,'Editing at the menu must not silently start or reload a game');
+  assert.equal(await page.evaluate(()=>Customization.getDraft().config.units[0].cost),25);
+  await page.locator('.ztps-close').focus();await page.keyboard.press('Escape');
+  await startStageOne();await click(38,84);
+  assert.equal((await snapshot()).cash,75);assert.equal((await snapshot()).units[0].orders,1);
+  for(let i=0;i<80&&!(await snapshot()).people.some(body=>body.type===0);i++)await step(1);
+  check('INSTANT-MENU-TO-BATTLE/UI','A numeric Enter edit at the menu has no Apply step, does not start a game, and the next real canvas purchase charges its configured $25.');
+
+  await page.keyboard.press('F2');await page.locator('#ztps-panel').waitFor({state:'visible'});
+  await page.locator('#ztps-tab-units').click();await edit('config.units.0.health',100,'blur');
+  assert.equal((await snapshot()).people.find(body=>body.type===0).hp,100);
+  await edit('rules.multipliers.units.health',1.5);
+  assert.equal((await snapshot()).people.find(body=>body.type===0).hp,150);
+  await page.locator('#ztps-tab-sandbox').click();await edit('rules.corpseSpawnOnImpact',false);
+  assert.equal(await page.evaluate(()=>Customization.getState().rules.corpseSpawnOnImpact),false);
+  const current=page.locator('[data-base-current="friendly"]');await current.fill('1111');await current.press('Enter');
+  assert.equal((await snapshot()).peopleBase,1111);
+  await page.locator('[data-spawn-species]').selectOption('zombie-3');await page.locator('[data-spawn-count]').fill('2');const enemyJob=await queuedBatch();
+  const spawned=await snapshot();assert.equal(spawned.zombies.filter(body=>body.type===35).length,2);assert.equal(enemyJob.firstSpawn.x,1600);
+  await page.locator('[data-clear-type="enemy"]').selectOption('zombie-3');await page.locator('[data-clear-selected="enemy"]').click();
+  assert.equal((await snapshot()).zombies.filter(body=>body.type===35).length,0);assert.equal((await snapshot()).people.filter(body=>body.type===0).length,1);
+  const beforeFriendly=await snapshot();await page.locator('[data-spawn-side]').selectOption('friendly');
+  await page.locator('[data-spawn-species]').selectOption('unit-2');await page.locator('[data-spawn-count]').fill('2');const friendJob=await queuedBatch();
+  const friendlyBatch=await snapshot();assert.equal(friendlyBatch.people.filter(body=>body.type===2).length,2);assert.equal(friendJob.firstSpawn.x,0);
+  const income=Math.floor((beforeFriendly.coins+(friendlyBatch.ticks-beforeFriendly.ticks)*beforeFriendly.buildings[1])/600)*50;
+  assert.equal(friendlyBatch.cash,beforeFriendly.cash+income);assert.equal(friendlyBatch.force,beforeFriendly.force);assert.deepEqual(friendlyBatch.units,beforeFriendly.units);
+  await page.locator('[data-clear-type="friendly"]').selectOption('unit-2');await page.locator('[data-clear-selected="friendly"]').click();
+  assert.equal((await snapshot()).people.filter(body=>body.type===2).length,0);assert.equal((await snapshot()).people.filter(body=>body.type===0).length,1);
+  await page.screenshot({path:`${out}/13-instant-sandbox-controls.png`});
+  check('INSTANT-LIVE-SANDBOX/UI','Real blur/Enter/checkbox edits immediately update existing HP, army multiplier, corpse rule and current base HP; both camps batch-spawn and species-clear exact actual entities without charging free friendly troops.');
+
+  assert.equal(await page.locator('#ztps-panel #ztps-time-host [data-time-controls]').count(),1);
+  assert.equal(await page.locator('body > [data-time-controls],main [data-time-controls],.ztps-entry').count(),0);
+  if(await page.locator('[data-time-toggle]').getAttribute('aria-expanded')!=='true')await page.locator('[data-time-toggle]').click();
+  await page.locator('[data-time-speed="0.5"]').click();assert.equal(await page.evaluate(()=>ZTPRuntime.getStatus().timeScale),0.5);
+  await page.locator('[data-time-number]').fill('2');await page.locator('[data-time-number]').press('Enter');assert.equal(await page.evaluate(()=>ZTPRuntime.getStatus().timeScale),2);
+  await page.locator('[data-time-speed="1"]').click();
+  assert.equal((await snapshot()).speed,2);assert.equal(await page.evaluate(()=>Customization.getState().paused),true);
+  check('INDEPENDENT-TIME/UI','The F2-internal time section exposes immediate 0.5×/2× controls, with no game-side entry or floating controls, while retaining original in-game speed and the settings pause; packaged acceptance separately measures actual rate ratios.');
+
   assert.deepEqual(errors,[],'Browser JavaScript exceptions');assert.deepEqual(badResponses,[],'Failed local asset responses');assert.deepEqual(remoteRequests,[],'Game must not require a remote service');
   assert.deepEqual((await snapshot()).runtime.errors,[],'Runtime diagnostics');
   for(const [file,hash] of Object.entries(evidence.sourceHashes))assert.equal(createHash('sha256').update(await readFile(file)).digest('hex'),hash,`Source changed while browser journey was running: ${file}`);

@@ -1,0 +1,23 @@
+/* In-flow clock section inside the F2 dock. No game-side floating controls. */
+.ztp-time-controls{position:static;box-sizing:border-box;width:100%;min-width:0;flex-shrink:0;color:#edf0d6;background:#1c281e;border:1px solid #657851;border-radius:7px;font:12px/1.4 system-ui,"Microsoft YaHei",sans-serif;font-variant-numeric:tabular-nums;pointer-events:auto}
+.ztp-time-controls *{box-sizing:border-box}
+.ztp-time-controls button,.ztp-time-controls input{font:inherit;color:inherit;background:#293a28;border:1px solid #657851;border-radius:4px;min-height:30px;padding:4px 7px}
+.ztp-time-controls button{cursor:pointer}
+.ztp-time-controls button:hover{background:#3c5033;border-color:#bac891}
+.ztp-time-controls :is(button,input):focus-visible{outline:2px solid #e5df97;outline-offset:2px}
+.ztp-time-header{display:flex;align-items:center;gap:5px;padding:5px}
+.ztp-time-toggle{flex:1;text-align:left;white-space:nowrap}
+.ztp-time-toggle::after{content:" ▸"}
+.ztp-time-toggle[aria-expanded=true]::after{content:" ▾"}
+.ztp-time-pause{font-weight:650;white-space:nowrap}
+.ztp-time-body{padding:5px 9px 9px;border-top:1px solid #526043}
+.ztp-time-body[hidden],.ztp-time-error[hidden]{display:none!important}
+.ztp-time-scale-row{display:grid;grid-template-columns:minmax(0,1fr) 55px;gap:7px;align-items:center;margin-bottom:8px}
+.ztp-time-scale-row input[type=range]{width:100%;padding:0;accent-color:#d4d990}
+.ztp-time-scale-row input[type=text]{width:55px;text-align:right;min-width:0}
+.ztp-time-presets{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px}
+.ztp-time-presets button{min-width:0;padding:4px}
+.ztp-time-presets button[aria-pressed=true]{background:#cad384;border-color:#dbe59e;color:#15210f;font-weight:700}
+.ztp-time-status{font-size:11px;color:#c1ceaa;margin-top:7px}
+.ztp-time-error{font-size:11px;color:#ffb9a8;margin-top:5px;overflow-wrap:anywhere}
+@media(max-width:500px){.ztp-time-controls{font-size:11px}.ztp-time-controls button{min-height:28px}.ztp-time-presets{grid-template-columns:repeat(4,minmax(0,1fr))}}

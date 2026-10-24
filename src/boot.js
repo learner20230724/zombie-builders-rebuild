@@ -25,8 +25,10 @@
     window.gameDefaults = defaults;
     const prepared = Customization.prepare(defaults,GameConfig.fromDocuments(documents),globalThis);
     const configuration = prepared.configuration;
-    GameConfig.install(globalThis, configuration);
+    GameConfig.install(globalThis, configuration, {multipliers: prepared.rules.multipliers});
     CustomRules.install(globalThis,prepared.rules);
+    Factions.install(globalThis);
+    SpawnQueue.install(globalThis);
     window.gameConfig = configuration;
     const response = await fetch('/public/assets/manifest.json');
     if (!response.ok) throw new Error(`资源清单 HTTP ${response.status}`);

@@ -53,7 +53,7 @@ Shovel Man, Angry Farmer, Survivalist and the four melee zombie types use `damag
 
 `buildTicks` is the charge countdown and `xp` is the activation cost. `unlockAfterStage: 0` means available immediately; `1..4` requires a saved win for that stage, not merely selecting a later stage.
 
-- Angry Mob: `effect.shovelCount`, `effect.shotgunCount` and `effect.angerSpeedMultiplier`.
+- Angry Mob: `effect.shovelCount`, `effect.shotgunCount`, `effect.survivalistCount`, `effect.bomberCount`, `effect.preacherCount`, and `effect.angerSpeedMultiplier`. Missing added counts default to `0`, so older JSON keeps its original summons. Each count, and Air Strike’s `jetCount`, accepts integers **0–2,147,483,647**. Counts no longer stop at the old 1,000 requested-summon limit; large activations dispatch gradually as battlefield slots become available (up to 32 actors/effects per simulation update).
 - Harvester: `effect.moveSpeed`.
 - Air Strike: `effect.jetCount` and `effect.moveSpeed`.
 
@@ -94,12 +94,36 @@ Each reinforcement contains a base-health `threshold` and ordered `calls`. It tr
 
 ## Live editing and presets
 
-Use **F2** for the non-modal editor. It pauses by default, but **继续战斗** lets the game run beside settings; this does not apply unsaved edits. Saving a preset only saves its draft. **应用本局** applies validated values and reconciles the current stage's waves by stable identity: remaining = `max(0, count - consumed)`, without replaying finished IDs. Existing enemies, elapsed timers, and queued reinforcements are retained. Other stages, completed-group edits, starting resources, and reinforcement definitions have clearly reported next-battle behavior.
+Open **F2** to edit beside the game. Checkboxes and menus commit immediately; numeric fields commit on Enter/change/blur. There is **no Apply button**. A complete configuration/rules pair is validated before committing, so invalid input does not partially change the battle. Loading/importing a preset, resetting defaults, and undoing the last edit also use this automatic commit path; saving a named preset remains separate.
 
-Old imported waves without a trusted identity require starting a new custom battle before live wave editing; other valid attributes can still apply now. The panel reports actual queued/spawned/consumed counts separately from draft rows. See the development guide for count reduction, disabled/deleted groups, delay changes, and compatibility-API details.
+In menus, edits update the selected template without starting a battle. Editing an original battle promotes it to custom. Recruitment population/prerequisites, unlocks, starting resources, reinforcement definitions, and other stages' queues remain next-battle settings. The panel labels these instead of asking for another apply step.
 
-Spawning/ability switches, income rules, Trailer population capacity, Harvester damage/range, and the named-preset wrapper are separate from these five entity documents. Their schema, live-apply boundaries, and storage keys are documented in the [development guide](../docs/DEVELOPMENT.md#presets-rules-and-sandbox) / [二次开发指南](../docs/DEVELOPMENT.zh-CN.md#预设规则与沙盒). New character types and entirely new mechanics require code rather than extra arbitrary JSON fields.
+Current-stage waves reconcile by stable identity: remaining = `max(0, count - consumed)`, retaining existing enemies, clocks, and queued reinforcements. Completed groups do not replay and are read-only in the editor; add a new group for additional enemies. **The editor displays newest rows first, but execution still follows ascending sequence number / the stored array order.** Old imported waves without a trusted identity bind when a new custom battle starts.
 
-**一键杀死己方小兵 / 一键杀死敌方小兵** are immediate actions in an active custom battle, not JSON fields. They clear current non-base troops only, including converted allies on the friendly side, without XP/kill credit. Bases, paid orders, future waves, reinforcement queues, and existing projectiles/power effects remain; the buttons do not disable subsequent spawning.
+### Shared troop multipliers
 
-中文：两个清场按钮是自定义局即时操作，不是可保存的 JSON 属性；只清当前对应阵营的小兵（己方含转化僵尸），不清基地，不刷 XP／击杀，不取消已付订单、不改未来出怪，也不移除已发出的投射物或技能效果。
+The preset's separate `rules.multipliers` object provides independent survivor and zombie HP, movement, and damage factors:
+
+```json
+{
+  "units": { "health": 1.5, "moveSpeed": 1, "damage": 1 },
+  "zombies": { "health": 1.5, "moveSpeed": 1, "damage": 1 }
+}
+```
+
+These are not extra fields in `units.json` or `zombies.json`. The group follows source species, independent of allegiance: enemy humans use `units`, and friendly/converted zombies use `zombies` plus stage factors. Both bases are excluded. Effective survivor HP is `truncate(base HP × units.health)`; enemy HP is `truncate(base HP × zombies.health × truncate(stage HP multiplier))`. Melee damage also combines the group and stage damage factors; thrown-corpse damage uses the zombie group factor but still not the stage melee factor. Effective values must remain within the supported combat-number bounds. Existing presets without multipliers default all six values to `1`.
+
+Spawning/ability switches, income rules, Trailer capacity, Harvester damage/range, and multipliers belong to the preset's `rules` document, not these five entity documents. See the [development guide](../docs/DEVELOPMENT.md#presets-rules-and-sandbox) / [二次开发指南](../docs/DEVELOPMENT.zh-CN.md#预设规则与沙盒) for the complete schema.
+
+### Sandbox actions
+
+- Spawn one zombie immediately with a type button, or choose a friendly/enemy camp, type, count, and rate and **加入出兵队列**. Both camps can select all ten species (five humans and five zombies), not only their original species. Units enter from their selected camp’s side with normal configured stats. Manual generation consumes no cash, XP, or reserved recruitment population, and does not change paid orders or automatic-wave order.
+- Each manual spawn job has an independent rate **0–1,000,000 units/game-second** (default 120); 0 pauses just that job and 0.1 means one per 10 game-seconds. Counts accept **1–2,147,483,647** and are compact pending requests, not a promise to allocate them in one tick. Jobs run concurrently within fair per-tick/live-capacity guards; edit a job’s rate or cancel its remainder without removing born actors. New battles clear this session-only queue. The five zombie quick buttons still bypass the queue and spawn immediately.
+- Clear all current troops on a side, or select one human/zombie type by current allegiance; converted units belong to their new camp. Bases, paid orders, future waves, and existing projectiles/power effects remain; clearing does not grant XP or kill credit.
+- Both bases have quick **maximum HP** configuration and a separate **current HP** action. Current HP is an integer `0..actual maximum`; setting it to `0` ends the battle normally rather than enabling invincibility. It is not saved as a starting-health preset value.
+- The power tab can cancel the selected or all current power effects, including pending dispatch, without clearing ordinary troops or refunding XP; it does not rewrite power JSON.
+- The time controls at the top of the F2 settings panel change runtime speed **0–20× in 0.1 steps**; `0` pauses. It does not change JSON or persist after restart, and multiplies the original in-game speed selection.
+
+Large summon requests are queued, not created in a single unbounded loop. The battlefield retains its separate active-entity safety limit; requested quantity and simultaneous actors are different controls.
+
+中文：F2 内勾选、下拉立即生效，数值回车或失焦生效，不再点“应用本局”；载入／导入、恢复默认和撤销也自动提交。当前关未完成波次按 ID 更新，已完成组只读，新增组显示在最上方但仍按执行序号出怪。全体生命／移速／伤害倍率放在预设 `rules.multipliers`，不乘基地，并与关卡倍率相乘。沙盒支持按类型清兵、双方阵营各十类单位（共二十种组合）的独立速率队列生成、双方基地最大／当前生命；当前生命 0 正常结束战斗。F2 面板内时间控制为 0–20 倍（步长 0.1），不写入预设；大量技能召兵排队分发，不再按旧的 1,000 请求上限截断。

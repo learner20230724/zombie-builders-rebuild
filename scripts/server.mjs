@@ -4,7 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {readFile, realpath, stat} from 'node:fs/promises';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const SOURCE_FILES = new Set(['boot.js', 'runtime.js', 'physics.js', 'generated-game.js', 'generated-game.report.json', 'data.js', 'game-config.js', 'custom-rules.js', 'customization.js', 'settings-ui.js', 'settings-ui.css']);
+const SOURCE_FILES = new Set(['boot.js', 'runtime.js', 'physics.js', 'generated-game.js', 'generated-game.report.json', 'data.js', 'game-config.js', 'custom-rules.js', 'customization.js', 'settings-ui.js', 'settings-ui.css', 'time-controls.js', 'time-controls.css', 'factions.js', 'spawn-queue.js']);
 const CONFIG_FILES = new Set(['units.json', 'zombies.json', 'buildings.json', 'powers.json', 'levels.json']);
 const TYPES = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.json':'application/json; charset=utf-8', '.txt':'text/plain; charset=utf-8', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.mp3':'audio/mpeg', '.wav':'audio/wav'};
 

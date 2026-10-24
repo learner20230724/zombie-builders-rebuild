@@ -8,6 +8,8 @@
   'use strict';
   const states = new WeakMap();
   const ENTITY_LIMIT = 1000;
+  const MULTIPLIER_LIMIT = 2147483647;
+  const multiplierKeys = ['health','moveSpeed','damage'];
   const keys = ['schemaVersion','automaticSpawning','zombieTypesEnabled','baseReinforcements','corpseSpawnOnImpact','abilities','economy'];
   const abilityKeys = ['preacherConversion','fatAreaAttack','corpseThrowing'];
   const optionalBooleanAbilities = ['ghoulLongLeap'];
@@ -38,14 +40,30 @@
     if (!Number.isInteger(value) || value < min || value > max) fail(path,'expected an integer between ' + min + ' and ' + max);
     return value;
   }
+  function multiplier(value,path,positive) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value > MULTIPLIER_LIMIT || (positive ? value <= 0 : value < 0))
+      fail(path,'expected a finite ' + (positive ? 'positive' : 'non-negative') + ' multiplier no greater than ' + MULTIPLIER_LIMIT);
+    return value;
+  }
+  function validateMultipliers(input) {
+    record(input,'$.multipliers',['units','zombies']);
+    const result = {};
+    for (const kind of ['units','zombies']) {
+      record(input[kind],'$.multipliers.'+kind,multiplierKeys);
+      result[kind] = {};
+      for (const key of multiplierKeys) result[kind][key] = multiplier(input[kind][key],'$.multipliers.'+kind+'.'+key,key === 'health');
+    }
+    return result;
+  }
   function defaults() {
     return {schemaVersion:1,automaticSpawning:true,zombieTypesEnabled:[true,true,true,true,true],
       baseReinforcements:true,corpseSpawnOnImpact:true,
       abilities:{preacherConversion:true,fatAreaAttack:true,corpseThrowing:true,ghoulLongLeap:true,harvesterDamagePerTick:100,harvesterRange:220},
-      economy:{salvagePayout:50,salvageIntervalTicks:600,populationPerTrailer:5}};
+      economy:{salvagePayout:50,salvageIntervalTicks:600,populationPerTrailer:5},
+      multipliers:{units:{health:1,moveSpeed:1,damage:1},zombies:{health:1,moveSpeed:1,damage:1}}};
   }
   function validate(input) {
-    record(input,'$',keys.filter(key=>key !== 'economy'),['economy']);
+    record(input,'$',keys.filter(key=>key !== 'economy'),['economy','multipliers']);
     if (input.schemaVersion !== 1) fail('$.schemaVersion','supported version is 1');
     record(input.abilities,'$.abilities',abilityKeys,numericAbilities.concat(optionalBooleanAbilities));
     const baseline = defaults();
@@ -75,6 +93,7 @@
     copy.economy.salvagePayout = integer(economy.salvagePayout,'$.economy.salvagePayout',0,1000000);
     copy.economy.salvageIntervalTicks = integer(economy.salvageIntervalTicks,'$.economy.salvageIntervalTicks',1,1000000);
     copy.economy.populationPerTrailer = integer(economy.populationPerTrailer,'$.economy.populationPerTrailer',1,1000);
+    copy.multipliers = validateMultipliers(Object.prototype.hasOwnProperty.call(input,'multipliers') ? input.multipliers : baseline.multipliers);
     return copy;
   }
   function portFor(target) {
@@ -95,21 +114,27 @@
     const game = port.state.bb_Game;
     if (game && game.bbmainState === 2 && game.bbzombiebase) game.bbzombiehealth = game.bbzombiebase.bbhealth;
   }
-  function atEntityLimit(game) {
+  function availableEntitySlots(game) {
+    if (!game) return ENTITY_LIMIT;
     let count = 0;
     for (const list of [game.bbpeople,game.bbzombies,game.bbpombies]) {
       if (!list) continue;
       const iterator = list.bbObjectEnumerator();
-      while (iterator.bbHasNext()) { iterator.bbNextObject(); if (++count >= ENTITY_LIMIT) return true; }
+      while (iterator.bbHasNext()) { iterator.bbNextObject(); if (++count >= ENTITY_LIMIT) return 0; }
     }
-    return false;
+    return ENTITY_LIMIT-count;
   }
+  function atEntityLimit(game) { return availableEntitySlots(game) === 0; }
+  function getEntityCapacity(target) { return availableEntitySlots(portFor(target).state.bb_Game); }
   function syncPopulation(port,state) {
     const game = port.state.bb_Game;
     if (game && game.bbztp) game.bbztp.bbmaxforce = game.bbztp.bbbuildingcount[0] * state.rules.economy.populationPerTrailer;
   }
   function hooks(target, state) {
     const port = portFor(target);
+    // Configuration-driven skill spawning shares the same live-body budget.
+    // A bounded pending dispatch can wait instead of silently dropping orders.
+    port.getEntityCapacity = () => availableEntitySlots(port.state.bb_Game);
     // The mob skill inserts people directly, bypassing AddPerson/AddZombie.
     // Guard only the three current live-entity lists; wave queues, effects,
     // scores and all other list instances remain untouched. Conversion removes
@@ -288,5 +313,5 @@
     state.manualDepth++;
     try { return fn(); } finally { state.manualDepth--; }
   }
-  return Object.freeze({defaults,validate,install,update,snapshot,beginManualSpawn,withManualSpawn:beginManualSpawn,ENTITY_LIMIT});
+  return Object.freeze({defaults,validate,validateMultipliers,install,update,snapshot,getEntityCapacity,beginManualSpawn,withManualSpawn:beginManualSpawn,ENTITY_LIMIT,MULTIPLIER_LIMIT});
 });

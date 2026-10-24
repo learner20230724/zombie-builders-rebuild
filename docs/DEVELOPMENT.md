@@ -60,7 +60,7 @@ The example above shows the container shape only. Keep the complete entries in t
 
 The [configuration reference](../config/README.md) covers all fields and reinforcement ordering.
 
-`config/defaults/` contains the separate original-mode baseline. Treat it as the baseline, not as the user's editable balance directory. **Return to original mode (`回到原版模式`)** reloads that baseline without deleting named presets; **Reset draft (`恢复原版默认`)** only resets the editor's unsaved values.
+`config/defaults/` contains the separate original-mode baseline. Treat it as the baseline, not as the user's editable balance directory. **Return to original mode (`回到原版模式`)** reloads that baseline without deleting named presets; **Reset defaults (`恢复原版默认`)** resets the values and automatically commits them through the same validated path as other editor changes.
 
 Units, zombies, and buildings use IDs **0–5**; unit and zombie ID **5** is the corresponding base. Powers use IDs **0–2**, and levels use IDs **1–4**.
 
@@ -68,7 +68,7 @@ Units, zombies, and buildings use IDs **0–5**; unit and zombie ID **5** is the
 
 `units[].health` and `zombies[].health` accept integers **1–2,147,483,647**. The earlier 100,000,000 ceiling was a configuration guard, not a gameplay rule. The new ceiling matches the existing signed 32-bit combat representation; do not remove it without replacing the relevant integer arithmetic. Health `0` is death, not an invincibility flag.
 
-An error path such as `$.units[5].health` points to the sixth JSON entry: the player base. `$.zombies[5].health` is the enemy base. Errors retain this machine-readable path and include readable Chinese field context. For each stage and non-base zombie, `health × truncate(zombieHealthMultiplier)` must also remain at or below **2,147,483,647**; enemy-base health is not multiplied. Validation occurs before applying changes, and an invalid draft does not partially mutate a battle. High-health enemy kill rewards saturate accumulated XP at the same signed 32-bit ceiling rather than wrapping negative; later power spending still deducts XP normally.
+An error path such as `$.units[5].health` points to the sixth JSON entry: the player base. `$.zombies[5].health` is the enemy base. Errors retain this machine-readable path and include readable Chinese field context. For every stage and non-base zombie, `truncate(health × rules.multipliers.zombies.health × truncate(zombieHealthMultiplier))` must also remain within **1–2,147,483,647**. Survivor HP includes `rules.multipliers.units.health`; neither base uses group or stage multipliers. Validation occurs before applying changes, and an invalid draft does not partially mutate a battle. High-health enemy kill rewards saturate accumulated XP at the same signed 32-bit ceiling rather than wrapping negative; later power spending still deducts XP normally.
 
 ### Example: stronger Shovel Men
 
@@ -174,14 +174,13 @@ All snippets above show selected fields only: merge the values into the matching
 
 ## Timing and game speed
 
-The runtime targets **60 base updates per second**. Each update advances `bbgamespeed` battle ticks; the default speed is **2**, so normal play advances about **120 battle ticks per second**. The speed button cycles through **1, 2, 3, and 4**.
+The runtime targets **60 base updates per second**. The original `bbgamespeed` selects battle ticks per game update (default **2**, its in-game button cycles **1–4**). The **time controls embedded at the top of the F2 settings panel** multiplies the update clock with **0–20×** speed in **0.1** steps. **1×** preserves the original game's current speed, not one battle tick per frame; **0** stops simulation frames. Speed is session-only, not stored in presets or across restarts.
 
-- `buildTicks` and `cooldownTicks` count battle ticks.
-- At a steady update rate, a duration is approximately `ticks / (60 × bbgamespeed)` real seconds.
-- The game's displayed time uses `battleTicks / 120`, independently of the selected speed.
-- Background-tab throttling and catch-up limits can affect wall-clock timing.
-
-Wave `delay` uses its own scheduler, as described above; do not convert it with the battle-tick formula.
+- At a steady update rate, ticks/second ≈ `60 × bbgamespeed × timeScale`; default is 120.
+- `buildTicks` and `cooldownTicks` count battle ticks. Wave `delay` uses its own scheduler, not this tick formula.
+- Displayed game time remains `battleTicks / 120`.
+- Fractional time accumulates whole fixed simulation frames; changing speed does not inject extra RNG draws or replay time spent editing. 20× is a target, not a guaranteed measured rate. Scaled realtime RAF batches have an approximately **25 ms soft CPU budget** and a secondary 150-frame cap; after at least one due complete update/render frame, unserved whole-frame debt is discarded instead of accumulating catch-up. Default untouched 1× and deterministic manual step/advance paths are unchanged.
+- `ZTPRuntime.setTimeScale(value)` validates `0..20` in 0.1 steps; `getStatus().timeScale` reports it. Explicit pause uses controller pause tokens, while zero speed can leave the runtime marked running with no simulation frames. Resume releases this panel's and the editor's pause token, restores a positive speed after 0, and never overrides the game's own pause or unrelated pause owners.
 
 ## Runtime and extension points
 
@@ -190,10 +189,13 @@ Wave `delay` uses its own scheduler, as described above; do not convert it with 
 | `src/boot.js` | Load assets and configuration, then start the game |
 | `src/game-config.js` | Validate JSON and adapt it to the game's tables and behavior |
 | `src/custom-rules.js` | Validated spawning and ability switches outside generated code |
-| `src/customization.js` | Named presets, explicit live operations, and separate custom records |
+| `src/factions.js` | Species-independent allegiance, cross-camp targeting/combat, and rendering adapter |
+| `src/spawn-queue.js` | Compact independent-rate manual jobs, fair dispatch, and job snapshots |
+| `src/customization.js` | Named presets, validated immediate commits, sandbox actions, and separate custom records |
 | `src/settings-ui.js` / `.css` | Non-modal settings dock, field editors, wave controls, and sandbox buttons |
 | `src/generated-game.js` | Game state, production, combat, UI, and level logic |
-| `src/runtime.js` | Canvas rendering, Web Audio, input, and browser storage |
+| `src/runtime.js` | Fixed-frame time scaling, Canvas, audio, input, and browser storage |
+| `src/time-controls.js` | Pause/speed controls embedded in the settings host |
 | `src/physics.js` | Physics integration |
 | `scripts/server.mjs` | Local HTTP server and allowed resource routes |
 | `desktop/main.cjs` / `protocol.cjs` | Sandboxed desktop window, fixed local resource protocol, and user configuration |
@@ -202,12 +204,13 @@ The browser adapter is exposed as `GameConfig`; Node tools can load the same mod
 
 - `fromDocuments(documents)`: combine and validate the five JSON documents.
 - `validate(config)`: validate a combined configuration and return a normalized copy.
-- `compile(config)`: produce the runtime tables and effect settings.
+- `compile(config, {multipliers}?)`: produce runtime tables/effects with optional validated group multipliers. `validateMultipliers` validates factors; compilation also checks effective stats.
 - `install(target, config)`: call before `bb_Init()` to wrap initialization and reapply configuration before `bb_Main()` runs.
 - `apply(target, config)`: apply directly after `bb_Init()` and before `bb_Main()`.
 - `getCurrent(target)`: return a deep copy of the latest complete configuration, including values deferred to the next battle.
 - `updateLive(target, config, options)`: update an initialized game, returning `{applied, deferred}` arrays of changed JSON paths. Supply the complete validated configuration, not a partial patch.
 - `getWaveProgress(target)`: snapshot tracked current/upcoming groups, consumed/spawned counts, completed IDs, and known group identities.
+- `getPowerProgress(target, {includeActive:true}?)`: read pending compact skill-dispatch groups; opt in to per-power active counts (`byPower`, `activeTotal`) without changing the default snapshot shape.
 - `applyLiveWaves(target, config)`: reconcile the current stage's unspawned schedule by identity, returning `{applied, deferred, notes, requiresNewBattle, reason, progress}`.
 
 ### Live-apply contract
@@ -219,7 +222,8 @@ const next = GameConfig.getCurrent(globalThis);
 next.zombies[3].health = 1500;
 const result = GameConfig.updateLive(globalThis, next, {
   healthPolicy: 'ratio',       // or 'new-only'
-  preserveTimerProgress: true
+  preserveTimerProgress: true,
+  multipliers: CustomRules.defaults().multipliers
 });
 ```
 
@@ -233,9 +237,9 @@ Use **`Customization`**, not the low-level adapter alone, for player-facing oper
 
 ### Non-modal editing
 
-Settings reserve a right-hand dock when the viewport is wider than **850 CSS pixels**; at **850 or below**, the game is above the settings. The canvas retains its 800×600 logical coordinate system while its visible area resizes. Opening settings takes an editor pause token; **继续战斗** releases that token without closing the dock, and **暂停战斗** takes a new token. These operations do not forcibly clear the game's own pause state. Closing settings restores the runtime state associated with its editor pause rather than replaying elapsed edit time.
+Settings reserve a right-hand dock when the viewport is wider than **850 CSS pixels**; at **850 or below**, the game is above the settings. The canvas retains its 800×600 logical coordinate system while its visible area resizes. Opening settings takes an editor pause token; the settings time section’s **继续战斗** releases that token without closing the dock, and **暂停战斗** takes its own pause token. These operations do not forcibly clear the game's own pause state. Closing settings restores the runtime state associated with its editor pause rather than replaying elapsed edit time.
 
-F2 toggles the dock globally. Esc closes it when focus is inside settings; form typing stays separate from game controls. Values remain a draft until explicit application: continuing the battle or saving a named preset is not an implicit apply.
+F2 is the customization entry and toggles the dock globally; there is no extra customization button or floating time widget over the closed game. The time module mounts into `#ztps-time-host` below the settings header and before presets, expanded by default, instead of reserving space outside it. It hides with F2; an explicit time-panel pause remains in effect until resumed after reopening. Esc closes the dock when focus is inside settings; form typing stays separate from game controls. The editor calls `commitSettings` automatically on checkbox/select changes and committed field edits (Enter/change/blur; multiline text also accepts Ctrl+Enter). Loading/importing/resetting/undoing follows the same path. There is no Apply button. Saving a named preset remains a separate reusable-library action. Completed wave rows are read-only; newest rows display first while stored execution order remains unchanged.
 
 ### Presets, rules, and sandbox
 
@@ -247,23 +251,61 @@ F2 toggles the dock globally. Esc closes it when focus is inside settings; form 
 | `exportPreset(spec, name)`, `importPreset(jsonText)` | Round-trip a versioned JSON preset; import validates but does not save/apply |
 | `startCustomBattle(stage, spec)` | Save the session selection, reload, and start stage 1–4 |
 | `validateDraft(spec)` | Validate and normalize both configuration and rules without changing state |
-| `applyDraft(spec, {healthPolicy})` | Recommended: validate both documents before mode promotion or live changes, then apply together |
+| `commitSettings(spec, {healthPolicy}?)` | Editor entry: validate both documents and auto-apply during a battle, or update the next-battle template without starting in menus |
+| `applyDraft(spec, {healthPolicy})` | Lower-level complete live draft operation; validates both documents before mode promotion or mutation |
 | `applyLive(config, {healthPolicy})` | Promote an active original run to custom and apply supported values |
 | `applyRules(rules)` | Apply behavior switches in a custom battle |
-| `spawnZombie(type, count = 1)` | Immediately create zombie type 0–4 in a custom battle; count 1–20 |
-| `clearFriendlyTroops()`, `clearEnemyTroops()` | Immediately clear current non-base troops on one side in an active custom battle; preserve pause and queues |
+| `enqueueSpawn(side, {kind,type}, count, {rate}?)` | Create a compact manual spawn job, count 1–2,147,483,647; rate 0–1,000,000 actors/game-second |
+| `setSpawnJobRate(id, rate)` | Immediately update only that job’s rate; return its snapshot |
+| `cancelSpawnJob(id = "all")`, `cancelAllSpawnJobs()` | Cancel pending requests for one/all jobs; return an array of cancelled-job snapshots; retain spawned actors |
+| `spawnFactionUnit(side, {kind,type}, count = 1)` | Immediate low-level generation in `friendly` / `enemy`; `kind` is `unit` / `zombie`, `type` is 0–4, count is 1–998; shared live-capacity preflight |
+| `spawnZombie(type, count = 1)` | Compatibility shortcut for enemy zombie type 0–4; count 1–998 |
+| `spawnFriendlyUnit(type, count = 1)` | Compatibility shortcut for friendly human type 0–4; count 1–998 |
+| `clearFriendlyTroops(selection?)`, `clearEnemyTroops(selection?)` | Clear all or one actor type; preserve bases, pause, paid orders, and future queues |
+| `setBaseHealth(side, currentHp)` | Set `friendly` / `enemy` base current HP to an integer `0..actual maximum`; 0 triggers normal game-over handling |
+| `cancelPowerEffects(powerId = "all")` | In an active custom battle, cancel power 0/1/2 or all; works paused without advancing the battle |
 | `applyUpcomingWaves(config)` | Compatibility wave-only alias for safe tracked-current-stage synchronization; does not apply other draft attributes |
 | `getBattleStatus()` | Read running/editor/game pause states, building counts, entity counts, and actual wave progress |
 | `restoreOriginal()` | Reload original mode; does not delete saved presets |
 | `pauseForEditor()`, `resumeFromEditor(token)` | Pause the editor safely without catch-up simulation on close |
 
-Use `applyDraft` for a complete player-edited draft rather than chaining `applyLive` and `applyRules`: an invalid rule must not leave a valid configuration half-applied. Validation failures leave the mode, stored data, and live configuration unchanged.
+Preset load/import methods above return data only; the settings UI immediately feeds their valid result to `commitSettings`. Use `commitSettings` for editor events (`applyDraft` for low-level live-only callers), rather than chaining `applyLive` and `applyRules`: an invalid rule must not leave a valid configuration half-applied. Validation failures leave the mode, stored data, and live configuration unchanged.
 
-The troop-clearing methods work while running or paused and do not advance simulation. Friendly clearing includes normal survivors, Angry Mob summons, and converted zombies. Selected actors are removed from their combat lists immediately, with health `0` and death mode `15`; bases are excluded. They return `{side, count, people, converted, zombies}` and release population only for ordinary recruited survivors, once per removal. Clearing an empty side again returns count `0`. They do not award XP, kills, losses, or cash, create death effects, remove existing corpses/projectiles/power effects, cancel paid orders, alter timers, or change wave/reinforcement queues. Automatic spawning remains enabled unless separately switched off. These are immediate sandbox actions, not saved preset flags.
+`spawnFactionUnit` returns `{side,kind,type,count,positions}`; the two compatibility shortcuts retain `{type,count,positions}`. These are immediate low-level calls; the player-facing batch form uses the queued path below, while the five enemy-zombie quick buttons remain immediate. All twenty camp/species combinations are supported: e.g. enemy Preachers/Survivalists and friendly Fat Zombies. Each enters from its selected side's natural origin (**friendly x = 0, enemy x = 1600**) and uses source-species configured/group stats without an Angry Mob bonus. Manual generation costs no cash/XP, changes no paid order, and reserves no recruitment population. Non-reserved population bookkeeping prevents death or clearing from refunding another paid unit/order's population. Both camps share the 1,000-active-entity guard; oversized batches are rejected before creation.
+
+`src/factions.js` separates source species from current allegiance rather than treating a camp switch as a cosmetic flag. Cross-camp units face/move toward the opposing side and target its actors/base with their type's combat behavior. Conversion changes allegiance, and typed clearing uses current camp. Numeric group modifiers still follow species, not allegiance; this is not a way to make enemy humans use zombie tables or vice versa. Projectiles retain their launch allegiance if their shooter is later converted. The cross-camp Preacher adapter can convert opposing mobile humans/zombies (range 320, base-HP budget 1,000, bases excluded); the native friendly Preacher retains its original zombie eligibility.
+
+`getBattleStatus().factions` reports `{friendly:{units,zombies},enemy:{units,zombies}}` from current allegiance. `powerProgress` in both battle status and controller state reports `{pendingTotal,groups:[{type,count,source}]}` for queued skill dispatch.
+
+`getState().troopCounts` / `getBattleStatus().troopCounts` is `{friendly:{units:[n0,n1,n2,n3,n4],zombies:[n0,n1,n2,n3,n4],total},enemy:{units:[...],zombies:[...],total}}`. The read-only **在场兵力** table appears below the sandbox stage/start row, with ten species rows and friendly/enemy totals. It counts unique living actors (`health > 0`, modes not 14/15) by current camp, including converted humans/zombies; bases, queued recruitment/manual/power requests, population capacity, and effect vehicles are excluded. Menus show zero; ended battles retain their actual survivors until reset. Reading counts advances no ticks or RNG and changes no state.
+
+The troop-clearing methods work while running or paused and do not advance simulation. Friendly clearing includes normal survivors, Angry Mob summons, and converted zombies. Selected actors are removed from their combat lists immediately, with health `0` and death mode `15`; bases are excluded. They return `{side, count, people, converted, zombies}` and release population only for ordinary recruited survivors, once per removal. Clearing an empty side again returns count `0`. They do not award XP, kills, losses, or cash, create death effects, remove existing corpses/projectiles/power effects, cancel paid orders, alter timers, or change wave/reinforcement queues. Automatic spawning remains enabled unless separately switched off. These are immediate sandbox actions, not saved preset flags. Omitted/null/`all` selections clear the side. Both methods accept `{kind:"unit",type:0..4}` or `{kind:"zombie",type:0..4}` and match that species in its current camp, including converted zombies. Legacy integers keep their native meaning (friendly humans, enemy zombies); friendly `{kind:"converted",type}` / `converted-N` remains an alias for friendly zombies. In returned counts, `people` is removed human species in either camp, `converted` is removed friendly zombies (manual or converted), and `zombies` is removed enemy zombies. Selection validation precedes removal, and a selected type never clears unrelated actors.
+
+Both bases are exposed by `getState().bases` / `getBattleStatus().bases` as `{friendly:{current,maximum}, enemy:{current,maximum}}`, or `null` outside an active battle. Maximum HP remains `config.units[5].health` / `config.zombies[5].health`, committed with the selected health policy; direct current-HP edits are not starting-health preset values and cannot revive an ended battle.
+
+### Independent manual spawn queues
+
+The batch form selects camp, species, count, and **本批出兵速率（只/游戏秒）**, then calls **加入出兵队列**. Counts accept **1–2,147,483,647**. Rates accept finite **0–1,000,000 actors per game-second**, including fractional values: `0.1` produces one actor per 10 game-seconds, `2` produces two per game-second, and `0` pauses only that job. A game-second is **120 battle ticks**; original game speed and runtime time scale change wall-clock delivery speed together. The default rate **120** applies only when creating a job, not to existing jobs.
+
+Jobs are independent concurrent streams, not a single blocking FIFO. Shared fair round-robin dispatch admits at most **32 actors per simulation tick**, respecting the **1,000 active entities including bases** capacity guard. Full capacity retains pending counts; it does not discard requests or accumulate an eventual giant catch-up burst. Rate changes and per-job pauses also do not backfill paused time. Very high requested rates are limited by this shared budget. The first actor is due after its interval (`120/rate` battle ticks), not at enqueue time; high-rate work starts no earlier than the next tick.
+
+`enqueueSpawn` and `setSpawnJobRate` return job snapshots. `getState().spawnQueue` / `getBattleStatus().spawnQueue` contains `defaultRate` (`rate` alias), `jobs`, `recent` (last 32 completed/cancelled jobs), `pendingJobs`, `totalPending` (`pending` alias), `totalRequested`, `totalSpawned`, `totalCancelled`, `paused`, `blocked`, `capacity`, and `maxPerTick`. Each job includes `id`, `side`, `descriptor:{kind,type}`, `kind`, `type`, `count`, `rate`, `spawned`, `remaining`, `status`, `createdTick`, `completedTick`, `cancelledCount`, and `firstSpawn:{x,y,side,kind,type}|null`.
+
+A job's live rate input changes only that job; users can add another batch without waiting for previous jobs. Cancelling one/all jobs removes only outstanding requests, unlike troop clearing or power-effect cancellation. Already spawned actors remain. Jobs are session-only and are cleared when the battlefield resets; they are not saved preset rule fields.
+
+Boot installs `SpawnQueue` **after `Factions`** (and configuration/rules) before game initialization. The module API is `install(target)`, `enqueue(target,side,descriptor,count,{rate}?)`, `updateRate(target,id,rate)`, `setDefaultRate(target,rate)` (`setRate` alias; new jobs only), `cancel(target,id?)` (omitted means all), and `snapshot(target)` (`getState` alias).
+
+### Cancel power effects
+
+The power tab's **取消当前技能效果** / **取消全部技能效果** call `Customization.cancelPowerEffects(0|1|2|"all")` (omitted means all). This action requires an active custom battle, works while paused, and preserves pause state. The controller performs a dry preflight before a frozen-time cancellation and returns `{pending,actors,powerups,projectiles,explosions,charging}` counts from `GameConfig.cancelPowerEffects`.
+
+Cancellation covers the selected charging power, its pending summon queue, and its surviving deployed effects: Angry Mob source actors (including later-converted actors), Harvesters, or aircraft/unlanded Air Strike bombs and tagged Air Strike explosion visuals. Ordinary troops, manually generated units, and Bomber bottles are not skill effects to be cleared. Cancelling a selected charge clears its busy/charge state but leaves remaining cooldown unchanged; recasting still follows normal requirements. It does not refund XP, reset cooldowns, undo damage, or alter cash/population or future wave/recruitment/building plans. This is an action, not a saved preset switch.
 
 ### Current-battle wave reconciliation
 
-The normal `applyDraft` operation updates the current stage's waves; there is no separate replace/replay button. Its `waveReport` contains `{applied, deferred, notes, requiresNewBattle, reason, progress, stage, otherStages}`. A live application does not restart the battle or wait for enemies to be killed.
+The wave header's **暂停波次 / 继续波次** toggles the existing live `rules.automaticSpawning` value, mirroring the sandbox checkbox. It freezes scripted scheduling/count progress without restarting/replaying the queue; combat, skills, and independent manual spawn jobs keep running. New base-health reinforcements are also gated (health crossings while paused are consumed, not replayed); corpse-impact spawning still has its own switch. This direct action updates the current rules only, so an invalid/uncommitted field elsewhere does not block it or get overwritten. It adds no separate pause flag or schema field.
+
+The editor's automatic `commitSettings` path (via `applyDraft`) updates the current stage's waves; there is no apply, replace, or replay button. Its `waveReport` contains `{applied, deferred, notes, requiresNewBattle, reason, progress, stage, otherStages}`. A live application does not restart the battle or wait for enemies to be killed.
 
 - For an unfinished ID, **remaining = `max(0, requested count - consumed)`**. `consumed` counts scheduler events, including waits or types filtered out by automatic-spawn rules; `spawned` counts actual generated enemies. Editing a count changes the intended battle total, not an additional number to append.
 - Changing type affects only the unspawned remainder. Reordering moves IDs without losing their consumed counts. Disabled/deleted unfinished groups have their remaining queue entries removed; re-enabling a still-unfinished ID can restore its unconsumed remainder.
@@ -285,6 +327,10 @@ Rule format:
   "zombieTypesEnabled": [true, true, true, true, true],
   "baseReinforcements": true,
   "corpseSpawnOnImpact": true,
+  "multipliers": {
+    "units": { "health": 1, "moveSpeed": 1, "damage": 1 },
+    "zombies": { "health": 1, "moveSpeed": 1, "damage": 1 }
+  },
   "economy": {
     "salvagePayout": 50,
     "salvageIntervalTicks": 600,
@@ -309,11 +355,18 @@ Rule format:
 | `abilities.harvesterDamagePerTick` | Integer 0–100,000,000 | Next tick, including existing Harvesters; per target, not DPS |
 | `abilities.harvesterRange` | Integer 0–3,200 | Next tick; original forward leading-edge test `0 <= distance < range`, excluding bases |
 
-Manual spawning deliberately bypasses automatic-spawn filters; automatic waves and their ordering are not edited by the spawn buttons. `CustomRules.ENTITY_LIMIT` is **1,000 combined combat units**, including bases, survivors, enemies, and converted allies, but not projectiles, power effects, or particles. A paid training order waits at one remaining tick until a slot opens, retaining its payment and reserved population; it is not discarded or charged twice. Excess Angry Mob summons are truncated without refunding the deployed power. `automaticSpawning: false` freezes the queue's scheduling/counts, not the battle. Base-health crossings during disabled reinforcement spawning are consumed rather than replayed later. Type switches filter queued spawns; `corpseSpawnOnImpact` separately controls the extra Zombie at corpse impact.
+Shared modifiers live in `rules.multipliers.units` and `.zombies`, each with `health`, `moveSpeed`, and `damage` (defaults **1**). Health factors must be positive; movement/damage allow zero. Each finite factor is at most **2,147,483,647**, with effective HP/damage checked against signed-int32 bounds and effective movement at most **1,000,000**. They do not change the stored base config values and never affect either base. Modifiers follow source species, not allegiance: enemy humans still use `units`; friendly/converted zombies still use `zombies` and stage factors.
+
+- Survivor HP: `truncate(base HP × units.health)`.
+- Zombie HP: `truncate(base HP × zombies.health × truncate(stage HP factor))`.
+- Melee damage combines base/group/stage factors before its normal final integer cast; zombie stage damage does not apply to corpse projectiles. Unit bottles and corpse projectiles use the appropriate group damage factor at launch; projectiles already in flight are unchanged. Preacher conversion behavior is not a direct-damage value.
+- Movement combines type speed and group speed; Angry Mob's own anger factor also applies. Live updates preserve direction and transient states, and honor the HP policy.
+
+Manual spawning deliberately bypasses automatic-spawn filters; automatic waves and their ordering are not edited by the spawn buttons. `CustomRules.ENTITY_LIMIT` is **1,000 combined combat units**, including bases, survivors, enemies, and converted allies, but not projectiles, power effects, or particles. A paid training order waits at one remaining tick until a slot opens, retaining its payment and reserved population; it is not discarded or charged twice. Angry Mob and Air Strike requests are stored as compact pending counts, up to **2,147,483,647 per configured count**, and dispatch at most **32 actors/effects per simulation update** within their separate live-capacity guards. Excess requests wait rather than being dropped; changing counts affects later activations, not an already queued activation. Battle reset discards its old pending requests. `automaticSpawning: false` freezes the scripted wave queue's scheduling/counts, not the battle or manual spawn jobs. Base-health crossings during disabled reinforcement spawning are consumed rather than replayed later. Type switches filter queued spawns; `corpseSpawnOnImpact` separately controls the extra Zombie at corpse impact.
 
 `ghoulLongLeap: false` disables the Ghoul's long-distance leap but keeps its nearby jump-bite; disabling it in the air returns the current leap to its ground height and walking behavior on the next battle tick. The other three ability booleans suppress the listed hit/conversion/projectile without cancelling the action's elapsed time or inventing an alternate attack. Attack frequency, general attack ranges, leap distance/speed, Fat attack radius, Preacher conversion budget/range, and Air Strike bomb damage/radius are not numeric controls in this version. New entity types and mechanics still require code.
 
-Version-1 presets made before the economy/Harvester/Ghoul additions may omit those added rule fields and receive their defaults. Unknown fields and the original required fields remain validated; backward compatibility is not permission to supply arbitrary JSON.
+Version-1 presets made before the economy/Harvester/Ghoul/multiplier additions may omit those added fields and receive their defaults. Angry Mob's added `survivalistCount`, `bomberCount`, and `preacherCount` default to 0; `shovelCount` and `shotgunCount` remain required. Unknown fields and the original required fields remain validated; backward compatibility is not permission to supply arbitrary JSON.
 
 Storage keys are stable across release versions: `zombie-builders-presets-v1` (up to 25 named presets, 2 MiB total), `zombie-builders-session-v1` (selected rules), `zombie-trailer-park-0.33` (original records), and `zombie-builders-custom-v1` (custom records). Preset JSON import/export is limited to 2 MiB. Saving a preset does not rewrite the five external JSON files; original and custom records are not merged.
 

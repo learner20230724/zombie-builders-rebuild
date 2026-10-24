@@ -9,6 +9,8 @@
   const diagnostics = {
     errors: [], warnings: [], assets: {}, frames: 0, updates: 0,
     drawCalls: 0, audioStarted: 0, audioPending: 0, storageAvailable: true,
+    timing: { scaledFrames: 0, droppedWallMilliseconds: 0, droppedSimulationMilliseconds: 0,
+      largestFrameBatch: 0, budgetLimitedBatches: 0 },
     cropCache: { entries: 0, pixels: 0, hits: 0, misses: 0 },
     remoteServices: 'Mochi Media is unavailable; scores and user data are local-only.'
   };
@@ -18,10 +20,12 @@
     audioContext: null, audioUnavailable: false, audioUnlocked: false,
     channels: new Set(), inputCleanup: null, running: false, raf: null,
     lastFrame: null, manualTime: null, movie: null, mochiState: 0,
+    timeScale: 1, scaledClock: null, scaledCredit: 0, scaledLastWall: null,
     mochiGets: [], mochiProperties: [], scoreDialog: null, options: {}, app: null
   };
   const perfNow = () => global.performance ? global.performance.now() : Date.now();
-  const now = () => state.manualTime === null ? perfNow() : state.manualTime;
+  const now = () => state.manualTime !== null ? state.manualTime
+    : state.scaledClock !== null ? state.scaledClock : perfNow();
   const zero = () => 0;
   // Native BitmapData rectangle edges use ties-to-even, not Math.round's
   // positive-half rule. This is distinct from setPixel/Point int coercion.
@@ -670,8 +674,72 @@
       && (state.movie.definition.stageFrameRate || state.movie.definition.frameRate);
     return movieRate || app.updateRate;
   }
+  const MAX_SCALED_WALL_DELTA = 250;
+  const MAX_SCALED_FRAME_BATCH = 150;
+  const SCALED_FRAME_BUDGET_MILLISECONDS = 25;
+  function setRuntimeTimeScale(value) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0 || value > 20
+      || Math.abs(value * 10 - Math.round(value * 10)) > 1e-8) {
+      throw new RangeError('Time scale must be between 0 and 20 in increments of 0.1.');
+    }
+    value = Math.round(value * 10) / 10;
+    if (value === state.timeScale) return value;
+    // Retain the unmodified legacy clock/scheduler until a non-default speed
+    // is actually selected. Thereafter keep one continuous virtual timeline:
+    // switching speeds must not create a jump in MilliSecs or pending audio.
+    if (state.scaledClock === null) state.scaledClock = now();
+    state.timeScale = value;
+    state.scaledLastWall = perfNow();
+    return value;
+  }
+  function advanceScaledClock(milliseconds, frameLimit = Infinity, deadline = Infinity) {
+    if (!state.timeScale) return;
+    state.scaledCredit += milliseconds * state.timeScale;
+    let count = 0, budgetExpired = false;
+    // Do not multiply a single generated update's elapsed duration: the game
+    // clamps that update to five ticks, so large speeds would silently lose
+    // simulation. Nor may we insert draw-only frames: original render methods
+    // consume RNG and mutate production animation timers. Each scheduled unit
+    // is the original complete update+render, on its original fixed cadence.
+    while (count < frameLimit) {
+      const interval = 1000 / effectiveFrameRate();
+      if (state.scaledCredit + 1e-7 < interval) break;
+      state.scaledCredit = Math.max(0, state.scaledCredit - interval);
+      if (state.manualTime !== null) state.manualTime += interval;
+      else state.scaledClock += interval;
+      if (state.app) state.app.OnEnterFrame();
+      count++; diagnostics.timing.scaledFrames++;
+      // Yield only between complete original frames; one slow update+render
+      // may itself exceed this soft budget. Manual stepping has no deadline.
+      if (deadline !== Infinity && perfNow() >= deadline) { budgetExpired = true; break; }
+    }
+    if (budgetExpired) diagnostics.timing.budgetLimitedBatches++;
+    if (count === frameLimit || budgetExpired) {
+      const interval = 1000 / effectiveFrameRate();
+      // Use the same epsilon as the scheduler so roundoff cannot retain an
+      // almost-whole frame which advance(0) would unexpectedly replay later.
+      const wholeFrames = Math.floor((state.scaledCredit + 1e-7) / interval);
+      if (wholeFrames > 0) {
+        const dropped = Math.min(state.scaledCredit, wholeFrames * interval);
+        diagnostics.timing.droppedSimulationMilliseconds += dropped;
+        state.scaledCredit = Math.max(0, state.scaledCredit - wholeFrames * interval);
+      }
+    }
+    diagnostics.timing.largestFrameBatch = Math.max(diagnostics.timing.largestFrameBatch, count);
+  }
   function frame(timestamp) {
     if (!state.running) return;
+    if (state.scaledClock !== null) {
+      const previous = state.scaledLastWall;
+      state.scaledLastWall = timestamp;
+      const elapsed = previous === null ? 0 : Math.max(0, timestamp - previous);
+      diagnostics.timing.droppedWallMilliseconds += Math.max(0, elapsed - MAX_SCALED_WALL_DELTA);
+      try { advanceScaledClock(Math.min(elapsed, MAX_SCALED_WALL_DELTA), MAX_SCALED_FRAME_BATCH,
+        perfNow() + SCALED_FRAME_BUDGET_MILLISECONDS); }
+      catch (error) { stopRuntime(); emit('error', 'Game frame failed: ' + error.message, error); return; }
+      state.raf = global.requestAnimationFrame(frame);
+      return;
+    }
     const app = state.app;
     const interval = 1000 / effectiveFrameRate();
     if (state.lastFrame === null || timestamp - state.lastFrame >= interval - 0.05) {
@@ -685,13 +753,15 @@
     if (state.running) return;
     if (!state.app) fail('No gxtkApp exists. Call bb_Init(), bb_Main(), and app.InvokeOnCreate() first.');
     if (state.manualTime !== null) fail('The runtime is in manual-clock mode. Call useRealtimeRuntime() before starting.');
-    state.running = true; state.lastFrame = null; state.raf = global.requestAnimationFrame(frame);
+    state.running = true; state.lastFrame = null; state.scaledLastWall = perfNow();
+    state.raf = global.requestAnimationFrame(frame);
   }
   function stopRuntime() { state.running = false; if (state.raf !== null) global.cancelAnimationFrame(state.raf); state.raf = null; }
   function advanceRuntime(milliseconds) {
     if (state.running) fail('Stop the animation loop before advancing the manual clock.');
     if (!(milliseconds >= 0) || !Number.isFinite(milliseconds)) fail('advanceRuntime requires a finite nonnegative millisecond duration.');
-    if (state.manualTime === null) state.manualTime = perfNow();
+    if (state.manualTime === null) state.manualTime = now();
+    if (state.scaledClock !== null) { advanceScaledClock(milliseconds); return; }
     const end = state.manualTime + milliseconds;
     while (state.manualTime < end) {
       const app = state.app;
@@ -703,6 +773,11 @@
   function stepRuntime(ticks = 1) {
     if (!Number.isInteger(ticks) || ticks < 0) fail('stepRuntime requires a nonnegative integer tick count.');
     if (state.running) fail('Stop the animation loop before stepping the manual clock.');
+    if (state.scaledClock !== null) {
+      if (state.manualTime === null) state.manualTime = now();
+      for (let tick = 0; tick < ticks; tick++) advanceScaledClock(1000 / effectiveFrameRate());
+      return;
+    }
     for (let tick = 0; tick < ticks; tick++) {
       const app = state.app;
       if (state.manualTime === null) state.manualTime = perfNow();
@@ -712,6 +787,12 @@
   }
   function useRealtimeRuntime() {
     if (state.manualTime !== null) {
+      if (state.scaledClock !== null) {
+        state.scaledClock = state.manualTime;
+        state.manualTime = null;
+        state.scaledLastWall = perfNow();
+        return;
+      }
       const difference = perfNow() - state.manualTime;
       if (state.app) state.app.startMillis += difference;
       if (state.movie && state.movie.start !== null) state.movie.start += difference;
@@ -736,7 +817,7 @@
         decodedPixels: [...images].reduce((sum, image) => sum + image.width * image.height, 0),
         retainedSoundBuffers: (movie.sounds || []).filter(sound => sound.buffer).length };
     }
-    return { running: state.running, milliseconds: state.app ? state.app.MilliSecs() : 0,
+    return { running: state.running, milliseconds: state.app ? state.app.MilliSecs() : 0, timeScale: state.timeScale,
       updateRate: state.app && state.app.updateRate, stageFrameRate: effectiveFrameRate(), loading: state.app && state.app.loading,
       audioState: state.audioContext ? state.audioContext.state : 'uninitialized',
       movie: state.movie && state.movie.name, movieLoading: !!(state.movie && state.movie.loading), movieAssets,
@@ -745,11 +826,12 @@
 
   const api = { configure: configureRuntime, preload: preloadRuntimeAssets, boot: bootRuntime,
     start: startRuntime, stop: stopRuntime, advance: advanceRuntime, step: stepRuntime, useRealtime: useRealtimeRuntime,
+    setTimeScale: setRuntimeTimeScale,
     unlockAudio: unlockRuntimeAudio, getStatus: getRuntimeStatus, diagnostics, closeMochiScores,
     get app() { return state.app; }, get canvas() { return state.canvas; } };
   Object.assign(global, {
     ZTPRuntime: api, configureRuntime, preloadRuntimeAssets, bootRuntime, startRuntime, stopRuntime,
-    advanceRuntime, stepRuntime, useRealtimeRuntime, unlockRuntimeAudio, getRuntimeStatus,
+    advanceRuntime, stepRuntime, useRealtimeRuntime, setRuntimeTimeScale, unlockRuntimeAudio, getRuntimeStatus,
     gxtkApp, gxtkGraphics, gxtkSurfaceListener, gxtkSurface, gxtkInput, gxtkAudio, gxtkSample, gxtkChannel,
     KeyToChar, SetCursor, Redirect, ReadInt, WriteInt, FlushInts, PlayMovie, EndMovie, MovieFinished,
     mochiMain, FetchMochi, ShowMochi: zero, HideMochi: zero, ShowMochiScores,

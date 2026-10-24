@@ -12,6 +12,12 @@
   // Recovered health fields are signed ActionScript int values. Unlike the
   // generic configuration default, this is the actual storage boundary.
   const HEALTH_SAFETY_LIMIT = 2147483647;
+  // Counts are stored as pending work, not a synchronous object-allocation
+  // loop. The numeric boundary is the original signed-int32 storage range;
+  // the per-frame budget is deliberately independent of the requested count.
+  const POWER_COUNT_LIMIT = 2147483647;
+  const POWER_DISPATCH_BUDGET = 32;
+  const ENTITY_SAFETY_LIMIT = 1000;
   const HEALTH_LABELS = {
     units:['铲兵','霰弹枪兵','机枪皮卡','燃烧瓶兵','牧师','己方基地'],
     zombies:['普通僵尸','跳跃僵尸','快速僵尸','肥胖僵尸','投尸僵尸','敌方基地']
@@ -30,6 +36,9 @@
   ];
   const states = new WeakMap();
   const projectileKind = Symbol('GameConfig.projectileKind');
+  // Enumerable symbol provenance survives Object.assign-based faction copies,
+  // while ordinary trained/manual people never acquire a skill source tag.
+  const powerProvenance = Symbol('GameConfig.powerProvenance');
   const maximumHealth = Symbol('GameConfig.maximumHealth');
   function fail(path, message) { throw new Error('GameConfig ' + path + ': ' + message); }
   function object(value, path, required, optional) {
@@ -89,7 +98,9 @@
     // fractional delays such as 0.3 -> 0. Do not silently change game timing.
     number(item.delay, path + '.delay', 0, 86400, false);
   }
-  function validate(input) {
+  function validate(input,options) {
+    if (options !== undefined) object(options,'$options',[],['multipliers']);
+    const composition = options === undefined ? null : validateMultipliers(options.multipliers);
     object(input, '$', ['schemaVersion'].concat(KINDS));
     if (input.schemaVersion !== 1) fail('$.schemaVersion', 'supported version is 1');
     for (const kind of ['units', 'zombies']) fixedItems(input[kind], kind, 0, 6, (item, path) => {
@@ -144,14 +155,15 @@
       integer(item.unlockAfterStage, path + '.unlockAfterStage', 0, 4);
       string(item.description, path + '.description');
       if (item.id === 0) {
-        object(item.effect, path + '.effect', ['shovelCount','shotgunCount','angerSpeedMultiplier']);
-        integer(item.effect.shovelCount, path + '.effect.shovelCount', 0, 1000);
-        integer(item.effect.shotgunCount, path + '.effect.shotgunCount', 0, 1000);
+        object(item.effect, path + '.effect', ['shovelCount','shotgunCount','angerSpeedMultiplier'],
+          ['survivalistCount','bomberCount','preacherCount']);
+        for (const key of ['shovelCount','shotgunCount','survivalistCount','bomberCount','preacherCount'])
+          if (key in item.effect) integer(item.effect[key], path + '.effect.' + key, 0, POWER_COUNT_LIMIT);
         number(item.effect.angerSpeedMultiplier, path + '.effect.angerSpeedMultiplier', 0, 100, false);
       } else {
         object(item.effect, path + '.effect', item.id === 2 ? ['jetCount','moveSpeed'] : ['moveSpeed']);
         number(item.effect.moveSpeed, path + '.effect.moveSpeed', 0.000001, 100, false);
-        if (item.id === 2) integer(item.effect.jetCount, path + '.effect.jetCount', 0, 1000);
+        if (item.id === 2) integer(item.effect.jetCount, path + '.effect.jetCount', 0, POWER_COUNT_LIMIT);
       }
     });
     fixedItems(input.levels, 'levels', 1, 4, (item, path) => {
@@ -179,10 +191,10 @@
         entry.calls.forEach((w,j) => wave(w, p + '.calls[' + j + ']', false));
       });
       for (const zombie of input.zombies.filter(z => z.id < 5)) {
-        if (zombie.health * Math.trunc(item.zombieHealthMultiplier) > HEALTH_SAFETY_LIMIT)
+        if (!composition && zombie.health * Math.trunc(item.zombieHealthMultiplier) > HEALTH_SAFETY_LIMIT)
           fail(path + '.zombieHealthMultiplier', 'effective health overflows signed int32 for zombie id ' + zombie.id +
             '（第 ' + item.id + ' 关：' + HEALTH_LABELS.zombies[zombie.id] + '生命值 × 关卡倍率的整数部分须 ≤ 2,147,483,647；请降低生命值或关卡倍率）');
-        if ('damage' in zombie && zombie.damage * item.zombieDamageMultiplier > 2147483647)
+        if (!composition && 'damage' in zombie && zombie.damage * item.zombieDamageMultiplier > 2147483647)
           fail(path + '.zombieDamageMultiplier', 'effective damage overflows signed int32 for zombie id ' + zombie.id);
       }
     });
@@ -197,6 +209,7 @@
         w.id = id; ids.add(id);
       });
     }
+    if (composition) validateEffective(result,composition);
     return result;
   }
   function fromDocuments(documents) {
@@ -217,10 +230,53 @@
     }
     return value;
   }
-  function compile(input) {
-    return compileValidated(validate(input));
+  function validateMultipliers(input) {
+    if (input === undefined) return {units:{health:1,moveSpeed:1,damage:1},zombies:{health:1,moveSpeed:1,damage:1}};
+    object(input,'$multipliers',['units','zombies']);
+    const result = {};
+    for (const kind of ['units','zombies']) {
+      object(input[kind],'$multipliers.'+kind,['health','moveSpeed','damage']);
+      result[kind] = {};
+      for (const field of ['health','moveSpeed','damage']) {
+        const value = input[kind][field], path = '$multipliers.'+kind+'.'+field;
+        number(value,path,0,HEALTH_SAFETY_LIMIT,false);
+        if (field === 'health' && value === 0) fail(path,'must be greater than zero');
+        result[kind][field] = value;
+      }
+    }
+    return result;
   }
-  function compileValidated(config) {
+  function effectiveMaximum(config,multipliers,human,id,levelMultiplier = 1) {
+    const item = config[human ? 'units' : 'zombies'][id];
+    return Math.trunc(item.health * (id === 5 ? 1 : multipliers[human ? 'units':'zombies'].health) *
+      (human || id === 5 ? 1 : Math.trunc(levelMultiplier)));
+  }
+  function validateEffective(config,multipliers) {
+    for (const kind of ['units','zombies']) for (const item of config[kind].slice(0,5)) {
+      const scale = multipliers[kind], path = '$multipliers.'+kind;
+      const levels = kind === 'zombies' ? config.levels : [{zombieHealthMultiplier:1,zombieDamageMultiplier:1}];
+      for (const level of levels) {
+        const maximum = effectiveMaximum(config,multipliers,kind === 'units',item.id,level.zombieHealthMultiplier);
+        if (maximum < 1 || maximum > HEALTH_SAFETY_LIMIT)
+          fail(path+'.health','effective health must be between 1 and '+HEALTH_SAFETY_LIMIT+' for '+item.key);
+        if ('damage' in item && item.damage*scale.damage*level.zombieDamageMultiplier > HEALTH_SAFETY_LIMIT)
+          fail(path+'.damage','effective damage overflows signed int32 for '+item.key);
+      }
+      if ('projectileDamage' in item && item.projectileDamage*scale.damage > HEALTH_SAFETY_LIMIT)
+        fail(path+'.damage','effective projectile damage overflows signed int32 for '+item.key);
+      const speed = item.moveSpeed*scale.moveSpeed;
+      if (speed > 1000000 || (kind === 'units' && speed*config.powers[0].effect.angerSpeedMultiplier > 1000000))
+        fail(path+'.moveSpeed','effective movement speed exceeds the numeric safety boundary of 1000000 for '+item.key);
+    }
+    return multipliers;
+  }
+  function compile(input,options) {
+    if (options !== undefined) object(options,'$options',[],['multipliers']);
+    const multipliers = validateMultipliers(options && options.multipliers);
+    const config = validate(input,{multipliers});
+    return compileValidated(config,multipliers);
+  }
+  function compileValidated(config,multipliers = validateMultipliers()) {
     const raw = {};
     for (const [kind, prefix, baseline] of [['units','unit',UNIT_ROWS], ['zombies','zombie',ZOMBIE_ROWS]]) {
       raw['bb_data_' + prefix + 'name'] = config[kind].map(item => item.name);
@@ -243,7 +299,7 @@
     raw.bb_data_difficultyname = config.levels.map(item => item.name);
     raw.bb_data_difficultytitle = config.levels.map(item => item.title);
     for (const level of config.levels) raw['bb_leveldata_level' + level.id] = level.waves.filter(w => w.enabled !== false).flatMap(w => [w.type,w.count,w.delay]);
-    return freeze({config, raw, reinforcements: config.levels.map(level => level.reinforcements.map(entry =>
+    return freeze({config, raw, multipliers, reinforcements: config.levels.map(level => level.reinforcements.map(entry =>
       ({threshold:entry.threshold,calls:entry.calls.filter(w => w.enabled !== false)})))});
   }
   function portFor(target) {
@@ -254,11 +310,197 @@
     if (!owner || typeof owner[name] !== 'function') throw new Error('GameConfig: missing runtime method ' + name);
     const original = owner[name]; owner[name] = replacement(original);
   }
+  function entityCapacity(port,game) {
+    if (typeof port.getEntityCapacity === 'function') return port.getEntityCapacity();
+    let count = 0;
+    for (const list of [game.bbpeople,game.bbzombies,game.bbpombies]) {
+      const iterator = list.bbObjectEnumerator();
+      while (iterator.bbHasNext()) { iterator.bbNextObject(); if (++count >= ENTITY_SAFETY_LIMIT) return 0; }
+    }
+    return ENTITY_SAFETY_LIMIT-count;
+  }
+  function effectCapacity(game) {
+    let count = 0, iterator = game.bbpowerups.bbObjectEnumerator();
+    while (iterator.bbHasNext()) { iterator.bbNextObject(); if (++count >= ENTITY_SAFETY_LIMIT) return 0; }
+    return ENTITY_SAFETY_LIMIT-count;
+  }
+  function dispatchPowerSpawns(target,state,game) {
+    const port = portFor(target), frame = state.powerDispatchFrame;
+    let budget = POWER_DISPATCH_BUDGET-(frame && frame.game === game ? frame.used : 0);
+    if (budget <= 0 || !state.powerSpawns.length) return;
+    let capacity, effects, cursor = 0;
+    while (budget > 0 && cursor < state.powerSpawns.length) {
+      const group = state.powerSpawns[cursor];
+      if (group.game !== game) { state.powerSpawns.splice(cursor,1); continue; }
+      const angry = group.source === 'angry-mob';
+      // Actor and power-up ceilings are independent. A full battlefield must
+      // not make a queued mob block an otherwise available air strike (or the
+      // reverse). FIFO order within each class of work remains unchanged.
+      if (angry ? (capacity ??= entityCapacity(port,game)) <= 0 : (effects ??= effectCapacity(game)) <= 0) { cursor++; continue; }
+      // Reuse a compact formation on later batches: a two-billion-unit order
+      // must not place its last unit billions of pixels away from the battle.
+      const position = group.index % POWER_DISPATCH_BUDGET + 1;
+      let body, admitted;
+      if (angry) {
+        const sheet = [game.bbshovelman,game.bbshotgunman,game.bbtrucksheet,game.bbbombersheet,game.bbpreachersheet][group.type];
+        body = game.bbunits[group.type].bbInstance(target.bb_Rand(8),port.bb_Cell.bbcells(sheet));
+        body[powerProvenance] = 0;
+        body.bbxpos = -position*group.spacing + target.bb_reversebits(position,4);
+        body.bbAnger(); admitted = game.bbpeople.bbAddLast(body);
+      } else {
+        body = new port.bb_PowerUp().bbPowerUp_new(target.bb_Rand(8),2,game.bbjetsheet,null);
+        body.bbxpos -= position*128; body.bbypos += target.bb_reversebits(position,4)*10;
+        admitted = game.bbpowerups.bbAddLast(body);
+      }
+      budget--;
+      if (frame && frame.game === game) frame.used++;
+      if (!admitted) break;
+      if (angry) capacity--; else effects--;
+      group.index++; group.count--;
+      if (group.count === 0) state.powerSpawns.splice(cursor,1);
+    }
+  }
+  function cancellationPowerId(value) {
+    if (value === undefined || value === 'all') return null;
+    if (!Number.isInteger(value) || value < 0 || value > 2)
+      fail('$powerId','expected 0, 1, 2 or all');
+    return value;
+  }
+  function cancellationNodes(game,key) {
+    const list = game[key], head = list && list.bb_head;
+    if (!head || typeof head !== 'object') throw new Error('GameConfig: skill effect list is unavailable: '+key);
+    const nodes = [], seen = new Set(); let node = head;
+    do {
+      if (!node || typeof node !== 'object' || seen.has(node) || seen.size > 100000 ||
+          !node.bb_succ || !node.bb_pred || node.bb_succ.bb_pred !== node || node.bb_pred.bb_succ !== node)
+        throw new Error('GameConfig: skill effect list is corrupt: '+key);
+      seen.add(node); if (node !== head) nodes.push(node); node = node.bb_succ;
+    } while (node !== head);
+    return {key,list,head,nodes};
+  }
+  function powerEffectSnapshot(state,game) {
+    const byPower = [0,1,2].map(id => ({id,pending:0,actors:0,powerups:0,projectiles:0,explosions:0,charging:0}));
+    const collections = [], counted = new Map(), pending = [];
+    for (const group of state.powerSpawns) {
+      if (group.game !== game) continue;
+      const id = group.powerId === undefined ? group.source === 'angry-mob' ? 0 : 2 : group.powerId;
+      if (!byPower[id] || !Number.isInteger(group.count) || group.count < 0)
+        throw new Error('GameConfig: invalid pending skill request');
+      byPower[id].pending += group.count;pending.push({group,id});
+      if (!Number.isSafeInteger(byPower[id].pending)) throw new Error('GameConfig: pending skill count exceeds safe integer storage');
+    }
+    if (game) for (const [key,category] of [['bbpeople','actors'],['bbzombies','actors'],['bbpombies','actors'],
+      ['bbpowerups','powerups'],['bbbottles','projectiles'],['bbexplosions','explosions']]) {
+      const collection = cancellationNodes(game,key);collection.category = category;collection.matches = [];
+      for (const node of collection.nodes) {
+        const body = node.bb_data;
+        let id = body && body[powerProvenance];
+        // The recovered power-up type identifies the two vehicle skills even
+        // for a pre-existing instance. Bottle kinds, unlike numeric damage,
+        // distinguish an air bomb from a bomber's equal-damage projectile.
+        if (category === 'powerups' && (body?.bbtype === 1 || body?.bbtype === 2)) id = body.bbtype;
+        if (category === 'projectiles') id = body && body[projectileKind] === 1 ? 2 : undefined;
+        if (![0,1,2].includes(id) || (category === 'actors' && id !== 0) ||
+            (category === 'powerups' && id === 0) || (category === 'explosions' && id !== 2)) continue;
+        if (category === 'actors' && (body === game.bbpeoplebase || body === game.bbzombiebase ||
+            body?.bbunit?.bbtype === 5 || body?.bbunit?.bbtype === 37)) continue;
+        collection.matches.push({node,body,id});
+        const identity = category+':'+id;
+        if (!counted.has(identity)) counted.set(identity,new Set());
+        if (!counted.get(identity).has(body)) {counted.get(identity).add(body);byPower[id][category]++;}
+      }
+      collections.push(collection);
+    }
+    if (game) for (const item of byPower) {
+      const power = game.bbpowers && game.bbpowers[item.id];
+      if (!power || !Number.isFinite(power.bbbusy)) throw new Error('GameConfig: invalid skill charging state');
+      item.charging = power.bbbusy > 0 ? 1 : 0;
+    }
+    return {byPower,collections,pending};
+  }
+  function cancelPowerEffects(target,powerId,options) {
+    const port = portFor(target), state = states.get(target);
+    if (!state) throw new Error('GameConfig: install or apply configuration first');
+    const id = cancellationPowerId(powerId), game = port.state.bb_Game;
+    if (!game) throw new Error('GameConfig: skill cancellation requires an initialized game');
+    if (options !== undefined) {
+      object(options,'$options',[],['validateOnly']);
+      if ('validateOnly' in options && typeof options.validateOnly !== 'boolean') fail('$options.validateOnly','expected a boolean');
+    }
+    const selected = value => id === null || value === id;
+    const snapshot = powerEffectSnapshot(state,game), report = {pending:0,actors:0,powerups:0,projectiles:0,explosions:0,charging:0};
+    for (const item of snapshot.byPower) if (selected(item.id)) for (const key of Object.keys(report)) report[key] += item[key];
+    const plan = [], actorStates = new Set();
+    const writable = (owner,key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(owner,key);
+      if (descriptor ? !('value' in descriptor) || !descriptor.writable : !Object.isExtensible(owner))
+        throw new Error('GameConfig: skill cancellation target is not writable: '+String(key));
+    };
+    for (const collection of snapshot.collections) {
+      const matches = collection.matches.filter(match => selected(match.id));
+      if (!matches.length) continue;
+      writable(game,collection.key);writable(collection.list,'bb_head');
+      for (const node of [collection.head,...collection.nodes]) {writable(node,'bb_pred');writable(node,'bb_succ');}
+      const removing = new Set(matches.map(match => match.node));
+      const retained = [collection.head,...collection.nodes.filter(node => !removing.has(node))];
+      for (let i=0;i<retained.length;i++) {
+        plan.push([retained[i],'bb_pred',retained[(i+retained.length-1)%retained.length]],
+          [retained[i],'bb_succ',retained[(i+1)%retained.length]]);
+      }
+      for (const {node,body} of matches) {
+        plan.push([node,'bb_pred',node],[node,'bb_succ',node]);
+        if (collection.category === 'actors' && !actorStates.has(body)) {
+          const type = body?.bbunit?.bbtype, human = Number.isInteger(type) && type >= 0 && type < 5;
+          if ((!human && !(Number.isInteger(type) && type >= 32 && type < 37)) || !Number.isFinite(body.bbhealth))
+            throw new Error('GameConfig: invalid summoned actor state');
+          writable(body,'bbhealth');writable(body,'bbmode');actorStates.add(body);
+          plan.push([body,'bbhealth',0],[body,'bbmode',human ? 14 : 15]);
+        }
+      }
+    }
+    for (const item of snapshot.byPower) if (selected(item.id) && item.charging) {
+      const power = game.bbpowers[item.id];writable(power,'bbbusy');plan.push([power,'bbbusy',0]);
+    }
+    writable(state,'powerSpawns');
+    if (options && options.validateOnly) return report;
+    // No virtual list removers, damage functions, tick, RNG, refunds or death
+    // rewards run here. Every ordinary data write was checked before this point.
+    const removingPending = new Set(snapshot.pending.filter(item => selected(item.id)).map(item => item.group));
+    const retainedPending = state.powerSpawns.filter(group => !removingPending.has(group));
+    commitPlan(plan);
+    state.powerSpawns = retainedPending;
+    return report;
+  }
+  function getPowerProgress(target,options) {
+    portFor(target);
+    const state = states.get(target);
+    if (!state) throw new Error('GameConfig: install or apply configuration first');
+    if (options !== undefined) {
+      object(options,'$options',[],['includeActive']);
+      if ('includeActive' in options && typeof options.includeActive !== 'boolean') fail('$options.includeActive','expected a boolean');
+    }
+    const game = target.ZTPGamePort.state.bb_Game;
+    const groups = state.powerSpawns.filter(group => group.game === game)
+      .map(group => ({type:group.type,count:group.count,source:group.source}));
+    const result = {pendingTotal:groups.reduce((total,group) => total+group.count,0),groups};
+    if (options && options.includeActive) {
+      result.byPower = powerEffectSnapshot(state,game).byPower;
+      result.activeTotal = result.byPower.reduce((total,item) => total+item.actors+item.powerups+item.projectiles+item.explosions,0);
+    }
+    return result;
+  }
   function hooks(target, state) {
     const port = portFor(target), config = () => (state.activeCompiled || state.compiled).config;
+    const multipliers = () => (state.activeCompiled || state.compiled).multipliers;
     wrap(port.bb_Unit.prototype, 'bbUnit_new', original => function (type, name, data, offset) {
       const result = original.apply(this, arguments);
       if (type >= 0 && type < 5) this.bbbuildtime = config().units[type].buildTicks;
+      const human = type >= 0 && type < 5, zombie = type >= 32 && type < 37;
+      if (human || zombie) {
+        const kind = human ? 'units':'zombies', item = config()[kind][human ? type : type-32];
+        this.bbhealth = item.health*multipliers()[kind].health;
+        if ('damage' in item) this.bbdamage = item.damage*multipliers()[kind].damage;
+      }
       return result;
     });
     wrap(port.bb_Building.prototype, 'bbBuilding_new', original => function (type) {
@@ -304,13 +546,25 @@
     });
     wrap(port.bb_Person.prototype, 'bbPerson_new', original => function (layer, unit) {
       const result = original.apply(this, arguments);
-      if (unit.bbtype >= 0 && unit.bbtype < 5) this.bbwalkspeed = config().units[unit.bbtype].moveSpeed;
+      if (unit.bbtype >= 0 && unit.bbtype < 5) {
+        this.bbwalkspeed = config().units[unit.bbtype].moveSpeed*multipliers().units.moveSpeed;
+        this.bbhealth = Math.trunc(unit.bbhealth);
+      }
       this[maximumHealth] = this.bbhealth;
       return result;
     });
     wrap(port.bb_Zombie.prototype, 'bbZombie_new', original => function (layer, unit) {
       const result = original.apply(this, arguments);
-      if (unit.bbtype >= 32 && unit.bbtype < 37) this.bbwalkspeed = config().zombies[unit.bbtype-32].moveSpeed;
+      if (unit.bbtype >= 32 && unit.bbtype < 37) {
+        this.bbwalkspeed = config().zombies[unit.bbtype-32].moveSpeed*multipliers().zombies.moveSpeed;
+        // The recovered constructor casts its template health before applying
+        // the level multiplier. Army modifiers require one final cast instead,
+        // e.g. 25 * 1.5 * 2 = 75, not trunc(37.5) * 2 = 74.
+        const game = port.state.bb_Game;
+        const level = config().levels[game && Number.isInteger(game.bbdifficulty) ? game.bbdifficulty : 0];
+        const stageHealth = game && game.bbZombieHealthMultiplier >= 1 ? game.bbZombieHealthMultiplier : level.zombieHealthMultiplier;
+        this.bbhealth = Math.trunc(unit.bbhealth*Math.trunc(stageHealth));
+      }
       this[maximumHealth] = this.bbhealth;
       return result;
     });
@@ -321,7 +575,10 @@
     });
     wrap(port.bb_PowerUp.prototype, 'bbPowerUp_new', original => function (layer, type) {
       const result = original.apply(this, arguments);
-      if (type === 1 || type === 2) this.bbwalkspeed = config().powers[type].effect.moveSpeed;
+      if (type === 1 || type === 2) {
+        this.bbwalkspeed = config().powers[type].effect.moveSpeed;
+        this[powerProvenance] = type;
+      }
       return result;
     });
     wrap(port.bb_Bottle.prototype, 'bbBottle_new', original => function (layer, image, x, y, vx, vy, kind) {
@@ -329,12 +586,13 @@
       // kind 0 is the bomber bottle; kind 1 is the air-strike bomb. Do not
       // alter the latter's 500 damage / zombie-base immunity convention.
       this[projectileKind] = kind | 0;
-      if ((kind | 0) === 0) this.bbdamage = config().units[3].projectileDamage;
+      if ((kind | 0) === 1) this[powerProvenance] = 2;
+      if ((kind | 0) === 0) this.bbdamage = Math.trunc(config().units[3].projectileDamage*multipliers().units.damage);
       return result;
     });
     wrap(port.bb_Fling.prototype, 'bbFling_new', original => function () {
       const result = original.apply(this, arguments);
-      this.bbdamage = config().zombies[4].projectileDamage;
+      this.bbdamage = Math.trunc(config().zombies[4].projectileDamage*multipliers().zombies.damage);
       return result;
     });
     // Scope provenance to the two original synchronous bottle loops. Calls to
@@ -342,12 +600,19 @@
     for (const method of ['bbGameTick','bbUpdateAttract']) wrap(port.bb_Zomba.prototype, method, original => function () {
       state.bottleLoopDepth = (state.bottleLoopDepth || 0) + 1;
       const previousXpFrame = state.xpAwardFrame;
+      const previousPowerFrame = state.powerDispatchFrame;
+      if (method === 'bbGameTick') state.powerDispatchFrame = {game:this,used:0};
       if (method === 'bbGameTick') state.xpAwardFrame = {game:this,
         eligible:Number.isInteger(this.bbztp.bbxp) && this.bbztp.bbxp >= 0 && this.bbztp.bbxp <= HEALTH_SAFETY_LIMIT};
-      try { return original.apply(this,arguments); }
+      try {
+        const result = original.apply(this,arguments);
+        if (method === 'bbGameTick' && this.bbmainState === 2) dispatchPowerSpawns(target,state,this);
+        return result;
+      }
       finally {
         state.bottleLoopDepth--; state.explodingBottle = null;
         state.xpAwardFrame = previousXpFrame;
+        state.powerDispatchFrame = previousPowerFrame;
       }
     });
     // The recovered tick adds a dead enemy's BASE health to XP, casts to int,
@@ -379,7 +644,9 @@
       const bomber = hasSource && source[projectileKind] === 0;
       const audio = port.state.bb_Audio;
       audio.bbPlay(target.bb_std_random_Rnd() <= 0.5 ? audio.bbexplosion2 : audio.bbexplosion1);
-      this.bbexplosions.bbAddLast(new port.bb_Explosion().bbExplosion_new(layer,port.bb_Cell.bbcells(this.bbexplosionsheet),x,y,1));
+      const explosion = new port.bb_Explosion().bbExplosion_new(layer,port.bb_Cell.bbcells(this.bbexplosionsheet),x,y,1);
+      if (hasSource && source[powerProvenance] === 2) explosion[powerProvenance] = 2;
+      this.bbexplosions.bbAddLast(explosion);
       const iterator = this.bbzombies.bbObjectEnumerator();
       while (iterator.bbHasNext()) {
         const zombie = iterator.bbNextObject();
@@ -393,40 +660,38 @@
       }
       return 0;
     });
-    // This is the small original dispatch, with loop limits supplied by JSON.
-    // Preserve random draws, positions, anger, audio, and cooldown placement.
+    // Preserve the original default draw sequence/positions while storing big
+    // requests as compact work. A full actor list delays, never discards, a
+    // skill reinforcement. Every tick shares one bounded dispatch budget.
     wrap(port.bb_Zomba.prototype, 'bbAddPower', () => function (power) {
       const c = config();
       if (power.bbtype === 0) {
-        for (const [id,count,spacing,sheet] of [[0,c.powers[0].effect.shovelCount,20,this.bbshovelman],[1,c.powers[0].effect.shotgunCount,50,this.bbshotgunman]]) {
-          for (let i=1;i<=count;i++) {
-            const person = this.bbunits[id].bbInstance(target.bb_Rand(8), port.bb_Cell.bbcells(sheet));
-            person.bbxpos = -i*spacing + target.bb_reversebits(i,4);
-            person.bbAnger(); this.bbpeople.bbAddLast(person);
-          }
-        }
+        const effect = c.powers[0].effect;
+        for (const [id,key,spacing] of [[0,'shovelCount',20],[1,'shotgunCount',50],
+          [2,'survivalistCount',100],[3,'bomberCount',50],[4,'preacherCount',50]])
+          if (effect[key]) state.powerSpawns.push({game:this,powerId:0,source:'angry-mob',type:id,count:effect[key],index:0,spacing});
+        dispatchPowerSpawns(target,state,this);
         const audio = port.state.bb_Audio; audio.bbPlay(audio.bbangrymob);
       } else if (power.bbtype === 1) {
         this.bbpowerups.bbAddLast(new port.bb_PowerUp().bbPowerUp_new(0,1,this.bbharvestsheet,this.bbharvestbloodsheet));
       } else if (power.bbtype === 2) {
-        for (let i=1;i<=c.powers[2].effect.jetCount;i++) {
-          const jet = new port.bb_PowerUp().bbPowerUp_new(target.bb_Rand(8),2,this.bbjetsheet,null);
-          jet.bbxpos -= i*128; jet.bbypos += target.bb_reversebits(i,4)*10;
-          this.bbpowerups.bbAddLast(jet);
-        }
+        if (c.powers[2].effect.jetCount)
+          state.powerSpawns.push({game:this,powerId:2,source:'airstrike',type:2,count:c.powers[2].effect.jetCount,index:0});
+        dispatchPowerSpawns(target,state,this);
         const audio = port.state.bb_Audio; audio.bbPlay(audio.bbairstrike);
       }
       power.bbcooldown = power.bbcooltime; return 0;
     });
     wrap(port.bb_Zomba.prototype, 'bbResetGame', original => function () {
       state.explodingBottle = null;
+      state.powerSpawns = [];
       state.firedReinforcements = new Set();
       // Promote next-match structural settings before the original reset reads
       // the wave arrays and creates its bases. Existing template objects must
       // be updated as well: the original reset does not reconstruct them.
       state.activeCompiled = state.compiled;
       writeRaw(target,state.compiled);
-      commitPlan(templatePlan(this,state.compiled.config,false));
+      commitPlan(templatePlan(this,state.compiled.config,false,state.compiled.multipliers));
       const previousStage = state.initializingWaveStage;
       state.initializingWaveStage = arguments[0] ? (arguments[0]|0)-1 : this.bbdifficulty;
       let result;
@@ -441,6 +706,13 @@
         power.bblocked = stage === 0 || this.bbrecords[stage-1] !== 0 ? 0 : 1;
       }
       return result;
+    });
+    // This recovered leaf only creates cosmetic debris; it does not change
+    // health. Huge custom damage must not allocate hundreds of millions of
+    // body parts before the actual hit clamps against the target's HP.
+    // All original ordinary hits (including 500-damage air bombs) are exact.
+    wrap(port.bb_Zomba.prototype, 'bbDamageBase', original => function (damage,x) {
+      return original.call(this,Math.min(damage|0,1024),x);
     });
     wrap(port.bb_ZombieMob, 'bbInit', original => function () {
       const result = original.apply(this,arguments);
@@ -515,12 +787,12 @@
   function stateFor(target, compiled) {
     let state = states.get(target);
     if (!state) {
-      state = {compiled,activeCompiled:compiled,firedReinforcements:new Set()}; states.set(target,state); hooks(target,state);
+      state = {compiled,activeCompiled:compiled,firedReinforcements:new Set(),powerSpawns:[]}; states.set(target,state); hooks(target,state);
     } else state.activeCompiled = state.compiled = compiled;
     return state;
   }
   function copy(value) { return JSON.parse(JSON.stringify(value)); }
-  function templatePlan(game, config, preserveTimerProgress) {
+  function templatePlan(game, config, preserveTimerProgress,multipliers = validateMultipliers()) {
     const plan = [];
     function set(owner,key,value) {
       if (!owner || typeof owner !== 'object') throw new Error('GameConfig: incomplete runtime templates');
@@ -531,13 +803,13 @@
         set(owner,key,Math.max(1,Math.ceil(Math.min(1,owner[key]/owner[totalKey])*nextTotal)));
       set(owner,totalKey,nextTotal);
     }
-    for (const [items,templates] of [[config.units,game.bbunits],[config.zombies,game.bbzunits]]) {
+    for (const [items,templates,kind] of [[config.units,game.bbunits,'units'],[config.zombies,game.bbzunits,'zombies']]) {
       if (!Array.isArray(templates) || templates.length !== items.length) throw new Error('GameConfig: incomplete runtime unit templates');
       for (const item of items) {
         const unit = templates[item.id];
         for (const [field,key] of [['name','bbname'],['cost','bbcost'],['health','bbhealth'],['damage','bbdamage'],
           ['dependency','bbdependency'],['people','bbpeople'],['hitRadius','bbhitradius'],['hitOffset','bbhitoffset']])
-          if (field in item) set(unit,key,item[field]);
+          if (field in item) set(unit,key,item.id !== 5 && ['health','damage'].includes(field) ? item[field]*multipliers[kind][field] : item[field]);
         if ('buildTicks' in item) timer(unit,'bbbusy','bbbuildtime',item.buildTicks);
       }
     }
@@ -601,13 +873,20 @@
       remainingTotal:groups.reduce((sum,group) => sum+group.remaining,0),completedGroups:completed.length,
       completed,knownIds:schedule ? [...schedule.tracks.keys()] : [],pending:[]};
   }
-  function applyLiveWaves(target,input) {
+  function applyLiveWaves(target,input,options) {
     const port = portFor(target), state = states.get(target);
     if (!state) throw new Error('GameConfig: install or apply configuration before updating waves');
     // Validate the entire requested document first, even when reconciliation
     // will be refused. A valid legacy document may be saved for a new battle,
     // but its unbound row positions are never guessed as current identities.
-    const requested = compile(input), game = port.state.bb_Game, schedule = state.waveSchedule;
+    if (options !== undefined) {
+      object(options,'$options',[],['validateOnly','multipliers']);
+      if ('validateOnly' in options && typeof options.validateOnly !== 'boolean') fail('$options.validateOnly','expected a boolean');
+      if ('multipliers' in options && options.validateOnly !== true)
+        fail('$options.multipliers','wave-only updates cannot change army multipliers; use updateLive first');
+    }
+    const selectedMultipliers = options && options.multipliers !== undefined ? options.multipliers : state.compiled.multipliers;
+    const requested = compile(input,{multipliers:selectedMultipliers}), game = port.state.bb_Game, schedule = state.waveSchedule;
     const stage = game && game.bbdifficulty, path = '$.levels['+stage+'].waves';
     function refused(reason) {
       return {applied:[],deferred:[path],notes:[reason],requiresNewBattle:true,reason,progress:getWaveProgress(target)};
@@ -658,16 +937,18 @@
     for (const track of tracks.values()) if (track.node) nodes.set(track.node,track);
     const queue = new port.bb_std_list_List().bbList_new();
     for (const node of nextQueue) queue.bbAddLast(node);
-    const pendingConfig = copy(state.compiled.config);pendingConfig.levels[stage].waves = copy(waves);
-    const pending = compile(pendingConfig), activeConfig = copy((state.activeCompiled || state.compiled).config);
-    activeConfig.levels[stage].waves = copy(waves);
-    const active = compileValidated(activeConfig), rawKey = 'bb_leveldata_level'+(stage+1);
+    const rawKey = 'bb_leveldata_level'+(stage+1);
     for (const [owner,key] of plan.concat([[port.bb_ZombieMob,'bbqueue',queue],[target,rawKey,null]])) {
       const descriptor = Object.getOwnPropertyDescriptor(owner,key);
       if (descriptor ? !('value' in descriptor) || !descriptor.writable : !Object.isExtensible(owner))
         throw new Error('GameConfig: wave update target is not writable');
     }
     const changed = !same((state.activeCompiled || state.compiled).config.levels[stage].waves,waves);
+    if (options && options.validateOnly) return {applied:changed ? [path] : [],deferred,notes,requiresNewBattle:false,reason:null,progress:getWaveProgress(target)};
+    const pendingConfig = copy(state.compiled.config);pendingConfig.levels[stage].waves = copy(waves);
+    const pending = compile(pendingConfig,{multipliers:selectedMultipliers}), activeConfig = copy((state.activeCompiled || state.compiled).config);
+    activeConfig.levels[stage].waves = copy(waves);
+    const active = compileValidated(activeConfig,(state.activeCompiled || state.compiled).multipliers);
     commitPlan(plan);port.bb_ZombieMob.bbqueue = queue;target[rawKey] = active.raw[rawKey].slice();
     state.compiled = pending;state.activeCompiled = active;
     state.waveSchedule = {...schedule,tracks,nodes};
@@ -678,6 +959,18 @@
     const state = states.get(target);
     if (!state) throw new Error('GameConfig: install or apply configuration first');
     return copy(state.compiled.config);
+  }
+  function getMaximumHealth(target,body) {
+    const port = portFor(target), state = states.get(target);
+    if (!state) throw new Error('GameConfig: install or apply configuration first');
+    const type = body && body.bbunit && body.bbunit.bbtype;
+    const human = Number.isInteger(type) && type >= 0 && type <= 5;
+    const id = human ? type : type-32;
+    if (!Number.isInteger(id) || id < 0 || id > 5) throw new Error('GameConfig: unknown body type');
+    if (body[maximumHealth]) return body[maximumHealth];
+    const active = state.activeCompiled || state.compiled, game = port.state.bb_Game;
+    const level = active.config.levels[game && Number.isInteger(game.bbdifficulty) ? game.bbdifficulty : 0];
+    return effectiveMaximum(active.config,active.multipliers,human,id,level.zombieHealthMultiplier);
   }
   // Structural values remain frozen for an ongoing battle. In particular,
   // changing bbpeople on a shared template would change the eventual death
@@ -699,12 +992,15 @@
     const game = port.state.bb_Game;
     if (!game) throw new Error('GameConfig: updateLive requires an initialized game; use apply before bb_Main');
     options = options === undefined ? {} : options;
-    object(options,'$options',[],['healthPolicy','preserveTimerProgress']);
+    object(options,'$options',[],['healthPolicy','preserveTimerProgress','multipliers','validateOnly']);
     const policy = options.healthPolicy === undefined ? 'ratio' : options.healthPolicy;
     if (!['ratio','new-only'].includes(policy)) fail('$options.healthPolicy','expected ratio or new-only');
     if ('preserveTimerProgress' in options && typeof options.preserveTimerProgress !== 'boolean')
       fail('$options.preserveTimerProgress','expected a boolean');
-    const next = compile(input), previous = (state.activeCompiled || state.compiled).config;
+    if ('validateOnly' in options && typeof options.validateOnly !== 'boolean') fail('$options.validateOnly','expected a boolean');
+    const next = compile(input,{multipliers:options.multipliers === undefined ? state.compiled.multipliers : options.multipliers});
+    const previousCompiled = state.activeCompiled || state.compiled, previous = previousCompiled.config;
+    const oldMultipliers = previousCompiled.multipliers;
     const effective = copy(next.config), deferred = [], applied = [];
     // The original quit/pause dialog is state 6 and resumes the same match.
     // Victory/defeat states 3/4 keep updating surviving units as well.
@@ -724,8 +1020,9 @@
     // that is safe for this existing queue, but not a valid next-match preset.
     // Do not reject the valid full preset merely because this transient hybrid
     // intentionally retains the previous match's absolute thresholds.
-    const active = compileValidated(effective), c = active.config;
-    const plan = templatePlan(game,c,options.preserveTimerProgress !== false);
+    const active = compileValidated(effective,next.multipliers), c = active.config, multipliers = active.multipliers;
+    changedPaths(oldMultipliers,multipliers,'$multipliers',applied);
+    const plan = templatePlan(game,c,options.preserveTimerProgress !== false,multipliers);
     const oldLevel = previous.levels[game.bbdifficulty], level = c.levels[game.bbdifficulty];
     if (!level || !oldLevel) throw new Error('GameConfig: invalid runtime difficulty');
     plan.push([game,'bbZombieDamageMultiplier',level.zombieDamageMultiplier],
@@ -743,7 +1040,9 @@
       if (!dead && id !== 5) {
         const oldAnger = human && body.bbisangry ? previous.powers[0].effect.angerSpeedMultiplier : 1;
         const newAnger = human && body.bbisangry ? c.powers[0].effect.angerSpeedMultiplier : 1;
-        const oldSpeed = old.moveSpeed*oldAnger, newSpeed = item.moveSpeed*newAnger;
+        const group = human ? 'units':'zombies';
+        const oldSpeed = old.moveSpeed*oldMultipliers[group].moveSpeed*oldAnger;
+        const newSpeed = item.moveSpeed*multipliers[group].moveSpeed*newAnger;
         // Preserve transient stops/slows and direction rather than replacing
         // movement-state fields. A configured zero speed can be unfrozen.
         const speed = newSpeed === oldSpeed ? body.bbwalkspeed : oldSpeed === 0 ? newSpeed : (body.bbwalkspeed/oldSpeed)*newSpeed;
@@ -751,8 +1050,8 @@
         plan.push([body,'bbwalkspeed',speed]);
       }
       if (policy === 'ratio' && !dead) {
-        const newMaximum = item.health*(human || id === 5 ? 1 : Math.trunc(level.zombieHealthMultiplier));
-        const oldMaximum = body[maximumHealth] || old.health*(human || id === 5 ? 1 : Math.trunc(game.bbZombieHealthMultiplier));
+        const newMaximum = effectiveMaximum(c,multipliers,human,id,level.zombieHealthMultiplier);
+        const oldMaximum = body[maximumHealth] || effectiveMaximum(previous,oldMultipliers,human,id,game.bbZombieHealthMultiplier);
         if (!(oldMaximum > 0)) throw new Error('GameConfig: invalid live maximum health');
         if (newMaximum !== oldMaximum) {
           const health = Math.max(1,Math.min(newMaximum,Math.round(body.bbhealth*newMaximum/oldMaximum)));
@@ -779,6 +1078,7 @@
       if (property ? !('value' in property) || !property.writable : !Object.isExtensible(target))
         throw new Error('GameConfig: raw table update target is not writable');
     }
+    if (options.validateOnly) return {applied,deferred};
     commitPlan(plan);
     writeRaw(target,active);
     state.compiled = next; state.activeCompiled = active;
@@ -787,15 +1087,15 @@
   function writeRaw(target, compiled) {
     for (const [key,value] of Object.entries(compiled.raw)) target[key] = value.slice();
   }
-  function apply(target, input) {
+  function apply(target, input,options) {
     portFor(target);
-    const compiled = compile(input);
+    const compiled = compile(input,options);
     if (!Array.isArray(target.bb_data_unitdata)) throw new Error('GameConfig: apply requires bb_Init first; use install before initialization');
     if (target.ZTPGamePort.state.bb_Game) throw new Error('GameConfig: apply must run after bb_Init and before bb_Main; restart the game to change configuration');
     stateFor(target,compiled); writeRaw(target,compiled); return compiled;
   }
-  function install(target, input) {
-    const port = portFor(target), compiled = compile(input);
+  function install(target, input,options) {
+    const port = portFor(target), compiled = compile(input,options);
     if (port.state.bb_Game) throw new Error('GameConfig: install must run before bb_Main; restart the game to change configuration');
     const state = stateFor(target,compiled);
     if (!state.initializer) {
@@ -807,11 +1107,14 @@
         state.firedReinforcements = new Set();
         state.waveSchedule = null;state.consumingWaveNode = null;
         state.explodingBottle = null; state.bottleLoopDepth = 0;
+        state.powerSpawns = [];state.powerDispatchFrame = null;
         writeRaw(target,state.compiled); return result;
       };
     }
     target.bb_Init = port.bb_Init = state.initializer;
     return compiled;
   }
-  return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive,getWaveProgress,applyLiveWaves,BUILDING_SAFETY_LIMIT,HEALTH_SAFETY_LIMIT});
+  return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive,getWaveProgress,applyLiveWaves,
+    validateMultipliers,getMaximumHealth,getPowerProgress,cancelPowerEffects,
+    BUILDING_SAFETY_LIMIT,HEALTH_SAFETY_LIMIT,POWER_COUNT_LIMIT,POWER_DISPATCH_BUDGET});
 });

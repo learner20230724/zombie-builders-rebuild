@@ -12,7 +12,7 @@ A desktop and browser version of **Zombie Trailer Park (建筑工大战僵尸)**
 - Survivor units, zombie types, and special powers with distinct roles.
 - Bundled graphics and audio, plus local progress and records.
 - Editable JSON configuration for units, zombies, buildings, powers, and levels.
-- In-game custom presets, live balance changes, wave editing, one-click zombie spawning, and troop-clearing buttons.
+- Instant in-game editing, shared troop multipliers, custom power summons, independent spawn queues, and type-specific clearing.
 - Side-by-side settings: keep the game visible and choose whether to pause or play while editing.
 
 ## Default game parameters
@@ -117,47 +117,31 @@ Then open **http://127.0.0.1:8318/**. On Windows, you can also double-click **St
 
 ## Customize the game
 
-Click **⚙ 自定义** or press **F2** to toggle settings. The game stays beside a **right-hand dock**, switching to a game-above/settings-below layout on narrow windows. Opening settings pauses by default; **继续战斗** resumes while the dock remains open, and **暂停战斗** pauses again. Close with F2, the close button, or Esc while focus is inside settings.
+Press **F2** to open settings beside the game (below it in narrow windows). Opening pauses by default; the **time controls at the top of the settings panel** provide pause/resume and **0–20× speed** (0.1 steps). The closed game view has no extra customization widgets.
 
-The six tabs cover sandbox/spawning, survivors, zombies, buildings, powers, and stages/waves. Each field shows its default, edited value, unit, and application timing. **Editing or resuming gameplay does not automatically apply the draft**: use **应用本局**. Saving a preset remains a separate action.
+**Changes apply automatically:** checkboxes and menus act when selected; numbers act on **Enter or leaving the field**. There is no separate “Apply to battle” step. Invalid values stay marked without changing the battle. Only settings that require a fresh battle are labelled accordingly.
 
-Health accepts integers **1–2,147,483,647**, including bases. `$.units[5].health` means **your base's health**, not the fifth recruitable unit. The former 100,000,000 limit was editor validation, not an original game rule. The new ceiling prevents signed 32-bit overflow; for zombies, base health × the integer-truncated stage multiplier must also fit. **0 means death, not invincibility.**
-
-| Action | Result |
+| Area | Controls |
 | --- | --- |
-| Save rules (`保存规则`) | Saves a named rule set; does not change the battle |
-| Load / import preset | Loads an editable draft; does not apply it or overwrite another preset |
-| Apply to battle (`应用本局`) | Applies supported values now and marks the run as custom |
-| Start custom battle (`开始自定义战局`) | Starts a fresh stage with the complete draft |
-| Reset draft (`恢复原版默认`) | Resets edited values only; does not apply them or delete presets |
-| Return to original mode (`回到原版模式`) | Ends the current battle and returns to original mode; keeps presets |
-| Export JSON (`导出 JSON`) | Downloads a JSON file for backup or sharing |
+| Sandbox / spawning | Five zombie buttons still spawn immediately. The batch form selects **friendly/enemy**, any of **ten types** (five humans + five zombies), and quantity; each camp enters from its own side with normal configured stats. A live troop table shows both camps’ counts for all ten types and totals. |
+| Spawn queues | Click **加入出兵队列** to start an independent stream at its own **units/game-second** rate; 0 pauses that job, 0.1 means one every 10 game-seconds. Add more batches without waiting, edit each rate live, or cancel pending jobs without removing already spawned troops. |
+| Clear current troops | Clear an entire side or a selected human/zombie type by its **current camp**, including converted allies. Bases and future production/waves remain. |
+| Both bases | Quick access directly below clearing: edit maximum HP and **current HP** separately. Current HP can be set to 0 to end the battle normally. |
+| Survivors / zombies | Edit each type; shared **HP, movement, and damage multipliers** sit above the type selector. They follow species (not camp), exclude bases, and combine multiplicatively with stage settings for zombies. |
+| Buildings | Edit price, time, and limits. **Maximum 0** removes the original gameplay cap; extra Salvage Yards contribute real income. |
+| Powers | Angry Mob can summon all five survivor types: Shovel Men, Farmers, Survivalists, Bombers, and Preachers. Larger requests are queued instead of discarded at the old 1,000-request limit. Cancel the selected power’s effects or all power effects with one button. |
+| Stages / waves | Edit type, count, delay, and enabled state. **Newest rows display first**, so added groups are immediately accessible; display order does not reverse execution order. Pause/resume scripted waves independently of battle and manual spawn jobs. |
 
-**Try one-click spawning:** open **沙盒 / 刷怪**, select a stage and **开始自定义战局**. Open F2 again, choose **继续战斗**, and click **肥胖僵尸** once to add one while watching the game beside it. Spawning requires an active custom battle.
+**Start custom battle** starts a fresh stage with all edited rules. **Save rules** names a reusable preset; load/import/reset/undo also commit their valid values automatically. Export JSON backs up a preset. Original and custom completion records remain separate. Returning to original mode keeps your presets.
 
-The same sandbox has **一键杀死己方小兵** and **一键杀死敌方小兵**. They immediately clear the selected side's current non-base troops, even while paused. Friendly clearing includes converted zombies and Angry Mob summons. Bases, paid recruitment/building orders, future waves, and queued reinforcements are kept; automatic spawning can still produce new enemies. Clearing grants no XP or kill credit, and leaves existing projectiles and power effects in play.
+### Live behavior
 
-### What changes immediately?
+- HP changes can keep each living unit's health percentage (default) or affect new units only; current-base HP has its own direct control. Maximum HP accepts **1–2,147,483,647**.
+- Damage/speed/switches affect subsequent actions; active production and cooldowns keep their progress. Projectiles already in flight keep their launch damage.
+- An unfinished wave's remaining count is `max(0, new total − already scheduled)`. Finished groups never replay; add a new group for another batch. Live status shows actual spawned/remaining counts.
+- Recruitment population/prerequisites, unlocks, opening resources, reinforcements, and other stages' queues take effect when starting the corresponding new battle.
 
-| Setting | Current battle |
-| --- | --- |
-| Health | Choose **keep health percentage** (default) or **new units only**; dead units are never revived |
-| Damage, speed, hitboxes, costs | Subsequent actions use the new values; projectiles already in flight keep their original damage |
-| Training, charging, cooldown | Preserve the remaining percentage, rather than restarting completed work |
-| Salvage payout / interval, population per Trailer | Live rule settings; existing cash/units are kept and the income pool retains its progress |
-| Harvester damage / range, listed ability switches | Subsequent battle ticks/actions, including active Harvesters |
-| Building maximum | Current battle; lowering it blocks new orders without deleting existing buildings or paid orders |
-| Recruitment population, prerequisites, power unlocks | Next battle; previously paid orders are not refunded or recharged |
-| Current stage's waves | Apply now by stable group ID; deduct already scheduled counts and do not replay finished groups |
-| Starting cash / XP, reinforcement definitions, other stages' waves | Next corresponding battle |
-
-Wave entries can be enabled/disabled, reordered, and edited by type, count, and scheduler `delay`. The sandbox also controls automatic queues, the five queued zombie types, base reinforcements, corpse-impact spawns, Ghoul long leaps, preacher conversion, Fat Zombie area attacks, and corpse throwing. Economy and Harvester damage/range are editable rule values. **Manual spawn is independent of automatic-spawn switches**: the **Big Fat Zombie** button creates one immediately, without changing wave order.
-
-**Apply waves with the normal `应用本局` button.** For a partially scheduled group, `count` is the desired total, so remaining = `max(0, count − already scheduled)`. Existing enemies, elapsed timers, and queued reinforcements are retained. Finished groups do not replay; add a new group if you want more enemies. The panel shows current, scheduled, spawned, and remaining counts, separately from your draft. Editing another stage affects its next battle. Old imported rules without a trusted group identity require starting a new custom battle before their waves can be live-edited; other valid attributes can still apply now.
-
-Original and custom runs have separate completion records and scores. Applying custom rules or sandbox changes must not improve original-mode records. Presets survive restoring original rules; they are local to the current desktop profile or browser.
-
-The battlefield has a safety limit of **1,000 combat units including bases**. The editor covers the existing configurable values and listed behavior switches. Adding new character types, animation-driven attack rates, or entirely new abilities still requires game code; it is not an unrestricted mod engine.
+More field details and technical limits are in the [configuration reference](config/README.md) and [development guide](docs/DEVELOPMENT.md).
 
 ### JSON configuration
 

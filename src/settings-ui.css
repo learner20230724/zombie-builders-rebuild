@@ -1,10 +1,9 @@
 /* The open dock reserves layout space; it never covers the game canvas. */
 body.ztps-docked{--ztps-dock-width:clamp(370px,43vw,660px);--ztps-dock-height:55dvh}
 body.ztps-docked main{right:var(--ztps-dock-width);height:auto}
-.ztps-entry,.ztps-overlay{font:14px/1.5 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;box-sizing:border-box}
-.ztps-entry{position:fixed;z-index:30;min-height:34px;padding:5px 11px!important;border-color:#d5d2a4!important;background:#202a1de8!important;box-shadow:0 2px 12px #0008;color:#f2efd3!important;font-size:12px!important}
+.ztps-overlay{font:14px/1.5 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;box-sizing:border-box}
 .ztps-overlay{position:fixed;top:0;right:0;bottom:0;width:var(--ztps-dock-width,clamp(370px,43vw,660px));z-index:100;display:block;background:#121a22;color:#e8edf2;box-shadow:-3px 0 18px #0005}
-.ztps-overlay[hidden],.ztps-entry[hidden]{display:none!important}
+.ztps-overlay[hidden]{display:none!important}
 .ztps-overlay *{box-sizing:border-box}
 .ztps-modal{width:100%;height:100%;display:flex;flex-direction:column;overflow:hidden;background:#121a22;border-left:1px solid #40505e;outline:none}
 .ztps-modal h1,.ztps-modal h2,.ztps-modal h3,.ztps-modal p{margin:0}
@@ -19,6 +18,7 @@ body.ztps-docked main{right:var(--ztps-dock-width);height:auto}
 .ztps-primary{background:#d6dc8a;color:#1b241b;border-color:#d6dc8a;font-weight:650}
 .ztps-primary:hover:not(:disabled){background:#edf2ad;border-color:#f0f4bb;color:#111}
 .ztps-close{background:transparent;border-color:#536371}
+.ztps-time-host{flex-shrink:0}
 .ztps-playback-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0;padding:8px 16px;background:#24322b;border-top:1px solid #344d3a;border-bottom:1px solid #344d3a}
 .ztps-playback-status{font-size:12px;color:#d9e5b3}.ztps-playback-toggle{border-color:#b2c484;color:#e2eabe;background:#384b34;min-width:94px}
 .ztps-preset-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 16px;border-bottom:1px solid #354450;flex-wrap:wrap;flex-shrink:0}
@@ -38,7 +38,7 @@ body.ztps-docked main{right:var(--ztps-dock-width);height:auto}
 .ztps-help{color:#a0b1bf;font-size:12px;line-height:1.7}
 .ztps-content>p.ztps-help{margin-top:10px}
 .ztps-table-scroll{overflow-x:auto;max-width:100%;border:1px solid #334450;border-radius:6px;scrollbar-width:thin}
-.ztps-table{border-collapse:collapse;width:100%;font-size:12px;text-align:left;min-width:680px}
+.ztps-table{border-collapse:collapse;width:100%;font-size:12px;text-align:left;min-width:530px}
 .ztps-table thead{background:#202e3a;color:#acbfce}
 .ztps-table th,.ztps-table td{padding:9px 12px;border-bottom:1px solid #2d3d49;vertical-align:middle}
 .ztps-table thead th{font-weight:600;white-space:nowrap}
@@ -104,3 +104,20 @@ body.ztps-docked main{right:var(--ztps-dock-width);height:auto}
 @media(min-width:851px) and (max-height:680px){.ztps-modal{display:block;overflow:auto}.ztps-content{overflow:visible;min-height:0}}
 @media(max-width:760px){.ztps-overlay{padding:0}.ztps-modal{border-radius:0}}
 @media(prefers-reduced-motion:reduce){.ztps-button{transition:none}}
+
+/* Compact instant editor controls, separate from the standalone time panel. */
+.ztps-next-battle{display:inline-block;margin-left:6px;padding:1px 5px;border:1px solid #655a36;border-radius:4px;color:#e7cf91;font-size:10px;white-space:nowrap}
+.ztps-multipliers{padding:12px;margin-bottom:16px;border:1px solid #4c6553;border-radius:6px;background:#202e26}
+.ztps-multipliers h2{font-size:14px;margin-bottom:4px}.ztps-multipliers p{margin-bottom:10px}
+.ztps-multiplier-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.ztps-multiplier-grid input{width:100%;min-width:0}
+.ztps-batch-controls{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:12px}.ztps-batch-controls .ztps-label{flex:1;min-width:95px}.ztps-batch-controls input,.ztps-batch-controls select{width:100%;min-width:0}.ztps-batch-controls>.ztps-button{flex-shrink:0}
+.ztps-filtered-clear{margin-top:8px}.ztps-filtered-clear .ztps-label{min-width:180px}.ztps-filtered-clear .ztps-button{min-width:155px}
+.ztps-base-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.ztps-base-card{padding:11px;border:1px solid #3f5260;border-radius:6px;background:#192630}.ztps-base-card h3{margin:0 0 10px;font-size:14px}.ztps-base-card .ztps-label{margin-bottom:9px}.ztps-base-card input{width:100%;min-width:0}.ztps-base-card small{display:block;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+@media(max-width:420px){.ztps-multiplier-grid,.ztps-base-grid{grid-template-columns:1fr}.ztps-batch-controls>.ztps-button{flex:1}.ztps-filtered-clear .ztps-label{min-width:140px}}
+
+.ztps-power-actions{padding:10px;margin-bottom:14px;border:1px solid #4c454b;border-radius:6px;background:#241f27}.ztps-power-actions>p{margin-top:8px;font-variant-numeric:tabular-nums}
+
+.ztps-spawn-queue{margin-top:14px;padding-top:10px;border-top:1px solid #3b4c59}.ztps-spawn-queue>.ztps-section-heading{margin-bottom:8px}.ztps-spawn-jobs{display:grid;gap:7px}.ztps-spawn-job{display:flex;align-items:center;gap:9px;padding:9px;border:1px solid #3b4c59;border-radius:5px;background:#17262f}.ztps-spawn-job-copy{flex:1;min-width:90px}.ztps-spawn-job-copy strong,.ztps-spawn-job-copy small{display:block;overflow-wrap:anywhere}.ztps-spawn-job-copy strong{font-size:12px}.ztps-spawn-job .ztps-label{width:100px;flex-shrink:0}.ztps-spawn-job input{width:100%;min-width:0}.ztps-spawn-job>.ztps-button{font-size:12px}
+@media(max-width:420px){.ztps-spawn-job{flex-wrap:wrap}.ztps-spawn-job-copy{flex-basis:100%}.ztps-spawn-job .ztps-label{flex:1}}
+
+.ztps-troop-counts{margin-top:15px}.ztps-troop-counts h2{font-size:14px;margin-bottom:7px}.ztps-troop-table{min-width:0;font-size:11px;border:1px solid #334450}.ztps-troop-table th,.ztps-troop-table td{padding:4px 10px}.ztps-troop-table tbody th{min-width:0;font-size:11px}.ztps-troop-table .ztps-troop-number{text-align:right;font-variant-numeric:tabular-nums}.ztps-troop-table thead th:not(:first-child){text-align:right}.ztps-troop-table tfoot{background:#26382f;color:#e3edb8;font-weight:650}
