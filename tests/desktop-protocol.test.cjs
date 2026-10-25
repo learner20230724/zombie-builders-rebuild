@@ -66,6 +66,7 @@ test('desktop routes serve exact declared assets, custom config and immutable de
   assert.equal((await get('/src/time-controls.js')).status,200);
   assert.equal((await get('/src/time-controls.css')).status,200);
   assert.equal((await get('/src/factions.js')).status,200);
+  assert.equal((await get('/src/death-effects.js')).status,200);
   assert.equal((await get('/src/spawn-queue.js')).status,200);
   assert.equal((await get('/assets/images/test.png')).status,200);
   assert.equal((await get('/public/assets/images/test.png')).status,200);

@@ -12,7 +12,7 @@ after(async () => {
   if (server) {server.closeAllConnections(); await new Promise(resolve => server.close(resolve));}
 });
 test('public game and health routes are available', async () => {
-  for (const name of ['/', '/src/runtime.js', '/src/game-config.js', '/src/custom-rules.js', '/src/customization.js', '/src/factions.js', '/src/spawn-queue.js', '/src/settings-ui.js', '/src/settings-ui.css', '/src/time-controls.js', '/src/time-controls.css', '/config/units.json', '/config/levels.json', '/defaults/units.json', '/defaults/levels.json', '/assets/manifest.json', '/public/vendor/BOX2D-LICENSE.txt']) {
+  for (const name of ['/', '/src/runtime.js', '/src/game-config.js', '/src/custom-rules.js', '/src/customization.js', '/src/factions.js', '/src/death-effects.js', '/src/spawn-queue.js', '/src/settings-ui.js', '/src/settings-ui.css', '/src/time-controls.js', '/src/time-controls.css', '/config/units.json', '/config/levels.json', '/defaults/units.json', '/defaults/levels.json', '/assets/manifest.json', '/public/vendor/BOX2D-LICENSE.txt']) {
     const response = await fetch(base + name, {signal:AbortSignal.timeout(5000)});
     assert.equal(response.status, 200, name); await response.arrayBuffer();
   }

@@ -4,10 +4,11 @@
   const api = factory(root, typeof module === 'object' && module.exports ? require('./game-config.js') : null,
     typeof module === 'object' && module.exports ? require('./custom-rules.js') : null,
     typeof module === 'object' && module.exports ? require('./factions.js') : null,
-    typeof module === 'object' && module.exports ? require('./spawn-queue.js') : null);
+    typeof module === 'object' && module.exports ? require('./spawn-queue.js') : null,
+    typeof module === 'object' && module.exports ? require('./death-effects.js') : null);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.Customization = api;
-})(typeof globalThis === 'object' ? globalThis : this, function (root, importedConfig, importedRules, importedFactions, importedQueue) {
+})(typeof globalThis === 'object' ? globalThis : this, function (root, importedConfig, importedRules, importedFactions, importedQueue, importedDeathEffects) {
   'use strict';
   const ORIGINAL_STORAGE = 'zombie-trailer-park-0.33', CUSTOM_STORAGE = 'zombie-builders-custom-v1';
   const PRESETS_KEY = 'zombie-builders-presets-v1', SESSION_KEY = 'zombie-builders-session-v1';
@@ -340,9 +341,10 @@
     }
     function deathEffectPlan(value,bodies) {
       const plan=[],partSheets=[value.bbzombiepartsheet,value.bbghoulpartsheet,value.bbfastzombiepartsheet,value.bbfatzombiepartsheet];
-      const add=(list,effect)=>{effect.bbSandboxDeath=1;plan.push([list,effect]);};
+      const deathEffects=target.DeathEffects||importedDeathEffects||root.DeathEffects;
+      const add=(list,effect,body)=>{if(deathEffects)deathEffects.tag(target,effect,body);effect.bbSandboxDeath=1;plan.push([list,effect]);};
       const explosion=(body,x,scale)=>add(value.bbexplosions,new port.bb_Explosion().bbExplosion_new(body.bblayer,
-        port.bb_Cell.bbcells(value.bbexplosionsheet),x,body.bbypos,scale));
+        port.bb_Cell.bbcells(value.bbexplosionsheet),x,body.bbypos,scale),body);
       const seed=port.state.bb_std_random_Seed;
       try {
         for (const body of bodies) {
@@ -351,7 +353,7 @@
           if (type>=0 && type<5) {
             const sheet=[value.bbshoveldeathsheet,value.bbshotgundeathsheet,null,null,value.bbpreacherdeathsheet][type];
             if ([0,1,4].includes(type) && (!sheet || !Number.isInteger(sheet.bblastframe) || sheet.bblastframe<1)) fail('无法清场：死亡动画素材无效');
-            if (sheet) add(value.bbdeathlist,new port.bb_Death().bbDeath_new(sheet,body.bblayer,body.bbxpos,body.bbypos));
+            if (sheet) add(value.bbdeathlist,new port.bb_Death().bbDeath_new(sheet,body.bblayer,body.bbxpos,body.bbypos),body);
             else if (type===2) explosion(body,body.bbxpos,3);
             else {explosion(body,body.bbxpos-10,2);explosion(body,body.bbxpos-5,1.5);}
           } else if (type===36) explosion(body,body.bbxpos,4);
@@ -362,7 +364,7 @@
               let vx=port.bb_std_random_Rnd2(4)-2,vy=-2-port.bb_std_random_Rnd2(4);
               if (body.bbsmackstyle===1) {vx=port.bb_std_random_Rnd2(4);vy=-2-port.bb_std_random_Rnd2(2);}
               if (body.bbsmackstyle===2) {vx=port.bb_std_random_Rnd2(5);vy=-2-port.bb_std_random_Rnd2(3);}
-              add(value.bbbodyparts,new port.bb_BodyPart().bbBodyPart_new(body.bblayer,sheet,frame,body.bbxpos,body.bbypos,vx,vy));
+              add(value.bbbodyparts,new port.bb_BodyPart().bbBodyPart_new(body.bblayer,sheet,frame,body.bbxpos,body.bbypos,vx,vy),body);
             }
           } else fail('无法清场：死亡动画类型无效');
         }
@@ -704,7 +706,12 @@
     };
     state.controller=Object.freeze(controller); active=state.controller;
     if (state.mode==='custom' && state.stage!==null) {
-      target.EndMovie?.(); game().bbPlayGame(state.stage);
+      target.EndMovie?.();
+      // The normal intro→menu transition switches its 30 Hz animation clock
+      // to 60 Hz gameplay. Auto-start bypasses that transition on every custom
+      // reload, so finish the movie first and restore the same original rate.
+      target.bb_mojo_app_SetUpdateRate(60);
+      game().bbPlayGame(state.stage);
     }
     resolveReady(active);
     if (typeof target.dispatchEvent==='function' && typeof target.CustomEvent==='function') target.dispatchEvent(new target.CustomEvent('customization-ready',{detail:active}));

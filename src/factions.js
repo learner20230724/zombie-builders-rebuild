@@ -76,7 +76,49 @@
     const human=body.bbunit.bbtype<32;
     return body.bbxpos+(human?body.bbunit.bbhitoffset:(camp==='friendly'?-body.bbunit.bbhitoffset:body.bbunit.bbhitoffset));
   }
-  function opponents(target,camp){return list(target,{side:camp==='friendly'?'enemy':'friendly',includeBases:true}).filter(alive);}
+  function opponentBodies(target,camp) {
+    const state=stateFor(target),game=portFor(target).state.bb_Game,frame=state.actorFrame;
+    if (!frame || frame.game!==game) return list(target,{side:camp==='friendly'?'enemy':'friendly',includeBases:true});
+    // Cache membership only for this synchronous tick. Positions, health and
+    // modes are read from the live body on every query, never snapshotted.
+    if (frame.version!==state.actorVersion || frame.people!==game.bbpeople || frame.converted!==game.bbpombies || frame.zombies!==game.bbzombies ||
+        frame.peopleHead!==game.bbpeople.bb_head || frame.convertedHead!==game.bbpombies.bb_head || frame.zombiesHead!==game.bbzombies.bb_head) {
+      frame.version=state.actorVersion;frame.people=game.bbpeople;frame.converted=game.bbpombies;frame.zombies=game.bbzombies;
+      frame.peopleHead=game.bbpeople.bb_head;frame.convertedHead=game.bbpombies.bb_head;frame.zombiesHead=game.bbzombies.bb_head;
+      frame.friendly=frame.enemy=null;
+    }
+    const key=camp==='friendly'?'enemy':'friendly';
+    return frame[key] || (frame[key]=list(target,{side:key,includeBases:true}));
+  }
+  function opponents(target,camp){return opponentBodies(target,camp).filter(alive);}
+  function nearestTarget(target,camp,x,radius) {
+    const dir=camp==='friendly'?1:-1,otherCamp=camp==='friendly'?'enemy':'friendly';
+    let nearest=null,score=Infinity;
+    for (const body of opponentBodies(target,camp)) {
+      if (!alive(body)) continue;
+      const forward=dir*(center(body,otherCamp)-x),otherRadius=body.bbunit.bbhitradius;
+      if (forward < -radius-otherRadius) continue;
+      const gap=forward-radius-otherRadius,next=Math.max(0,gap);
+      // The former stable sort treats every overlapping (gap <= 0) body as
+      // equal. Strict comparison preserves the original list's first tie.
+      if (next<score) {nearest={body,gap};score=next;if (score===0) break;}
+    }
+    return nearest;
+  }
+  function rangedTargets(target,camp,x,radius,range,preacher) {
+    const dir=camp==='friendly'?1:-1,otherCamp=camp==='friendly'?'enemy':'friendly',game=portFor(target).state.bb_Game,result=[];
+    for (const body of opponentBodies(target,camp)) {
+      if (!alive(body) || preacher && (body===game.bbpeoplebase || body===game.bbzombiebase)) continue;
+      const forward=dir*(center(body,otherCamp)-x),otherRadius=body.bbunit.bbhitradius;
+      if (forward < -radius-otherRadius) continue;
+      const gap=forward-radius-otherRadius;
+      if (gap<range) result.push({body,gap});
+    }
+    // Sort only real hit-frame candidates. For priests the original second
+    // stable sort put type first, leaving clamped-gap/list order as tie-break.
+    return result.sort(preacher ? (a,b)=>b.body.bbunit.bbtype-a.body.bbunit.bbtype || Math.max(0,a.gap)-Math.max(0,b.gap)
+      : (a,b)=>Math.max(0,a.gap)-Math.max(0,b.gap));
+  }
   function damage(body,amount,style=1){
     amount=Math.max(0,Math.min(2147483647,Math.trunc(amount)));
     if(!alive(body)||!amount)return amount;
@@ -106,35 +148,34 @@
   }
   function humanUpdate(target,body){
     const state=stateFor(target),port=portFor(target),game=port.state.bb_Game,meta=state.people.get(body),camp=meta.side,dir=camp==='friendly'?1:-1;
-    const targets=opponents(target,camp),x=center(body,camp),radius=body.bbunit.bbhitradius;
-    const reachable=targets.map(other=>{
-      const otherCamp=camp==='friendly'?'enemy':'friendly',c=center(other,otherCamp),forward=dir*(c-x);
-      return {body:other,gap:forward-radius-other.bbunit.bbhitradius,forward};
-    }).filter(v=>v.forward>=-radius-v.body.bbunit.bbhitradius).sort((a,b)=>Math.max(0,a.gap)-Math.max(0,b.gap));
-    const nearest=reachable[0],type=body.bbunit.bbtype;
-    if(body.bbmode===0&&nearest){
-      const gap=Math.max(0,nearest.gap);
-      if(type===0&&gap<16){body.bbmode=1;body.bbswing=0;}
-      else if(type===1&&gap<240){body.bbmode=3;body.bbshoot=0;}
-      else if(type===2&&gap<140){body.bbmode=5;body.bbshoot=0;}
-      else if(type===3&&gap<400){body.bbmode=4;body.bbthrow=0;}
-      else if(type===4&&gap<320){body.bbmode=6;body.bbspell=0;}
+    const x=center(body,camp),radius=body.bbunit.bbhitradius,type=body.bbunit.bbtype;
+    let nearest;
+    if(body.bbmode===0){
+      nearest=nearestTarget(target,camp,x,radius);
+      if(nearest){
+        const gap=Math.max(0,nearest.gap);
+        if(type===0&&gap<16){body.bbmode=1;body.bbswing=0;}
+        else if(type===1&&gap<240){body.bbmode=3;body.bbshoot=0;}
+        else if(type===2&&gap<140){body.bbmode=5;body.bbshoot=0;}
+        else if(type===3&&gap<400){body.bbmode=4;body.bbthrow=0;}
+        else if(type===4&&gap<320){body.bbmode=6;body.bbspell=0;}
+      }
     }
     const mode=body.bbmode;
+    // Do not move HitKey before the mode-0 transition: it consumes the exact
+    // original animation hit flag. Busy non-hit animation needs no target work.
     if([1,3,4,5,6].includes(mode)&&port.bb_Person.prototype.bbHitKey.call(body)){
       const pool=Math.max(0,Math.trunc(body.bbunit.bbdamage||0));
-      if(mode===1){const victim=reachable.find(v=>v.gap<40);if(victim)damage(victim.body,pool,1);}
-      else if(mode===3){if(nearest&&nearest.gap<300)damage(nearest.body,pool,3);}
-      else if(mode===5){let left=pool;for(const hit of reachable){if(hit.gap>=180||left<=0)break;left=damage(hit.body,left,2);}}
+      if(mode===1){const victim=nearest===undefined?nearestTarget(target,camp,x,radius):nearest;if(victim&&victim.gap<40)damage(victim.body,pool,1);}
+      else if(mode===3){const victim=nearest===undefined?nearestTarget(target,camp,x,radius):nearest;if(victim&&victim.gap<300)damage(victim.body,pool,3);}
+      else if(mode===5){let left=pool;for(const hit of rangedTargets(target,camp,x,radius,180,false)){if(left<=0)break;left=damage(hit.body,left,2);}}
       else if(mode===4){
         const previous=state.shotSide;state.shotSide=camp;
         try{game.bbAddBottle(body.bblayer,body.bbxpos+12*dir,body.bbypos-64,4*dir,-4,0);}finally{state.shotSide=previous;}
       }
       else if(mode===6&&enabled(target,'preacherConversion')){
         let budget=1000;
-        const eligible=reachable.filter(hit=>hit.gap<320&&hit.body!==game.bbpeoplebase&&hit.body!==game.bbzombiebase)
-          .sort((a,b)=>b.body.bbunit.bbtype-a.body.bbunit.bbtype);
-        for(const hit of eligible){if(budget<=0)break;if(convert(target,hit.body,camp))budget-=hit.body.bbunit.bbhealth;}
+        for(const hit of rangedTargets(target,camp,x,radius,320,true)){if(budget<=0)break;if(convert(target,hit.body,camp))budget-=hit.body.bbunit.bbhealth;}
       }
     }
     if(!alive(body))return 0;
@@ -192,9 +233,21 @@
   function install(target){
     const port=portFor(target);if(states.has(target))return target;
     if(port.state.bb_Game)fail('install must run before bb_Main');
-    const state={people:new WeakMap(),projectiles:new WeakMap(),cross:false,tickDepth:0,impact:null,pendingImpact:null,exploding:null,shotSide:null,mirrorHuman:false};states.set(target,state);
+    const state={people:new WeakMap(),projectiles:new WeakMap(),cross:false,tickDepth:0,actorFrame:null,actorVersion:0,impact:null,pendingImpact:null,exploding:null,shotSide:null,mirrorHuman:false};states.set(target,state);
     wrap(port.bb_Zomba.prototype,'bbResetGame',original=>function(){state.cross=false;state.impact=state.pendingImpact=state.exploding=null;return original.apply(this,arguments);});
-    wrap(port.bb_Zomba.prototype,'bbGameTick',original=>function(){state.tickDepth++;try{return original.apply(this,arguments);}finally{state.tickDepth--;state.impact=state.pendingImpact=state.exploding=null;}});
+    for (const method of ['bbAddLast','bbAddFirst','bbRemove','bbRemoveFirst','bbRemoveLast','bbClear']) wrap(port.bb_std_list_List.prototype,method,original=>function(){
+      const frame=state.actorFrame,game=frame&&frame.game;
+      // Invalidate before calling a mutator, including partial failures. An
+      // enemy dying/converting or a newly born actor must affect the very next
+      // attacker in this same tick. Non-actor lists do not disturb this cache.
+      if (game && (this===game.bbpeople || this===game.bbpombies || this===game.bbzombies)) state.actorVersion++;
+      return original.apply(this,arguments);
+    });
+    wrap(port.bb_Zomba.prototype,'bbGameTick',original=>function(){
+      const previous=state.actorFrame;
+      state.actorFrame=state.cross?{game:this,version:-1}:null;state.tickDepth++;
+      try{return original.apply(this,arguments);}finally{state.actorFrame=previous;state.tickDepth--;state.impact=state.pendingImpact=state.exploding=null;}
+    });
     wrap(port.bb_Zombie.prototype,'bbUpdate',original=>function(){
       if(state.cross&&this.bbunit&&this.bbunit.bbtype===36&&this.bbdirection<0&&this.bbmode===11&&this.bbHitKey()){
         const previous=state.shotSide;state.shotSide='friendly';try{port.state.bb_Game.bbAddFling(this.bblayer,this.bbxpos,this.bbypos);}finally{state.shotSide=previous;}

@@ -26,19 +26,20 @@ function dispatch(h,count=1) {
   const mob=h.target.ZTPGamePort.bb_ZombieMob;
   for(let i=0;i<count;i++) {const head=entries(mob.bbqueue)[0];assert.ok(head,'dispatch requires a queued group');head.bbtime=1000;mob.bbticks=60;mob.bbUpdate();}
 }
-function fixture({storage=new Map(),external=baseline(),custom=false,throwStorage=false,throwWrites=false}={}) {
+function fixture({storage=new Map(),external=baseline(),custom=false,throwStorage=false,throwWrites=false,finishIntro=true,timeScale=1,traceTiming=false}={}) {
   if(custom) storage.set(constants.SESSION_KEY,JSON.stringify({schemaVersion:1,mode:'custom',config:external,rules:CustomRules.defaults(),stage:1,selectedPresetId:null}));
   const manifest=JSON.parse(read('public/assets/manifest.json'));
   const drawing=new Proxy({Width:()=>800,Height:()=>600,LoadSurface(name){const image=manifest.images[name];assert.ok(image,name);return {Width:()=>image.width,Height:()=>image.height};}},{get:(target,key)=>target[key]||(()=>0)});
   const input=new Proxy({},{get:()=>()=>0}), audio={LoadSample:name=>({name}),PlaySample:()=>0,StopChannel:()=>0};
-  class App {GraphicsDevice(){return drawing;}InputDevice(){return input;}AudioDevice(){return audio;}SetUpdateRate(){return 0;}MilliSecs(){return 0;}}
+  const updateRates=[],timingEvents=[];
+  class App {GraphicsDevice(){return drawing;}InputDevice(){return input;}AudioDevice(){return audio;}SetUpdateRate(rate){this.updateRate=rate;updateRates.push(rate);timingEvents.push('rate:'+rate);return 0;}MilliSecs(){return 0;}}
   let namespace=constants.ORIGINAL_STORAGE, reloads=0, ended=0;
-  const runtimeCalls=[],runtimeState={running:true},events=[];
+  const runtimeCalls=[],runtimeState={running:true,timeScale},events=[];
   const target=vm.createContext({console,gxtkApp:App,gxtkSurfaceListener:class {},
     localStorage:{getItem:key=>{if(throwStorage)throw Error('storage off');return storage.get(key)||null;},setItem:(key,value)=>{if(throwStorage||throwWrites)throw Error('storage full');storage.set(key,value);}},
     ReadInt:(group,key)=>Number(storage.get(namespace+'/shared/'+group+'/'+key)||0)|0,
     WriteInt:(group,key,value)=>storage.set(namespace+'/shared/'+group+'/'+key,String(value|0)),FlushInts:()=>0,
-    PlayMovie:()=>0,MovieFinished:()=>1,EndMovie:()=>{ended++;},ShowMochi:()=>0,ShowMochiScores:()=>0,HideMochiScores:()=>0,MochiState:()=>0,Redirect:()=>0,
+    PlayMovie:()=>0,MovieFinished:()=>finishIntro?1:0,EndMovie:()=>{ended++;timingEvents.push('end-movie');},ShowMochi:()=>0,ShowMochiScores:()=>0,HideMochiScores:()=>0,MochiState:()=>0,Redirect:()=>0,
     configureRuntime:options=>{if(runtimeState.running)throw Error('Stop the runtime before reconfiguring it');namespace=options.storageKey;},location:{reload:()=>{reloads++;}},
     CustomEvent:class {constructor(type,options){this.type=type;this.detail=options.detail;}},dispatchEvent:event=>events.push(event),
     ZTPRuntime:{getStatus:()=>({...runtimeState}),stop:()=>{runtimeCalls.push('stop');runtimeState.running=false;},advance:n=>runtimeCalls.push('advance:'+n),
@@ -49,11 +50,46 @@ function fixture({storage=new Map(),external=baseline(),custom=false,throwStorag
   namespace=prepared.storageKey;
   GameConfig.install(target,prepared.configuration,{multipliers:prepared.rules.multipliers});CustomRules.install(target,prepared.rules);
   target.Factions=Factions;Factions.install(target);target.SpawnQueue=SpawnQueue;SpawnQueue.install(target);
+  if(traceTiming){const original=target.ZTPGamePort.bb_Zomba.prototype.bbPlayGame;target.ZTPGamePort.bb_Zomba.prototype.bbPlayGame=function(stage){timingEvents.push('play:'+stage);return original.apply(this,arguments);};}
   target.bb_Init();target.bb_Main();
   const device=target.ZTPGamePort.state.bb_mojo_app_device;device.OnCreate();device.OnUpdate();
+  const beforeAttach={mainState:target.ZTPGamePort.state.bb_Game.bbmainState,updateRate:device.updateRate};
   const controller=Customization.attach(target,{prepared}),game=target.ZTPGamePort.state.bb_Game;
-  return {target,controller,game,storage,events,runtimeCalls,prepared,get namespace(){return namespace;},get reloads(){return reloads;},get ended(){return ended;}};
+  return {target,controller,game,device,storage,events,runtimeCalls,prepared,beforeAttach,updateRates,timingEvents,get namespace(){return namespace;},get reloads(){return reloads;},get ended(){return ended;}};
 }
+
+test('custom auto-start ends an unfinished intro, restores the native 60 Hz rate, then starts gameplay',()=>{
+  const h=fixture({custom:true,finishIntro:false,traceTiming:true});
+  assert.deepEqual(h.beforeAttach,{mainState:0,updateRate:30});
+  assert.deepEqual(h.updateRates,[30,60]);
+  assert.deepEqual(h.timingEvents,['rate:30','end-movie','rate:60','play:1']);
+  assert.equal(h.device.updateRate,60);assert.equal(h.game.bbmainState,2);assert.equal(h.game.bbdifficulty,0);
+  assert.equal(h.ended,1);assert.deepEqual(h.runtimeCalls,[]);
+});
+
+test('the original intro keeps its original 30-to-60 Hz transition without a custom auto-start',()=>{
+  const h=fixture({finishIntro:false,traceTiming:true}),seed=h.target.ZTPGamePort.state.bb_std_random_Seed;
+  assert.equal(h.game.bbmainState,0);assert.equal(h.device.updateRate,30);assert.deepEqual(h.updateRates,[30]);
+  assert.equal(h.ended,0);h.target.MovieFinished=()=>1;h.device.OnUpdate();
+  assert.equal(h.game.bbmainState,1);assert.equal(h.device.updateRate,60);assert.deepEqual(h.updateRates,[30,60]);
+  assert.deepEqual(h.timingEvents,['rate:30','end-movie','rate:60']);
+  assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,seed);assert.equal(h.namespace,constants.ORIGINAL_STORAGE);
+});
+
+test('custom fourth-stage reloads retain 60 Hz without changing time scale, scores or the reset random sequence',()=>{
+  const storage=new Map([[constants.SESSION_KEY,JSON.stringify({schemaVersion:1,mode:'custom',config:baseline(),rules:CustomRules.defaults(),stage:4,selectedPresetId:null})],
+    [constants.ORIGINAL_STORAGE+'/shared/ZTPBestScores/0','1234'],[constants.CUSTOM_STORAGE+'/shared/ZTPBestScores/2','9876']]);
+  const scoreBytes=()=>[...storage].filter(([key])=>key.includes('/shared/ZTPBestScores/'));
+  const originalScores=scoreBytes(),a=fixture({storage,finishIntro:false,timeScale:3.5,traceTiming:true});
+  const seed=a.target.ZTPGamePort.state.bb_std_random_Seed;
+  assert.equal(a.game.bbdifficulty,3);assert.equal(a.device.updateRate,60);assert.equal(a.target.ZTPRuntime.getStatus().timeScale,3.5);
+  assert.deepEqual(a.timingEvents,['rate:30','end-movie','rate:60','play:4']);assert.deepEqual(scoreBytes(),originalScores);
+  a.controller.startCustomBattle(4,a.controller.getDraft());assert.equal(a.reloads,1);
+  const b=fixture({storage,finishIntro:false,timeScale:3.5,traceTiming:true});
+  assert.equal(b.game.bbdifficulty,3);assert.equal(b.device.updateRate,60);assert.equal(b.target.ZTPRuntime.getStatus().timeScale,3.5);
+  assert.deepEqual(b.timingEvents,['rate:30','end-movie','rate:60','play:4']);assert.deepEqual(b.runtimeCalls,[]);
+  assert.deepEqual(scoreBytes(),originalScores);assert.equal(b.target.ZTPGamePort.state.bb_std_random_Seed,seed);
+});
 
 test('baseline starts original; external configuration edits are identified as custom',()=>{
   const h=fixture();assert.equal(h.prepared.mode,'original');assert.equal(h.namespace,constants.ORIGINAL_STORAGE);

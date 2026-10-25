@@ -718,7 +718,10 @@ async function run(options) {
       await ready(); await page.waitForFunction(() => Customization.getState().isBattle); await freeze();
       const initial = await state(); assert.equal(initial.customization.mode, 'custom');
       assert.deepEqual(initial.waves.map(wave => wave.type), [4, 1]);
-      await step(115); const after = await save('04-ordered-type-filter');
+      // Wait on the original wave state, not an assumed four game ticks per
+      // rendered frame (custom startup now correctly restores 60 Hz / 2 ticks).
+      for(let frame=0;frame<230&&(await state()).waves.length;frame++)await step(1);
+      const after = await save('04-ordered-type-filter');
       assert.equal(after.zombies.filter(zombie => zombie.type === 35).length, 0);
       assert.equal(after.zombies.filter(zombie => zombie.type === 32).length, 1);
       assert.equal(after.waves.length, 0);

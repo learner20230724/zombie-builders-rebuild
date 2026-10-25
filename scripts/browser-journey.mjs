@@ -30,7 +30,7 @@ async function menu(){await page.waitForFunction(()=>ZTPGamePort.state.bb_Game.b
 async function startStageOne(){await click(660,65);for(let i=0;i<220;i++){if((await snapshot()).state===2)return;await step(1);}throw new Error('Stage-one menu transition never entered gameplay');}
 
 try {
-  evidence.sourceHashes={};for(const file of ['src/runtime.js','src/generated-game.js','public/assets/manifest.json','public/assets/splash.json','scripts/browser-journey.mjs'])evidence.sourceHashes[file]=createHash('sha256').update(await readFile(file)).digest('hex');
+  evidence.sourceHashes={};for(const file of ['src/runtime.js','src/generated-game.js','src/death-effects.js','public/assets/manifest.json','public/assets/splash.json','scripts/browser-journey.mjs'])evidence.sourceHashes[file]=createHash('sha256').update(await readFile(file)).digest('hex');
   const splash=JSON.parse(await readFile('public/assets/splash.json','utf8'));
   evidence.introDefinition={finishAt:splash.finishAt,duration:splash.duration,sourceFrames:splash.sourceFrameCount,renderedFrameSegments:splash.frames.length,sounds:splash.sounds.length,skippable:splash.skippable};
   assert.equal(splash.finishAt,8200);assert.equal(splash.skippable,false);assert.equal(splash.sourceFrameCount,247);assert.equal(splash.sounds.length,8);
@@ -212,6 +212,32 @@ try {
   for(const key of ['ticks','cash','coins','xp','peopleBase','zombieBase','records','units','powers'])assert.deepEqual(bothCleared[key],quick[key]);
   assert.ok(await page.evaluate(()=>{const g=ZTPGamePort.state.bb_Game;return ['bbdeathlist','bbbodyparts','bbexplosions'].some(key=>{const it=g[key].bbObjectEnumerator();while(it.bbHasNext())if(it.bbNextObject().bbSandboxDeath)return true;return false;});}),'Both-army clearing must retain original native death animation visuals');
   check('PARALLEL-SPAWN-AND-BOTH-CLEAR/UI','Friendly/enemy forms remain visible with separate type/count fields; both immediate camp cards work and one button clears both armies, retaining bases, resources, records and paid orders while adding native death visuals.');
+
+  await page.evaluate(()=>{
+    const g=ZTPGamePort.state.bb_Game,entries=list=>{const values=[],it=list.bbObjectEnumerator();while(it.bbHasNext())values.push(it.bbNextObject());return values;};
+    window.__qaBrowserDeaths={before:new Set(entries(g.bbdeathlist)),draws:[],current:null};
+    for(const [side,x]of [['friendly',300],['enemy',1300]]){
+      Customization.spawnFactionUnit(side,{kind:'unit',type:0},1);const body=Factions.list(window,{side,kind:'unit',type:0}).at(-1);Object.assign(body,{bbxpos:x,bbypos:0,bblayer:0});
+    }
+    const qa=window.__qaBrowserDeaths,ctx=document.querySelector('#game').getContext('2d');qa.originalImage=ctx.drawImage;qa.originalDeath=ZTPGamePort.bb_Death.prototype.bbDraw;
+    ctx.drawImage=function(){if(qa.current&&qa.draws.length<128){const m=this.getTransform();qa.draws.push({...qa.current,a:m.a});}return qa.originalImage.apply(this,arguments);};
+    ZTPGamePort.bb_Death.prototype.bbDraw=function(){
+      const previous=qa.current;qa.current=qa.before.has(this)?null:{side:this.bbxpos<800?'friendly':'enemy',frame:this.bbframe};
+      try{return qa.originalDeath.apply(this,arguments);}finally{qa.current=previous;}
+    };
+  });
+  evidence.syntheticFixtures.push({name:'Browser death draw direction',synthetic:true,method:'Two public-API stationary human witnesses at x300/1300. Real both-army button creates their deaths, and the normal renderer produces forwarded Canvas.drawImage observations and sequential screenshots; no mirror metadata is used as the oracle.'});
+  await page.locator('[data-clear-troops="all"]').click();await page.locator('[data-time-pause]').click();await page.evaluate(()=>stopRuntime());
+  await step(1);await page.screenshot({path:`${out}/13a-camp-death-frame-01.png`});await step(12);await page.screenshot({path:`${out}/13b-camp-death-frame-13.png`});
+  const deathDraws=await page.evaluate(()=>{
+    const qa=window.__qaBrowserDeaths;document.querySelector('#game').getContext('2d').drawImage=qa.originalImage;ZTPGamePort.bb_Death.prototype.bbDraw=qa.originalDeath;return qa.draws;
+  });
+  for(const [side,sign]of [['friendly',1],['enemy',-1]]){
+    const draws=deathDraws.filter(draw=>draw.side===side);assert.ok(draws.length>0);assert.ok(draws.every(draw=>Math.sign(draw.a)===sign));assert.ok(new Set(draws.map(draw=>draw.frame)).size>1);
+  }
+  evidence.deathDrawDirection=deathDraws;
+  await page.evaluate(()=>{ZTPRuntime.useRealtime();ZTPRuntime.start();});await page.locator('[data-time-pause]').click();await page.evaluate(()=>stopRuntime());
+  check('CURRENT-CAMP-DEATH/UI','The real both-army clear button creates genuine sequential human death frames: native friendly draws retain a positive horizontal basis and enemy humans use a negative basis. Full Canvas draws are observed and forwarded, not replaced or inferred from a flag.');
 
   await page.locator('#ztps-tab-powers').click();assert.equal(await page.locator('[data-release-power]').count(),6);
   const beforePowers=await snapshot();

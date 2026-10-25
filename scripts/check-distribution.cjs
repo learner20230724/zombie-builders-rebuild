@@ -33,7 +33,7 @@ function checkDistribution() {
   }
   for (const entry of [...splash.frames, ...splash.sounds]) fileFor(entry.src);
   assert.equal(splash.finishAt, 8200);
-  for (const name of ['runtime.js', 'generated-game.js', 'physics.js', 'game-config.js', 'custom-rules.js', 'customization.js', 'factions.js', 'spawn-queue.js', 'settings-ui.js', 'time-controls.js', 'boot.js'])
+  for (const name of ['runtime.js', 'generated-game.js', 'physics.js', 'game-config.js', 'custom-rules.js', 'customization.js', 'factions.js', 'death-effects.js', 'spawn-queue.js', 'settings-ui.js', 'time-controls.js', 'boot.js'])
     new vm.Script(read('src/' + name).toString('utf8'), {filename:name}); // Parse only; do not boot the game.
   GameConfig.fromDocuments(Object.fromEntries(['units','zombies','buildings','powers','levels']
     .map(name => [name,JSON.parse(read('config/defaults/' + name + '.json'))])));

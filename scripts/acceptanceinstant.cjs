@@ -589,7 +589,7 @@ module.exports = async function instantAcceptance(h) {
     await page.locator('[data-toggle-waves]').click();await settled();const resumed=await state();
     assert.equal(resumed.rules.automaticSpawning,true);assert.equal(resumed.waveProgress.current.id,paused.waveProgress.current.id);assert.equal(resumed.waveProgress.current.spawned,2);
     await closeEditor();
-    for(let frame=0;frame<60&&zombieCount(await state(),32)<3;frame++)await step(1);
+    for(let frame=0;frame<120&&zombieCount(await state(),32)<3;frame++)await step(1);
     const next=await save('14b-pause-waves-not-battle');assert.equal(zombieCount(next,32),3);assert.equal(next.waveProgress.current.spawned,3);
     assert.equal(next.waveProgress.current.id,'independent-wave-current');
     return {before:partial.waveProgress.current,whilePaused:whilePaused.waveProgress.current,manualSpawned:2,battleTicksAdvanced:whilePaused.ticks-paused.ticks,resumed:next.waveProgress.current};
@@ -702,6 +702,104 @@ module.exports = async function instantAcceptance(h) {
     await canvasClick(660,340);for(let frame=0;frame<220&&(await state()).mainState!==2;frame++)await step(1);
     const fourth=await state();assert.equal(fourth.mainState,2);assert.equal(fourth.difficulty,3);assert.deepEqual(await scoreStorage(),stores);assert.equal(fourth.records[2],0);
     return {placement,unlocked:runtimeLocks,customStageFlag:true,actualCanvasStage:4,originalAndCustomScoresPreserved:true,noBuildingsOrResourcesGifted:true};
+  });
+
+  await check('CURRENT-CAMP-DEATH-DIRECTION', 'Fatal hits and the real both-army clear button draw detached human deaths and zombie parts with the current camp horizontal basis, including converted humans; real native frame sequences advance and recycle without leaking a matrix.', async () => {
+    const phases=[];
+    for(const phase of ['damage','clear']) {
+      await fixture('Current camp death '+phase,draft=>{
+        for(const entity of [...draft.config.units.slice(0,5),...draft.config.zombies.slice(0,5)]){entity.moveSpeed=0;if('damage'in entity)entity.damage=0;if('projectileDamage'in entity)entity.projectileDamage=0;}
+      });
+      await openEditor();await page.locator('#ztps-tab-sandbox').click();
+      const rows=await page.evaluate(()=>{
+        const g=ZTPGamePort.state.bb_Game;
+        const definitions=[
+          {name:'friendly-human',side:'friendly',kind:'unit',type:0,x:220,sign:1},
+          {name:'enemy-human',side:'enemy',kind:'unit',type:0,x:460,sign:-1},
+          {name:'friendly-zombie',side:'friendly',kind:'zombie',type:0,x:740,sign:-1},
+          {name:'enemy-zombie',side:'enemy',kind:'zombie',type:0,x:1000,sign:1},
+          {name:'converted-to-enemy-human',side:'friendly',kind:'unit',type:1,x:1250,sign:-1,convert:'enemy'},
+          {name:'converted-to-friendly-human',side:'enemy',kind:'unit',type:4,x:1450,sign:1,convert:'friendly'}
+        ];
+        const bodies=definitions.map(row=>{
+          Customization.spawnFactionUnit(row.side,{kind:row.kind,type:row.type},1);
+          const body=Factions.list(window,{side:row.side,kind:row.kind,type:row.type}).at(-1);
+          if(row.convert)Factions.convert(window,body,row.convert);
+          Object.assign(body,{bbxpos:row.x,bbypos:0,bblayer:0});return body;
+        });
+        window.__qaDeath={rows:definitions,bodies,draws:[],matrices:[],current:null};
+        const qa=window.__qaDeath,ctx=document.querySelector('#game').getContext('2d'),draw=ctx.drawImage;
+        ctx.drawImage=function(){
+          if(qa.current&&qa.draws.length<4096){const m=this.getTransform();qa.draws.push({...qa.current,a:m.a,b:m.b,c:m.c,d:m.d,e:m.e,f:m.f});}
+          return draw.apply(this,arguments);
+        };
+        for(const [kind,Class]of [['death',ZTPGamePort.bb_Death],['part',ZTPGamePort.bb_BodyPart]]){
+          const original=Class.prototype.bbDraw;
+          Class.prototype.bbDraw=function(){
+            const row=qa.rows.reduce((nearest,candidate)=>Math.abs(candidate.x-this.bbxpos)<Math.abs(nearest.x-this.bbxpos)?candidate:nearest),before=ctx.getTransform(),previous=qa.current;
+            qa.current={kind,name:row.name,x:this.bbxpos,y:this.bbypos,frame:this.bbframe,vx:this.bbvelx};
+            try{return original.apply(this,arguments);}
+            finally{const after=ctx.getTransform();qa.matrices.push({name:row.name,balanced:['a','b','c','d','e','f'].every(key=>before[key]===after[key])});qa.current=previous;}
+          };
+        }
+        return definitions.map((row,index)=>({...row,currentSide:Factions.getSide(window,bodies[index])}));
+      });
+      evidence.syntheticFixtures.push({name:'Current-camp death '+phase,synthetic:true,notNaturalFullStage:true,
+        method:'Paused public spawn/convert APIs position six stationary witnesses. Damage phase invokes the original fatal Infect/Smack handlers, then original ticks create deaths; clear phase uses the actual both-army button. Actual Canvas drawImage transforms are observed and forwarded, not replaced. Native screenshots retain multiple real animation frames.',actors:rows});
+      if(phase==='damage')await page.evaluate(()=>{for(const body of window.__qaDeath.bodies){const amount=body.bbhealth+1;if(typeof body.bbInfect==='function'&&body.bbunit.bbtype<32)body.bbInfect(amount);else body.bbSmack(amount,1);}});
+      else await page.locator('[data-clear-troops="all"]').click();
+      await closeEditor();await step(1);await screenshot(artifact('16-'+phase+'-death-frame-01.png'));
+      await step(6);await screenshot(artifact('16-'+phase+'-death-frame-07.png'));
+      await step(6);await screenshot(artifact('16-'+phase+'-death-frame-13.png'));
+      const drawn=await page.evaluate(()=>({draws:window.__qaDeath.draws,matrices:window.__qaDeath.matrices}));
+      for(const row of rows){
+        const actual=drawn.draws.filter(draw=>draw.name===row.name);
+        assert.ok(actual.length>0,'Actual image draw is required: '+phase+' '+row.name);
+        assert.ok(actual.every(draw=>Math.sign(draw.a)===row.sign),'Current camp must determine actual horizontal draw basis: '+phase+' '+row.name);
+        if(row.kind==='unit')assert.ok(new Set(actual.map(draw=>draw.frame)).size>1,'A native death animation must advance, not remain a static flipped image');
+      }
+      assert.ok(drawn.matrices.length&&drawn.matrices.every(value=>value.balanced),'Every detached death draw must restore the real canvas transform');
+      await step(300);
+      const remaining=await page.evaluate(()=>{const g=ZTPGamePort.state.bb_Game;return ['bbdeathlist','bbbodyparts'].reduce((total,key)=>{const it=g[key].bbObjectEnumerator();while(it.bbHasNext()){it.bbNextObject();total++;}return total;},0);});
+      assert.equal(remaining,0,'Original detached death physics/animations recycle normally');
+      phases.push({phase,actors:rows,draws:drawn.draws,matrixDraws:drawn.matrices.length,allMatricesBalanced:true,recycled:true});
+    }
+    return {scope:'Actual full renderer draws and native screenshots; no natural full-stage or pixel-equivalence claim.',phases};
+  });
+
+  await check('FOUR-HUNDRED-ACTOR-FULL-RUNTIME', 'A positioned 400-actor cross-camp battle retains every live unit and computes real damage while complete update/render frames advance; timings are recorded, not asserted as a universal FPS promise.', async () => {
+    await fixture('Four hundred actor full runtime',draft=>{
+      for(const entity of [...draft.config.units.slice(0,5),...draft.config.zombies.slice(0,5)]){entity.moveSpeed=0;entity.health=1000000;if('damage'in entity)entity.damage=1;if('projectileDamage'in entity)entity.projectileDamage=1;}
+    });
+    await openEditor();await page.locator('#ztps-tab-sandbox').click();
+    const setup=await page.evaluate(()=>{
+      const started=performance.now();Customization.spawnFactionUnit('friendly',{kind:'unit',type:0},200);Customization.spawnFactionUnit('enemy',{kind:'unit',type:0},200);
+      for(const side of ['friendly','enemy'])Factions.list(window,{side}).forEach((body,index)=>Object.assign(body,{bbxpos:(side==='friendly'?600:650)+(index%20),bbypos:0,bblayer:0}));
+      return {milliseconds:performance.now()-started,actors:Factions.list(window).length};
+    });
+    assert.equal(setup.actors,400);evidence.syntheticFixtures.push({name:'400-actor render pressure',synthetic:true,notNaturalRecruitment:true,
+      method:'Public immediate APIs create 200 ordinary humans in each camp; only positions are arranged for contact. Config sets high HP/zero movement to retain 400 actors while real original attack timers/damage and complete runtime rendering execute. Setup, Playwright serialization, and wall-yield time are excluded from frame CPU samples.',actors:400});
+    await closeEditor();
+    const samples=[];
+    for(const dock of ['closed','open']){
+      if(dock==='open'){await openEditor();await togglePlayback();await freeze();}
+      const sample=await page.evaluate(async()=>{
+        const g=ZTPGamePort.state.bb_Game,diag=ZTPRuntime.getStatus().diagnostics;
+        const inspect=()=>{const actors=Factions.list(window);return {ticks:g.bbgameticks,frames:diag.frames,drawCalls:diag.drawCalls,hp:actors.reduce((total,body)=>total+body.bbhealth,0),attackModes:actors.reduce((counts,body)=>{counts[body.bbmode]=(counts[body.bbmode]||0)+1;return counts;},{})};};
+        ZTPRuntime.step(2); // Exclude the first resumed integer-clock boundary.
+        const rate=ZTPRuntime.getStatus().updateRate,stageFrameRate=ZTPRuntime.getStatus().stageFrameRate,gameSpeed=g.bbgamespeed,before=inspect();
+        const times=[];for(let sample=0;sample<12;sample++){const start=performance.now();ZTPRuntime.step(10);times.push((performance.now()-start)/10);await new Promise(resolve=>setTimeout(resolve,0));}
+        const sorted=times.slice().sort((a,b)=>a-b),after=inspect();
+        return {rate,stageFrameRate,gameSpeed,before,after,actors:Factions.list(window).length,meanMillisecondsPerFrame:times.reduce((sum,value)=>sum+value,0)/times.length,medianMillisecondsPerFrame:sorted[Math.floor(sorted.length/2)],p95MillisecondsPerFrame:sorted[Math.ceil(sorted.length*.95)-1],samples:times};
+      });
+      assert.equal(sample.rate,60,'Custom battles must restore the original post-intro 60 Hz cadence');assert.equal(sample.stageFrameRate,60);assert.equal(sample.gameSpeed,2);
+      assert.equal(sample.actors,400,'Pressure acceptance must not silently drop/cull actors');assert.equal(sample.after.frames-sample.before.frames,120);
+      assert.equal(sample.after.ticks-sample.before.ticks,240,'120 complete 60 Hz frames at original speed 2 must execute 240 real game ticks');assert.ok(sample.after.drawCalls-sample.before.drawCalls>=400*120,'Full sprite rendering must not be skipped to improve timings');
+      assert.ok(sample.after.hp<sample.before.hp,'Real damage must still be calculated while pressure frames execute');
+      assert.ok(Number.isFinite(sample.meanMillisecondsPerFrame)&&sample.meanMillisecondsPerFrame>0);samples.push({dock,...sample});
+      await screenshot(artifact('17-four-hundred-actors-'+dock+'.png'));
+    }
+    return {scope:'One-machine acceptance smoke timings, not a baseline comparison or guaranteed FPS. Dedicated CPU profiling separately documents reproducible before/after results.',setup,samples};
   });
 
   await check('INDEPENDENT-TIME-DIMENSION', 'The independent time panel owns pause/resume and 0.5×/2× numeric/preset controls; actual runtime elapsed time and simulation ticks scale without changing original game speed or replaying paused time.', async () => {

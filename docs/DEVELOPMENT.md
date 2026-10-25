@@ -176,6 +176,8 @@ All snippets above show selected fields only: merge the values into the matching
 
 The runtime targets **60 base updates per second**. The original `bbgamespeed` selects battle ticks per game update (default **2**, its in-game button cycles **1–4**). The **time controls embedded at the top of the F2 settings panel** multiplies the update clock with **0–20×** speed in **0.1** steps. **1×** preserves the original game's current speed, not one battle tick per frame; **0** stops simulation frames. Speed is session-only, not stored in presets or across restarts.
 
+Custom-session auto-start follows the normal gameplay cadence: after `EndMovie()`, the controller calls the original `bb_mojo_app_SetUpdateRate(60)` before `bbPlayGame(stage)`. This applies to both a new F2 custom battle and restoring a saved custom battle after reload. Previously, that path bypassed the normal intro-to-game transition and retained the intro's 30 Hz scheduler; default battle time still advanced at about 120 ticks/second, but four battle ticks were grouped into each frame instead of two at 60 Hz. The fix restores the update/render scheduling cadence, not a different damage or attack-frequency formula. A 60 Hz scheduling target is not a measured or guaranteed 60 FPS on every device.
+
 - At a steady update rate, ticks/second ≈ `60 × bbgamespeed × timeScale`; default is 120.
 - `buildTicks` and `cooldownTicks` count battle ticks. Wave `delay` uses its own scheduler, not this tick formula.
 - Displayed game time remains `battleTicks / 120`.
@@ -190,6 +192,7 @@ The runtime targets **60 base updates per second**. The original `bbgamespeed` s
 | `src/game-config.js` | Validate JSON and adapt it to the game's tables and behavior |
 | `src/custom-rules.js` | Validated spawning and ability switches outside generated code |
 | `src/factions.js` | Species-independent allegiance, cross-camp targeting/combat, and rendering adapter |
+| `src/death-effects.js` | Current-camp orientation for detached death sprites and fragments |
 | `src/spawn-queue.js` | Compact independent-rate manual jobs, fair dispatch, and job snapshots |
 | `src/customization.js` | Named presets, validated immediate commits, sandbox actions, and separate custom records |
 | `src/settings-ui.js` / `.css` | Non-modal settings dock, field editors, wave controls, and sandbox buttons |
@@ -278,6 +281,12 @@ Preset load/import methods above return data only; the settings UI immediately f
 `spawnFactionUnit` returns `{side,kind,type,count,positions}`; the two compatibility shortcuts retain `{type,count,positions}`. These are immediate low-level calls; the player-facing batch form uses the queued path below, while five human cards and five zombie cards spawn immediately for their respective camp. Both camp forms remain visible and retain independent type/count/rate drafts. All twenty camp/species combinations are supported: e.g. enemy Preachers/Survivalists and friendly Fat Zombies. Each enters from its selected side's natural origin (**friendly x = 0, enemy x = 1600**) and uses source-species configured/group stats without an Angry Mob bonus. Manual generation costs no cash/XP, changes no paid order, and reserves no recruitment population. Non-reserved population bookkeeping prevents death or clearing from refunding another paid unit/order's population. Both camps share the 1,000-active-entity guard; oversized batches are rejected before creation.
 
 `src/factions.js` separates source species from current allegiance rather than treating a camp switch as a cosmetic flag. Cross-camp units face/move toward the opposing side and target its actors/base with their type's combat behavior. Conversion changes allegiance, and typed clearing uses current camp. Numeric group modifiers still follow species, not allegiance; this is not a way to make enemy humans use zombie tables or vice versa. Projectiles retain their launch allegiance if their shooter is later converted. The cross-camp Preacher adapter can convert opposing mobile humans/zombies (range 320, base-HP budget 1,000, bases excluded); the native friendly Preacher retains its original zombie eligibility.
+
+Dense cross-camp targeting avoids building/sorting a full target array for every human on every tick. Idle acquisition uses a stable linear nearest-target scan; busy non-hit animation frames do not query targets. Only actual machine-gun/Preacher hit events sort the eligible subset using the original priority and tie order. A tick-scoped cache holds raw camp-member references, not stale positions/HP/modes; live values are read for each decision. Actor-list mutations or list/head replacement invalidate the cache, and tick exit/exception restores its scope. These changes retain target order, damage sharing, conversions, animation hit timing, fixed update frequency, and RNG.
+
+**Death visual direction.** `DeathEffects.install(target)` runs after `Factions.install(target)` and before game initialization. It adapts the original detached death effects rather than changing a combat actor's damage/death state. `DeathEffects.tag(target, effect, body)` gives sandbox-created death visuals the same orientation handling as normal combat deaths.
+
+Direction is captured from the actor's current allegiance at death, not its original species: enemy humans mirror the native left-falling human sprite to fall right; friendly zombies mirror their native zombie fragment sprites and initial horizontal fragment velocity. Converted actors use their new allegiance. Native friendly humans and native enemy zombies retain their original visuals. Source-relative cosmetic blast offsets are mirrored with the source as well. Death visuals remain non-attacking, follow normal pause/update/recycle behavior, and do not change XP, population, hit timing, damage budgets, or RNG draws. This is not a balance setting or a saved preset field.
 
 `getBattleStatus().factions` reports `{friendly:{units,zombies},enemy:{units,zombies}}` from current allegiance. `powerProgress` in both battle status and controller state reports `{pendingTotal,groups:[{type,count,source,side?}]}` for queued skill dispatch. `side` appears only on sandbox groups; normal skill snapshots retain their previous shape.
 
@@ -385,6 +394,20 @@ Storage keys are stable across release versions: `zombie-builders-presets-v1` (u
 If profile storage is unavailable or full, ordinary live changes may continue in memory with a warning and will not be promised across restarts. Operations that require reloading—starting a custom battle or returning to original mode—must successfully save their session first; otherwise they report the error and keep the current battle instead of reloading with lost rules.
 
 Keep handwritten configuration behavior in `src/game-config.js`. Regenerating `src/generated-game.js` does not overwrite `config/`. `data/raw.json` is baseline data used by checks, not the user-facing balance configuration. New entity types or new mechanics also require changes to game behavior, animation, and UI code.
+
+## Dense-battle profiling
+
+Use `scripts/profile-performance.cjs` for controlled source comparisons. Its baseline is the stored `v0.4.1` tag; `--current` measures the working source. Run the local game server first and point the profiler at that server:
+
+```powershell
+$env:GAME_URL = 'http://127.0.0.1:8318'
+node scripts/profile-performance.cjs --browser --quick
+node scripts/profile-performance.cjs --browser --quick --current
+```
+
+`--quick` uses 400 actors. The full matrix uses 250, 400, and 800 actors in native walking, mixed native, cross-camp human, and dense cross-camp scenes, with settings closed/open. The synthetic fixture keeps actor counts stable with elevated HP; dense scenes also fix positions and movement. It still executes complete game updates and rendering for every actor. Reports, frozen source snapshots, and CPU profiles are retained in unique `output/perf-*` directories.
+
+Browser results measure CPU time submitting the actual Canvas frame, separated into update/render/full-frame distributions; they are not guaranteed RAF FPS or GPU-completion time. Without `--browser`, the Node VM retains real gameplay but uses mock drawing and must not be presented as desktop rendering performance. Compare identical fixtures, counts, warm-up, and frame budgets; preserve target order, leftover-damage distribution, hit timing, conversions, and RNG rather than dropping units or simulation updates. Keep measured before/after results and acceptance scope in the release record instead of promising a universal unit-count/frame-rate limit.
 
 ## Checks and packaging
 
