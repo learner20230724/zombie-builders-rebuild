@@ -1,6 +1,6 @@
 # v0.4.1 verification / 验收记录
 
-状态：**实现、自动回归、构建、网页及最终 Electron／EXE 验收通过；桌面快捷方式已更新，待完成仓库同步及 Release 发布。**
+状态：**实现、自动回归、构建、网页及最终 Electron／EXE 验收通过；已同步仓库并公开发布 v0.4.1，桌面快捷方式已更新。**
 
 ## Scope / 本次范围
 
@@ -33,10 +33,10 @@
 
 ## Delivery / 交付
 
-本地最终程序：`output/desktop-v0.4.1/ZombieBuilders.exe`（ProductVersion 0.4.1）。现有桌面“建筑工大战僵尸”快捷方式已从 v0.4.0 更新到该 EXE，并复核目标和 ProductVersion 0.4.1；未启动或关闭用户游戏。Release 与公开资产验证待补充，尚不宣称公开发布。本文档不在发行运行文件集合内，补充交付记录不改变已验收程序。
+本地最终程序：`output/desktop-v0.4.1/ZombieBuilders.exe`（ProductVersion 0.4.1）。现有桌面“建筑工大战僵尸”快捷方式已从 v0.4.0 更新到该 EXE，并复核目标和 ProductVersion 0.4.1；未启动或关闭用户游戏。已同步仓库并发布 [v0.4.1 Release](https://github.com/learner20230724/zombie-builders-rebuild/releases/tag/v0.4.1)，标签对应 `44e3e32ef13cf50f92f1fc6339559279468fd087`。三个资产（桌面 ZIP、Web ZIP 和校验清单）全部上传；匿名核对 latest 为 v0.4.1，全部资产大小及 GitHub 服务端 SHA-256 与本地一致，公开 `SHA256SUMS.txt` 完整下载后逐字节匹配。大 ZIP 未再次完整公开回下载，完整 CRC／源文件校验在本地完成，不混淆两种验证口径。证据：`output/releases/v0.4.1/published.json`、`output/releases/v0.4.1/public-download-verification.json`。本文档不在发行运行文件集合内，补充交付记录不改变已验收程序。
 
 ## Coverage / 覆盖口径
 
 脚本明确标记了非零存档夹具、暂停时直接 API 建场和仅调整位置的技能交战夹具；伤害、投弹／飞行／落地和动画回收均走实际运行时。没有宣称自然通关四关、穷尽所有动画组合、原生 Flash 等价、干净机器或 SmartScreen 验证。
 
-English: v0.4.1 adds atomic both-army clearing with native death animations, persistent parallel camp spawn panels, six immediate camp-specific power icons, and score-isolated unlock-all including the original four-stage menu. Passed: 477 automated tests, build/105 asset hashes, browser smoke/19-step journey, source Electron 39/39, packaged EXE 41/41 including ZIP relocation, and complete local archive CRC/source/license verification. Independent review also passed 267 targeted tests and default-path parity over 9,600 full update/render frames. Both native reports retain genuine screenshots with no capture warnings or runtime/request errors. Isolated QA profiles show no residual processes; the owned local server was stopped. The existing desktop shortcut now targets the verified v0.4.1 EXE. Public publication remains pending final confirmation below.
+English: v0.4.1 adds atomic both-army clearing with native death animations, persistent parallel camp spawn panels, six immediate camp-specific power icons, and score-isolated unlock-all including the original four-stage menu. Passed: 477 automated tests, build/105 asset hashes, browser smoke/19-step journey, source Electron 39/39, packaged EXE 41/41 including ZIP relocation, and complete local archive CRC/source/license verification. Independent review also passed 267 targeted tests and default-path parity over 9,600 full update/render frames. Both native reports retain genuine screenshots with no capture warnings or runtime/request errors. Isolated QA profiles show no residual processes; the owned local server was stopped. The existing desktop shortcut now targets the verified v0.4.1 EXE. v0.4.1 is published and anonymously verified as latest: all asset sizes/server SHA-256 match, and the full public checksum manifest matches local bytes. Large public ZIPs were not downloaded again; their complete local CRC/source verification is recorded separately.
