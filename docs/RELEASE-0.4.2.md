@@ -1,6 +1,6 @@
 # v0.4.2 verification / 验收记录
 
-状态：**实现、完整自动回归、构建、浏览器及源码／最终发行 EXE（含完整 ZIP 搬移）验收通过；桌面快捷方式已更新，待仓库同步与公开发布。**
+状态：**实现、完整自动回归、构建、浏览器及源码／最终发行 EXE（含完整 ZIP 搬移）验收通过；桌面快捷方式已更新，已同步仓库并公开发布 v0.4.2。**
 
 ## Scope / 本次范围
 
@@ -63,10 +63,10 @@ B1／B2 保留其启动调度修复前的原始源码哈希，不冒充最终发
 | `zombie-builders-desktop-win-x64-v0.4.2.zip` | 204,900,725 | 409 | 336 | `1a32421a1dc55866654cde9e7fe5d805103b587cacd0ce283c59700ca264f390` |
 | `zombie-builders-web-v0.4.2.zip` | 43,478,220 | 338 | 337 | `e5b73dea3cab084605f37f94a7d2adbcb77e424a66e15e1f4d87ead5c35e42c3` |
 
-现有桌面“建筑工大战僵尸”快捷方式已由 v0.4.1 更新到上述 v0.4.2 EXE，已复核目标与 ProductVersion；没有启动／关闭用户游戏或修改用户存档。仓库同步、Release 资产上传和匿名公开验证待完成。本文档不在运行包文件集合中，后续补充验收不改变已冻结程序。
+现有桌面“建筑工大战僵尸”快捷方式已由 v0.4.1 更新到上述 v0.4.2 EXE，已复核目标与 ProductVersion；没有启动／关闭用户游戏或修改用户存档。已同步仓库并公开发布 [v0.4.2 Release](https://github.com/learner20230724/zombie-builders-rebuild/releases/tag/v0.4.2)，标签对应 `82a77d18113d8ddc1f6af5b499e61b950bf48cb5`。桌面 ZIP、Web ZIP 与 `SHA256SUMS.txt` 三个资产全部上传；匿名访问确认 latest 为 v0.4.2，三个资产的字节数／GitHub 服务端 SHA-256 与本地一致，公开校验清单完整下载后逐字节一致。大型公开 ZIP 没有再次全量下载；其完整 CRC 和逐文件源码哈希已在本地验证，不混淆两种验证口径。证据：`output/releases/v0.4.2/published.json`、`output/releases/v0.4.2/public-download-verification.json`。本文档不在运行包文件集合中，后续补充验收不改变已冻结程序。
 
 ## Coverage / 覆盖口径
 
 压力单位数／血量／摆位，以及死亡验证的直接 spawn／convert／原伤害 API 均明确作为合成夹具。攻击、伤害、投射物与动画更新仍走真实运行时；绘图观察器原样转发真实调用。没有宣称自然通关四关、穷尽所有自定义组合、原生 Flash 等价、干净机器、签名或 SmartScreen 验证。
 
-English: v0.4.2 aligns detached death visuals with the current camp, reduces repeated cross-camp target allocation/sorting, and restores the original nominal 60 Hz cadence when loading a custom battle. Measured headless Edge ABBA tests retain full updates/rendering and all actors; 400-unit cross-human scenarios take about 3.1–3.7 times less mean frame CPU time in the specified closed-panel fixture, not a universal FPS guarantee. Source Electron 41/41, final packaged EXE 43/43 including complete ZIP relocation, browser journey 20/20, full regression 497/497 and local archive/source/license checks passed. Both native reports retain 44 genuine screenshots without capture/runtime/request errors; owned QA profiles show no residual processes and the local server was stopped. The desktop shortcut now points to the verified v0.4.2 EXE; public publication remains pending.
+English: v0.4.2 aligns detached death visuals with the current camp, reduces repeated cross-camp target allocation/sorting, and restores the original nominal 60 Hz cadence when loading a custom battle. Measured headless Edge ABBA tests retain full updates/rendering and all actors; 400-unit cross-human scenarios take about 3.1–3.7 times less mean frame CPU time in the specified closed-panel fixture, not a universal FPS guarantee. Source Electron 41/41, final packaged EXE 43/43 including complete ZIP relocation, browser journey 20/20, full regression 497/497 and local archive/source/license checks passed. Both native reports retain 44 genuine screenshots without capture/runtime/request errors; owned QA profiles show no residual processes and the local server was stopped. The desktop shortcut now points to the verified v0.4.2 EXE; v0.4.2 is published and anonymously verified as latest, with matching asset sizes/server SHA-256 and a full public checksum-manifest download. Large public ZIPs were not downloaded again; their complete local CRC/source verification is recorded separately.
