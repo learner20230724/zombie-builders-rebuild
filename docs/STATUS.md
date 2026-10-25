@@ -10,10 +10,11 @@
 | Customization / 二开 | Non-modal F2 dock; valid edits, preset loads/imports, reset, and undo commit automatically. / F2 并列设置；有效字段、载入／导入、恢复与撤销自动生效，无需应用按钮。 |
 | Time / 时间 | Pause and 0–20× clock controls at the top of F2 settings (0.1 steps); no floating customization widgets. / F2 设置顶部暂停与 0–20 倍速控制（步长 0.1），游戏画面无额外悬浮自定义控件。 |
 | Group stats / 全体倍率 | Separate human/zombie HP, movement, and damage multipliers by species, not allegiance; bases excluded. / 人类与僵尸按物种独立生命、移速、伤害倍率，不随阵营改变，不影响基地。 |
-| Powers / 技能 | All five Angry Mob survivor types; queued large summons; selected/all power-effect cancellation. / 愤怒暴民可设五种己方兵，大数量排队分批出兵，可取消当前／全部技能效果。 |
+| Powers / 技能 | Friendly/enemy one-click releases for all three powers, all five Angry Mob survivor types, queued large summons, and selected/all effect cancellation. / 双方各三技能一键释放，愤怒暴民可设五种兵、大数量排队，可取消当前／全部效果。 |
 | Troop counts / 在场兵力 | Live friendly/enemy counts for all ten species and totals, by current allegiance; living non-base actors only. / 十种单位双方数量及合计实时统计，按当前阵营，只计存活非基地角色。 |
 | Building limits / 建筑上限 | Live caps; zero removes the gameplay cap, with a separate engine safety guard. / 上限本局更新，0 取消玩法上限，另有引擎安全保护。 |
-| Sandbox / 沙盒 | Immediate one-click zombies; independent per-job spawn rates for all ten species in either camp, with current-allegiance typed clearing, both-base max/current HP, and tracked live waves with newest-first display and independent wave pause. / 即时一键僵尸、双方各十种类型的独立速率队列、按当前阵营和类型清兵、双方基地最大／当前生命及按身份更新波次（新增组置顶显示，可独立暂停）。 |
+| Sandbox / 沙盒 | Parallel persistent camp spawn panels and immediate cards; independent per-job rates for all ten species, atomic both-army or typed clearing, both-base HP, newest-first waves and independent wave pause. / 双方出兵区并列，各十种类型的独立速率队列与即时图标；双方一键／按类型清兵、基地血量、波次置顶显示与独立暂停。 |
+| Unlock / 解锁 | One-click custom building/power/stage access without awarding resources or original wins. / 一键解锁自定义建筑、技能和关卡，不赠资源、不改原版成绩。 |
 | Packaging / 打包 | Windows x64 Electron desktop and portable web packaging tools. / Windows x64 Electron 桌面包与网页便携包的构建工具。 |
 
 [English README](../README.md) · [中文说明](../README.zh-CN.md) · [Development](DEVELOPMENT.md) · [二次开发](DEVELOPMENT.zh-CN.md)

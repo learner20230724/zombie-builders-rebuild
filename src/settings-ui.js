@@ -30,7 +30,7 @@
     buildTicks: ['生产 / 蓄力时间', '战斗 tick', '保留进度'], cooldownTicks: ['冷却时间', '战斗 tick', '保留进度'],
     dependency: ['所需建筑 ID', '0–5（见建筑页）', '下局'], people: ['占用人口', '人', '下局'], maximum: ['最大建筑数', '0 = 不设上限', '立即'],
     hitRadius: ['水平命中半径', '距离', '立即'], hitOffset: ['水平命中偏移', '距离', '立即'], xp: ['技能所需经验', 'XP', '立即'],
-    unlockAfterStage: ['通关解锁要求', '0=直接；1–4=需通关', '下局'],
+    unlockAfterStage: ['通关解锁要求', '0=直接；1–4=需通关', '下局'], unlockAllStages: ['解锁全部关卡', '开 / 关', '立即'],
     shovelCount: ['暴民铲工数量', '人', '下次技能'], shotgunCount: ['暴民农夫数量', '人', '下次技能'],
     survivalistCount: ['暴民机枪手数量', '人', '下次技能'], bomberCount: ['暴民炸弹手数量', '人', '下次技能'], preacherCount: ['暴民牧师数量', '人', '下次技能'],
     angerSpeedMultiplier: ['暴民速度倍率', '倍', '立即（含在场暴民）'], jetCount: ['空袭飞机数量', '架', '下次技能'],
@@ -93,10 +93,12 @@
     let opened = false, pauseToken, pollTimer, previousFocus = null, draft, baseline, baselineSaved = false, selectedPresetId = '', activeTab = 'sandbox', lastBattleStage = null, waveSequence = 0;
     let selection = {units: 0, zombies: 0, buildings: 0, powers: 0, levels: 0}, wavePage = 0, reinforcementPage = 0, reinforcementIndex = 0;
     const undo = [], invalid = new Map(), cleanups = [], consumedKeys = new Set();
-    let disposed = false, clearingTroops = false, spawningBatch = false, cancelingPowerEffects = false, togglingWaves = false, committing = false, commitSequence = 0, committedSequence = 0, commitQueue = Promise.resolve();
+    let disposed = false, clearingTroops = false, cancelingPowerEffects = false, togglingWaves = false, unlockingAll = false, unlockEpoch = 0, committing = false, commitSequence = 0, committedSequence = 0, commitQueue = Promise.resolve();
+    const spawningBatches = new Set(), releasingPowers = new Set();
     const baseQueues = {friendly: Promise.resolve(), enemy: Promise.resolve()};
     const spawnJobNodes = new Map(), spawnJobRateQueues = new Map(), cancelingSpawnJobs = new Set();
-    let cancelingAllSpawnJobs = false, spawnFormRate;
+    let cancelingAllSpawnJobs = false;
+    const spawnForms = {friendly:{species:'unit-0',count:'1',rate:undefined},enemy:{species:'zombie-0',count:'1',rate:undefined}};
     function node(tag, className, text) {
       const el = doc.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = String(text); return el;
     }
@@ -126,13 +128,14 @@
       snapshot(); assign(draft); updateDirty(); return commitDraft(path !== 'rules.automaticSpawning');
     }
     function commitDraft(mergeAutomaticSpawning = false) {
-      const next = validateDraft(clone(draft)), sequence = ++commitSequence, healthPolicy = hpPolicy.value;
+      const next = validateDraft(clone(draft)), sequence = ++commitSequence, healthPolicy = hpPolicy.value, capturedUnlockEpoch = unlockEpoch;
       committing = true; updateDirty();
       const pending = commitQueue.then(async () => {
         if (disposed) return;
         // Independent field edits queued while the dedicated wave switch is
         // pending must not re-enable an old automatic-spawning snapshot.
         if(mergeAutomaticSpawning)next.rules.automaticSpawning=state().rules.automaticSpawning;
+        if(capturedUnlockEpoch<unlockEpoch)mergeUnlocked(next,state());
         // One atomic controller transaction, never separate config/rules writes.
         const report = await controller.commitSettings(next, {healthPolicy});
         committedSequence = sequence;
@@ -343,9 +346,10 @@
       const status = content.querySelector('[data-battle-status]');
       if (status) status.textContent = s.isCustom && s.isBattle ? '自定义战局 · 第 ' + s.stage + ' 关' + (ownsPause ? ' · 设置暂停中' : ' · 设置与游戏可同时操作') : s.isBattle ? '原版战局 · 修改参数后转为自定义'  : '先选择关卡，开始自定义战局。';
       for (const b of content.querySelectorAll('[data-spawn]')) b.disabled = !(s.isCustom && s.isBattle) || typeof controller.spawnZombie !== 'function';
-      for (const b of content.querySelectorAll('[data-spawn-batch]')) b.disabled = spawningBatch || !(s.isCustom && s.isBattle) || typeof controller.enqueueSpawn !== 'function';
+      for (const b of content.querySelectorAll('[data-spawn-friendly]')) b.disabled = !(s.isCustom && s.isBattle) || typeof controller.spawnFriendlyUnit !== 'function';
+      for (const b of content.querySelectorAll('[data-spawn-batch]')) b.disabled = spawningBatches.has(b.dataset.side) || !(s.isCustom && s.isBattle) || typeof controller.enqueueSpawn !== 'function';
       for (const b of content.querySelectorAll('[data-clear-troops]')) {
-        const method = b.dataset.clearTroops === 'friendly' ? 'clearFriendlyTroops' : 'clearEnemyTroops';
+        const method = b.dataset.clearTroops === 'all' ? 'clearAllTroops' : b.dataset.clearTroops === 'friendly' ? 'clearFriendlyTroops' : 'clearEnemyTroops';
         b.disabled = clearingTroops || !(s.isCustom && s.isBattle) || typeof controller[method] !== 'function';
       }
       for (const b of content.querySelectorAll('[data-clear-selected]')) {
@@ -353,6 +357,8 @@
         b.disabled = clearingTroops || !(s.isCustom && s.isBattle) || typeof controller[method] !== 'function';
       }
       for (const b of content.querySelectorAll('[data-cancel-power-effects]')) b.disabled = cancelingPowerEffects || !(s.isCustom && s.isBattle) || typeof controller.cancelPowerEffects !== 'function';
+      for (const b of content.querySelectorAll('[data-release-power]')) b.disabled = releasingPowers.has(b.dataset.side+':'+b.dataset.releasePower) || !(s.isCustom && s.isBattle) || typeof controller.releaseSandboxPower !== 'function';
+      for (const b of content.querySelectorAll('[data-unlock-all]')) b.disabled = unlockingAll || typeof controller.unlockAll !== 'function';
       for(const b of content.querySelectorAll('[data-toggle-waves]')){b.textContent=s.rules.automaticSpawning?'暂停波次':'继续波次';b.disabled=togglingWaves||typeof controller.commitSettings!=='function';b.setAttribute('aria-pressed',String(!s.rules.automaticSpawning));}
       for(const text of content.querySelectorAll('[data-wave-pause-status]'))text.textContent=s.rules.automaticSpawning?'波次进行中':'波次已暂停（保留进度）';
       const bases = battle.bases || s.bases;
@@ -425,11 +431,15 @@
       const toolbar = node('div', 'ztps-section-heading'), picker = node('select'); picker.setAttribute('aria-label', '选择' + TABS.find(t => t[0] === kind)[1]);
       draft.config[kind].forEach((item, i) => option(picker, i, NAMES[kind][item.id - (kind === 'levels' ? 1 : 0)] + ' · ' + item.name)); picker.value = String(selection[kind]);
       picker.addEventListener('change', () => { selection[kind] = Number(picker.value); wavePage = reinforcementPage = reinforcementIndex = 0; render(); });
-      toolbar.appendChild(labeled('编辑对象', picker)); content.appendChild(toolbar);
+      toolbar.appendChild(labeled('编辑对象', picker));
+      if(kind==='levels') {
+        const unlock=button('一键解锁建筑、技能和关卡',()=>action(unlockAll,true),'ztps-primary');unlock.dataset.unlockAll='true';toolbar.appendChild(unlock);
+      }
+      content.appendChild(toolbar);
       const index = selection[kind], entity = draft.config[kind][index], original = defaults().config[kind].find(item => item.id === entity.id);
       if (kind === 'levels') { const editing = node('p', 'ztps-editing-stage'); editing.dataset.editingStage = String(entity.id); content.appendChild(editing); }
       if (kind === 'buildings') { const actual = node('p', 'ztps-building-status'); actual.dataset.buildingStatus = String(entity.id); content.appendChild(actual); }
-      if (kind === 'powers') renderPowerCancellation(entity.id);
+      if (kind === 'powers') {renderPowerRelease();renderPowerCancellation(entity.id);}
       // Preserve legacy JSON fingerprints; absent optional counts are zero in
       // the view only until the user actually changes one of these controls.
       let displayed = entity, displayedOriginal = original;
@@ -447,6 +457,51 @@
       }
       if (kind === 'buildings') content.appendChild(node('p', 'ztps-help', '最大数量填 0 不设玩法上限；降低上限不会拆除已有建筑。'));
       if (kind === 'levels') { renderWaves(entity, index); renderReinforcements(entity, index); }
+    }
+    function mergeUnlocked(target,source) {
+      for(const kind of ['units','buildings'])for(let i=0;i<target.config[kind].length;i++)if(Object.prototype.hasOwnProperty.call(source.config[kind][i],'dependency'))target.config[kind][i].dependency=source.config[kind][i].dependency;
+      for(let i=0;i<target.config.powers.length;i++)target.config.powers[i].unlockAfterStage=source.config.powers[i].unlockAfterStage;
+      if(Object.prototype.hasOwnProperty.call(source.rules,'unlockAllStages'))target.rules.unlockAllStages=source.rules.unlockAllStages;
+    }
+    function unlockAll() {
+      if(unlockingAll)return commitQueue;
+      if(typeof controller.unlockAll!=='function')throw new Error('解锁功能不可用。');
+      unlockingAll=true;renderBattleState();
+      const sequence=++commitSequence;committing=true;
+      const pending=commitQueue.then(async()=>{
+        if(disposed)return;
+        const before=clone(draft),report=await controller.unlockAll();
+        if(disposed)return report;
+        unlockEpoch++;mergeUnlocked(draft,typeof controller.getDraft==='function'?controller.getDraft():state());
+        if(!equal(before,draft)){undo.push(before);if(undo.length>30)undo.shift();}
+        committedSequence=sequence;
+        for(const input of content.querySelectorAll('[data-path]'))if(/config\.(units|buildings)\.\d+\.dependency$|config\.powers\.\d+\.unlockAfterStage$/.test(input.dataset.path)&&doc.activeElement!==input)input.value=String(getAt(draft,input.dataset.path));
+        notice('建筑、技能和全部 4 关已解锁。');updateDirty();renderBattleState();return report;
+      });
+      commitQueue=pending.catch(error=>{if(!disposed)notice(error.message||String(error),true);}).finally(()=>{
+        unlockingAll=false;if(sequence===commitSequence)committing=false;if(!disposed)renderBattleState();
+      });
+      return commitQueue;
+    }
+    function renderPowerRelease() {
+      const section=node('section','ztps-power-release');section.appendChild(node('h2','','一键释放'));
+      const camps=node('div','ztps-camp-columns');
+      for(const [side,label] of [['friendly','己方'],['enemy','敌方']]) {
+        const camp=node('section','ztps-camp-card');camp.dataset.powerSide=side;camp.appendChild(node('h3','',label+'阵营'));
+        const cards=node('div','ztps-power-grid');
+        NAMES.powers.forEach((name,id)=>{
+          const key=side+':'+id,b=button('',()=>action(async()=>{
+            if(releasingPowers.has(key))return;
+            if(typeof controller.releaseSandboxPower!=='function')throw new Error('沙盒技能功能不可用。');
+            releasingPowers.add(key);renderBattleState();
+            try{await commitQueue;await controller.releaseSandboxPower(id,side);notice('已为'+label+'释放'+name+'。');}
+            finally{releasingPowers.delete(key);renderBattleState();}
+          },true),'ztps-spawn ztps-power-spawn');
+          b.dataset.releasePower=String(id);b.dataset.side=side;b.setAttribute('aria-label',label+'阵营立即释放'+name);
+          const icon=node('span','ztps-power-icon ztps-power-'+id);icon.setAttribute('aria-hidden','true');b.appendChild(icon);b.appendChild(node('strong','',name));cards.appendChild(b);
+        });camp.appendChild(cards);camps.appendChild(camp);
+      }
+      section.appendChild(camps);content.appendChild(section);
     }
     function renderPowerCancellation(powerId) {
       const section=node('section','ztps-power-actions'),controls=node('div','ztps-clear-actions');
@@ -633,44 +688,48 @@
       content.appendChild(start);
       renderTroopCounts();
       const spawn = node('section', 'ztps-section'); spawn.appendChild(node('h2', '', '一键刷怪'));
-      const cards = node('div', 'ztps-spawn-grid');
-      ZOMBIES.forEach((name, type) => {
-        const b = button('', () => action(async () => { await commitQueue; const result = await controller.spawnZombie(type, 1); notice('已生成 ' + result.count + ' 只' + name + '。'); }, true), 'ztps-spawn'); b.dataset.spawn = String(type);
-        b.setAttribute('aria-label', '生成 1 只敌方' + name);
-        const icon = node('span', 'ztps-zombie-icon ztps-zombie-' + type); icon.setAttribute('aria-hidden', 'true'); b.appendChild(icon); b.appendChild(node('strong', '', name)); b.appendChild(node('small', '', '敌方 ＋ 1 只')); cards.appendChild(b);
-      }); spawn.appendChild(cards);
-      const batch = node('div', 'ztps-batch-controls'), side = node('select'), species = node('select');
-      side.dataset.spawnSide = 'true'; side.setAttribute('aria-label', '批量生成阵营'); option(side,'enemy','敌方'); option(side,'friendly','己方'); side.value='enemy';
-      species.dataset.spawnSpecies = 'true'; species.setAttribute('aria-label', '批量生成类型');
-      addSpeciesOptions(species); species.value = 'zombie-0';
-      const count = node('input'); count.type = 'number'; count.min = '1'; count.max=String(HEALTH_SAFETY_LIMIT); count.step = '1'; count.value = '1'; count.inputMode = 'numeric'; count.dataset.spawnCount = 'true'; count.setAttribute('aria-label', '批量刷怪数量');
-      const quickCount = node('select'); quickCount.dataset.spawnCountPreset = 'true'; quickCount.setAttribute('aria-label', '常用刷怪数量'); for (const n of [1,5,10,50,100]) option(quickCount,n,n+' 只'); quickCount.value='1'; quickCount.addEventListener('change',()=>{ count.value=quickCount.value; });
-      const rate=node('input');rate.type='number';rate.min='0';rate.max='1000000';rate.step='any';rate.inputMode='decimal';rate.dataset.spawnRate='true';rate.setAttribute('aria-label','本批出兵速率（只/游戏秒）');
-      if(spawnFormRate===undefined){const queue=state().spawnQueue;spawnFormRate=queue&&Number.isFinite(queue.rate)?String(queue.rate):'120';}rate.value=spawnFormRate;rate.addEventListener('input',()=>{spawnFormRate=rate.value;});
-      const batchButton = button('加入出兵队列', () => action(async () => {
-        if(spawningBatch)return;
-        const amount = numericValue(count.value), selected=parseSpecies(species.value), selectedSide=side.value, selectedRate=readSpawnRate(rate);
-        if (!Number.isInteger(amount) || amount < 1 || amount>HEALTH_SAFETY_LIMIT) throw new Error('生成数量须为 1–'+HEALTH_SAFETY_LIMIT+' 的整数。');
-        if(typeof controller.enqueueSpawn!=='function')throw new Error('当前出兵队列接口不可用。');
-        spawningBatch=true;renderBattleState();
-        try { await commitQueue; await controller.enqueueSpawn(selectedSide,selected,amount,{rate:selectedRate});spawnFormRate=rate.value; notice('已加入 '+amount+' 个单位；本批 '+selectedRate+' 只/游戏秒'+(selectedRate===0?'（暂停）':'')+'。'); }
-        finally { spawningBatch=false;renderBattleState(); }
-      }, true), 'ztps-primary'); batchButton.dataset.spawnBatch='true';
-      side.addEventListener('change',()=>{renderBattleState();});
-      batch.appendChild(labeled('阵营',side)); batch.appendChild(labeled('类型',species)); batch.appendChild(labeled('常用数量',quickCount)); batch.appendChild(labeled('数量',count));batch.appendChild(labeled('本批出兵速率（只/游戏秒）',rate)); batch.appendChild(batchButton); spawn.appendChild(batch);
+      const camps=node('div','ztps-camp-columns');
+      for(const [side,label] of [['friendly','己方'],['enemy','敌方']]) {
+        const form=spawnForms[side],camp=node('section','ztps-camp-card');camp.dataset.spawnForm=side;camp.appendChild(node('h3','',label+'阵营'));
+        const cards=node('div','ztps-spawn-grid');
+        (side==='friendly'?NAMES.units.slice(0,5):ZOMBIES).forEach((name,type)=>{
+          const b=button('',()=>action(async()=>{
+            await commitQueue;const result=side==='friendly'?await controller.spawnFriendlyUnit(type,1):await controller.spawnZombie(type,1);notice('已生成 '+result.count+' 个'+label+name+'。');
+          },true),'ztps-spawn');
+          if(side==='friendly')b.dataset.spawnFriendly=String(type);else b.dataset.spawn=String(type);
+          b.dataset.side=side;b.setAttribute('aria-label','生成 1 '+(side==='friendly'?'名':'只')+label+name);
+          const icon=node('span',(side==='friendly'?'ztps-unit-icon ztps-unit-':'ztps-zombie-icon ztps-zombie-')+type);icon.setAttribute('aria-hidden','true');b.appendChild(icon);b.appendChild(node('strong','',name));b.appendChild(node('small','',label+' ＋ 1'));cards.appendChild(b);
+        });camp.appendChild(cards);
+        const batch=node('div','ztps-batch-controls'),species=node('select');species.dataset.spawnSpecies='true';species.dataset.side=side;species.setAttribute('aria-label',label+'批量生成类型');addSpeciesOptions(species);species.value=form.species;species.addEventListener('change',()=>{form.species=species.value;});
+        const count=node('input');count.type='number';count.min='1';count.max=String(HEALTH_SAFETY_LIMIT);count.step='1';count.value=form.count;count.inputMode='numeric';count.dataset.spawnCount='true';count.dataset.side=side;count.setAttribute('aria-label',label+'批量刷怪数量');count.addEventListener('input',()=>{form.count=count.value;});
+        const quickCount=node('select');quickCount.dataset.spawnCountPreset='true';quickCount.dataset.side=side;quickCount.setAttribute('aria-label',label+'常用刷怪数量');for(const n of [1,5,10,50,100])option(quickCount,n,n+' 个');quickCount.value='1';quickCount.addEventListener('change',()=>{count.value=quickCount.value;form.count=count.value;});
+        const rate=node('input');rate.type='number';rate.min='0';rate.max='1000000';rate.step='any';rate.inputMode='decimal';rate.dataset.spawnRate='true';rate.dataset.side=side;rate.setAttribute('aria-label',label+'本批出兵速率（只/游戏秒）');
+        if(form.rate===undefined){const queue=state().spawnQueue;form.rate=queue&&Number.isFinite(queue.rate)?String(queue.rate):'120';}rate.value=form.rate;rate.addEventListener('input',()=>{form.rate=rate.value;});
+        const batchButton=button('加入出兵队列',()=>action(async()=>{
+          if(spawningBatches.has(side))return;
+          const amount=numericValue(count.value),selected=parseSpecies(species.value),selectedRate=readSpawnRate(rate);
+          if(!Number.isInteger(amount)||amount<1||amount>HEALTH_SAFETY_LIMIT)throw new Error('生成数量须为 1–'+HEALTH_SAFETY_LIMIT+' 的整数。');
+          if(typeof controller.enqueueSpawn!=='function')throw new Error('当前出兵队列接口不可用。');
+          form.species=species.value;form.count=count.value;form.rate=rate.value;spawningBatches.add(side);renderBattleState();
+          try{await commitQueue;await controller.enqueueSpawn(side,selected,amount,{rate:selectedRate});notice('已加入 '+amount+' 个'+label+'单位；本批 '+selectedRate+' 只/游戏秒'+(selectedRate===0?'（暂停）':'')+'。');}
+          finally{spawningBatches.delete(side);renderBattleState();}
+        },true),'ztps-primary');batchButton.dataset.spawnBatch='true';batchButton.dataset.side=side;
+        batch.appendChild(labeled('类型',species));batch.appendChild(labeled('常用数量',quickCount));batch.appendChild(labeled('数量',count));batch.appendChild(labeled('本批速率（只/游戏秒）',rate));batch.appendChild(batchButton);camp.appendChild(batch);camps.appendChild(camp);
+      }
+      spawn.appendChild(camps);
       const queue=node('section','ztps-spawn-queue');queue.dataset.spawnQueue='true';const queueHeading=node('div','ztps-section-heading'),summary=node('span','ztps-help');summary.dataset.spawnQueueSummary='true';queueHeading.appendChild(summary);
       const cancelAll=button('取消全部出兵任务',()=>action(()=>cancelSpawnQueueJob(),true),'ztps-danger');cancelAll.dataset.cancelSpawnAll='true';queueHeading.appendChild(cancelAll);queue.appendChild(queueHeading);const list=node('div','ztps-spawn-jobs');list.dataset.spawnQueueList='true';queue.appendChild(list);spawn.appendChild(queue);content.appendChild(spawn);
       const clear = node('section', 'ztps-section'); clear.appendChild(node('h2', '', '清理当前小兵'));
       const clearHelp = node('p', 'ztps-help', '只清理场上小兵，保留基地、招募排队与后续波次。'); clearHelp.id = 'ztps-clear-troops-help'; clear.appendChild(clearHelp);
       async function clearTroops(side, type) {
         const s=state(); if (!s.isCustom || !s.isBattle) throw new Error('请先开始自定义战局。'); if(clearingTroops)return;
-        const method=side==='friendly'?'clearFriendlyTroops':'clearEnemyTroops'; if(typeof controller[method]!=='function')throw new Error('清理功能不可用。');
+        const method=side==='all'?'clearAllTroops':side==='friendly'?'clearFriendlyTroops':'clearEnemyTroops'; if(typeof controller[method]!=='function')throw new Error('清理功能不可用。');
         clearingTroops=true; renderBattleState();
-        try { const result=await controller[method](type); notice('已清理 ' + result.count + ' 个' + (side==='friendly'?'己方':'敌方') + '小兵。'); }
+        try { const result=await controller[method](type); notice('已击杀 ' + result.count + ' 个' + (side==='all'?'双方':side==='friendly'?'己方':'敌方') + '小兵。'); }
         finally { clearingTroops=false; renderBattleState(); }
       }
       const clearActions = node('div', 'ztps-clear-actions');
-      for (const [side, label] of [['friendly','己方'],['enemy','敌方']]) {
+      for (const [side, label] of [['all','双方'],['friendly','己方'],['enemy','敌方']]) {
         const b=button('一键杀死'+label+'小兵',()=>action(()=>clearTroops(side),true),'ztps-danger'); b.dataset.clearTroops=side; b.setAttribute('aria-label','一键杀死当前场上的所有'+label+'小兵'); b.setAttribute('aria-describedby',clearHelp.id); clearActions.appendChild(b);
       }
       clear.appendChild(clearActions);

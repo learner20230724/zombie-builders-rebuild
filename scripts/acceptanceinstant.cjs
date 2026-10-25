@@ -55,13 +55,14 @@ module.exports = async function instantAcceptance(h) {
     evidence.syntheticFixtures.push({name:'Paused direct-spawn fixture',synthetic:true,
       method:'Public immediate spawnFactionUnit API only, to establish an isolated encounter/cleanup fixture without advancing the game clock.',side,kind,type,count});
   }
+  const spawnForm = side => page.locator('[data-spawn-form="' + side + '"]');
   async function enqueueOnly(type,count,side='enemy',kind='zombie',rate=1000000){
-    await page.locator('[data-spawn-side]').selectOption(side);
-    await page.locator('[data-spawn-species]').selectOption(kind + '-' + type);
-    await page.locator('[data-spawn-count]').fill(String(count));
-    await page.locator('[data-spawn-rate]').fill(String(rate));
+    const form = spawnForm(side);
+    await form.locator('[data-spawn-species]').selectOption(kind + '-' + type);
+    await form.locator('[data-spawn-count]').fill(String(count));
+    await form.locator('[data-spawn-rate]').fill(String(rate));
     const before=await state();assert.equal(before.customization.paused,true);
-    await page.locator('[data-spawn-batch]').click();
+    await form.locator('[data-spawn-batch]').click();
     const job=await page.evaluate(()=>Customization.getState().spawnQueue.jobs.at(-1));assert.ok(job);
     const after=await state();
     for(const key of ['ticks','cash','coins','force','randomSeed','people','zombies','converted','bases','units','waves','waveTicks'])assert.deepEqual(after[key],before[key],'Enqueue while paused must not advance or create actors: '+key);
@@ -113,8 +114,8 @@ module.exports = async function instantAcceptance(h) {
     await page.locator('[data-clear-troops="friendly"]').click();
     assert.equal((await state()).force,paid.force,'Clearing free sandbox troops may not release reserved paid population');
     assert.equal((await state()).units[0].orders,1);
-    await page.locator('[data-spawn-count-preset]').selectOption('5');
-    assert.equal(await page.locator('[data-spawn-count]').inputValue(), '5');
+    await spawnForm('enemy').locator('[data-spawn-count-preset]').selectOption('5');
+    assert.equal(await spawnForm('enemy').locator('[data-spawn-count]').inputValue(), '5');
     const before = await state(); const fatJob=await batchQueued(3,4); const four = await state();
     assert.equal(zombieCount(four, 35), 4);assert.ok(four.ticks>before.ticks);
     assert.equal(fatJob.firstSpawn.x,1600);assert.ok(fatJob.firstSpawn.x>four.bases.enemy.x);
@@ -138,6 +139,67 @@ module.exports = async function instantAcceptance(h) {
     assert.ok(encounter.people.find(body => body.type === 0)?.health < 10000, 'The incoming enemy actually attacks the worker at the gate');
     assert.equal(encounter.mainState, 2); assert.equal(encounter.bases.enemy.health, waiting.bases.enemy.health);
     return {friendlyFiveKindCounts:[2,2,2,2,2],friendlyFreeAndNormal:true,batchCount: 4, singleCardTotal: 5, batchEntry: four.zombies.filter(body => body.type === 35), workerBefore: waiting.people.find(body => body.type === 0), workerAfter: encounter.people.find(body => body.type === 0)};
+  });
+
+  await check('PARALLEL-CAMP-SPAWN-FORMS', 'Both camp forms remain visible with independent species/count/rate drafts, immediate quick cards and concurrent queued jobs; no camp dropdown or repeated switching is needed.', async () => {
+    await fixture('Parallel camp forms acceptance',draft=>{
+      for(const source of [...draft.config.units.slice(0,5),...draft.config.zombies.slice(0,5)])source.moveSpeed=0;
+    });
+    await openEditor();await page.locator('#ztps-tab-sandbox').click();
+    assert.equal(await page.locator('[data-spawn-side]').count(),0);
+    for(const side of ['friendly','enemy'])assert.equal(await spawnForm(side).isVisible(),true);
+    const friendlyBox=await spawnForm('friendly').boundingBox(),enemyBox=await spawnForm('enemy').boundingBox();
+    assert.ok(friendlyBox&&enemyBox);assert.ok(Math.abs(friendlyBox.y-enemyBox.y)<=1&&friendlyBox.x+friendlyBox.width<=enemyBox.x+1,'Camp forms are horizontally adjacent, not hidden behind a camp selector');
+    assert.equal(await page.locator('[data-spawn-friendly]').count(),5);assert.equal(await page.locator('[data-spawn]').count(),5);
+    const friendly=spawnForm('friendly'),enemy=spawnForm('enemy');
+    await friendly.locator('[data-spawn-species]').selectOption('unit-2');await friendly.locator('[data-spawn-count]').fill('3');await friendly.locator('[data-spawn-rate]').fill('2');
+    await enemy.locator('[data-spawn-species]').selectOption('zombie-3');await enemy.locator('[data-spawn-count]').fill('4');await enemy.locator('[data-spawn-rate]').fill('0.1');
+    const draft=async form=>({kind:await form.locator('[data-spawn-species]').inputValue(),count:await form.locator('[data-spawn-count]').inputValue(),rate:await form.locator('[data-spawn-rate]').inputValue()});
+    const friendlyDraft=await draft(friendly),enemyDraft=await draft(enemy),before=await state();
+    await friendly.locator('[data-spawn-batch]').click();await enemy.locator('[data-spawn-batch]').click();
+    const queued=await page.evaluate(()=>Customization.getState().spawnQueue);
+    assert.equal(queued.jobs.length,2);assert.deepEqual(queued.jobs.map(job=>({side:job.side,type:job.type,count:job.count,rate:job.rate})),[{side:'friendly',type:2,count:3,rate:2},{side:'enemy',type:3,count:4,rate:0.1}]);
+    assert.deepEqual(await draft(friendly),friendlyDraft);assert.deepEqual(await draft(enemy),enemyDraft);assert.equal((await state()).ticks,before.ticks);
+    await page.locator('[data-spawn-friendly="4"]').click();await page.locator('[data-spawn="3"]').click();
+    const quick=await state();assert.equal(troopCount(quick,4),1);assert.equal(zombieCount(quick,35),1);assert.equal(quick.cash,before.cash);assert.equal(quick.xp,before.xp);assert.equal(quick.force,before.force);
+    assert.deepEqual(await draft(friendly),friendlyDraft);assert.deepEqual(await draft(enemy),enemyDraft);
+    await page.locator('#ztps-tab-powers').click();await page.locator('#ztps-tab-sandbox').click();
+    assert.deepEqual(await draft(friendly),friendlyDraft);assert.deepEqual(await draft(enemy),enemyDraft);
+    await screenshot(artifact('10d-parallel-camp-spawn-panels.png'));
+    return {friendlyDraft,enemyDraft,jobs:queued.jobs.map(job=>({side:job.side,type:job.type,count:job.count,rate:job.rate})),immediateFriendly:1,immediateEnemy:1};
+  });
+
+  await check('ATOMIC-BOTH-ARMY-CLEAR', 'One real button clears both camps including converted/cross-species actors in one paused operation, retains bases/orders/queued jobs/waves/effects and rewards, is idempotent, and paid recruitment still finishes afterwards.', async () => {
+    await fixture('Both-army clear acceptance',draft=>{
+      draft.config.levels[0].startingCash=10000;
+      draft.config.levels[0].waves=[{id:'both-clear-preserved-wave',type:1,count:3,delay:30,enabled:true}];
+      Object.assign(draft.config.units[0],{cost:1,buildTicks:40,dependency:0,people:1,moveSpeed:0});
+      for(const source of [...draft.config.units.slice(1,5),...draft.config.zombies.slice(0,5)])source.moveSpeed=0;
+    });
+    await canvasClick(40,90);for(let frame=0;frame<80&&!troopCount(await state(),0);frame++)await step(1);
+    assert.equal(troopCount(await state(),0),1);await canvasClick(40,90);
+    await openEditor();await page.locator('#ztps-tab-sandbox').click();
+    await batch(1,1,'friendly','unit');await batch(3,1,'friendly','zombie');await batch(4,1,'enemy','unit');await batch(3,1,'enemy','zombie');
+    await enqueueOnly(0,7,'friendly','unit',0);await enqueueOnly(0,9,'enemy','zombie',0);
+    const before=await state(),queueBefore=await page.evaluate(()=>Customization.getState().spawnQueue);
+    assert.equal(before.units[0].orders,1);assert.equal(before.force,2);
+    await page.locator('[data-clear-troops="all"]').click();const cleared=await state(),queueAfter=await page.evaluate(()=>Customization.getState().spawnQueue);
+    assert.deepEqual(cleared.people,[before.bases.friendly]);assert.deepEqual(cleared.zombies,[before.bases.enemy]);assert.deepEqual(cleared.converted,[]);
+    assert.deepEqual(stableBattle(cleared),stableBattle(before));assert.deepEqual(cleared.effects,before.effects);assert.equal(cleared.randomSeed,before.randomSeed);
+    assert.equal(cleared.force,1,'Only the live paid recruit releases population; its paid queued replacement remains reserved');
+    const removed=before.people.length+before.converted.length+before.zombies.length-2;
+    assert.equal(queueAfter.capacity,queueBefore.capacity+removed,'Clearing frees shared live actor capacity');
+    assert.deepEqual({...queueAfter,capacity:queueBefore.capacity},queueBefore);assert.equal(cleared.customization.paused,true);
+    const deathVisuals=Object.values(cleared.clearVisuals).reduce((sum,count)=>sum+count,0);assert.ok(deathVisuals>0,'Clearing both camps must create original detached death animations');
+    const counts=await assertLiveTroopTable();assert.equal(counts.friendly.total,0);assert.equal(counts.enemy.total,0);
+    await page.locator('[data-clear-troops="all"]').click();assert.deepEqual(await state(),cleared);
+    await screenshot(artifact('10e-both-armies-cleared.png'));
+    await closeEditor();for(let frame=0;frame<80&&!(await state()).people.some(body=>body.type===0);frame++)await step(1);
+    const resumed=await state();assert.equal(troopCount(resumed,0),1);assert.equal(resumed.units[0].orders,0);assert.equal(resumed.force,1);
+    assert.equal((await page.evaluate(()=>Customization.getState().spawnQueue)).totalPending,16);
+    await step(300);const recycled=await state();assert.equal(Object.values(recycled.clearVisuals).reduce((sum,count)=>sum+count,0),0,'Original native death animations recycle under normal gameplay');
+    assert.equal(troopCount(recycled,0),1);assert.equal(recycled.kills,before.kills);assert.equal(recycled.lost,before.lost);assert.equal(recycled.xp,before.xp);assert.deepEqual(recycled.bases,before.bases);
+    return {beforeCounts:before.people.length+before.converted.length+before.zombies.length-2,clearedCounts:counts,paidOrderRetained:1,pendingRetained:16,deathVisuals,nativeDeathAnimationsRecycled:true,paidRecruitCompleted:true};
   });
 
   await check('FILTERED-CLEAR', 'Species dropdowns distinguish native humans, converted zombies, and enemy species; unrelated troops, bases, paid orders, and future waves survive every selected clear.', async () => {
@@ -195,7 +257,8 @@ module.exports = async function instantAcceptance(h) {
     });
     await canvasClick(40,90);await openEditor();await page.locator('#ztps-tab-sandbox').click();
     const paid=await state();assert.equal(paid.units[0].orders,1);
-    assert.equal(await page.locator('[data-spawn-species] option').count(),10);
+    assert.equal(await page.locator('[data-spawn-form]').count(),2);
+    for(const side of ['friendly','enemy'])assert.equal(await spawnForm(side).locator('[data-spawn-species] option').count(),10);
     assert.equal(await page.locator('[data-clear-type="friendly"] option').count(),10);
     assert.equal(await page.locator('[data-clear-type="enemy"] option').count(),10);
     const bodies=(snapshot,side)=>side==='friendly'?[...snapshot.people,...snapshot.converted]:snapshot.zombies;
@@ -237,7 +300,11 @@ module.exports = async function instantAcceptance(h) {
     const cleared=await save('10b-all-twenty-typed-clears');
     assert.deepEqual(cleared.people,[paid.bases.friendly]);assert.deepEqual(cleared.zombies,[paid.bases.enemy]);assert.deepEqual(cleared.converted,[]);
     const clearedTable=await assertLiveTroopTable();assert.equal(clearedTable.friendly.total,0);assert.equal(clearedTable.enemy.total,0);
-    return {combinations,spawned:40,typedClears:20,fullTable,clearedTable,freePopulation:full.force===paid.force,paidOrderRetained:cleared.units[0].orders};
+    const deathVisuals=Object.values(cleared.clearVisuals).reduce((sum,count)=>sum+count,0);assert.ok(deathVisuals>0,'All twenty species/camp clear combinations produce original native death visuals');
+    await closeEditor();await step(300);const recycled=await state();assert.equal(Object.values(recycled.clearVisuals).reduce((sum,count)=>sum+count,0),0);
+    assert.deepEqual(recycled.bases,cleared.bases);assert.equal(recycled.kills,cleared.kills);assert.equal(recycled.lost,cleared.lost);assert.equal(recycled.xp,cleared.xp);assert.equal(recycled.units[0].orders,1);
+    await openEditor();await page.locator('#ztps-tab-sandbox').click();
+    return {combinations,spawned:40,typedClears:20,fullTable,clearedTable,deathVisuals,nativeDeathAnimationsRecycled:true,freePopulation:full.force===paid.force,paidOrderRetained:cleared.units[0].orders};
   });
 
   await check('INDEPENDENT-SPAWN-JOB-STREAMS', 'A slow 1000-unit batch and a later fast batch have separate live rates and timers: paused enqueue is inert, changing only the fast stream lets it complete first, and individual/all pending cancellation never kills already born troops.', async () => {
@@ -424,6 +491,58 @@ module.exports = async function instantAcceptance(h) {
     return {angryRequested:1001,angryPendingBefore:angryProgress.byPower[0].pending,manualTroopsRetained:2,vehiclesBefore,harvestCancelled,cancelledAll,ordinaryBottleRetained:true,paidOrderRetained:afterAll.units[0].orders};
   });
 
+  await check('DUAL-CAMP-INSTANT-POWERS', 'Both camp columns provide three real free-release icons; all six casts work paused with zero XP and a real existing cooldown/lock state unchanged, use mirrored origins, cancel by source, and enemy Harvester/Air Strike actually damage friendly troops without friendly fire or base damage.', async () => {
+    await fixture('Dual camp instant powers acceptance',draft=>{
+      draft.config.levels[0].startingXp=1;
+      Object.assign(draft.config.powers[0],{xp:1,buildTicks:1,cooldownTicks:10000});
+      Object.assign(draft.config.powers[0].effect,{shovelCount:1,shotgunCount:2,survivalistCount:0,bomberCount:0,preacherCount:0});
+      draft.config.powers[2].effect.jetCount=1;
+      for(const source of [...draft.config.units.slice(0,5),...draft.config.zombies.slice(0,5)]){source.moveSpeed=0;source.health=10000;if('damage' in source)source.damage=0;}
+      draft.rules.abilities.harvesterDamagePerTick=17;draft.rules.abilities.harvesterRange=250;
+    });
+    await canvasClick(650,90);for(let frame=0;frame<60&&troopCount(await state(),1)<2;frame++)await step(1);
+    await openEditor();await page.locator('#ztps-tab-sandbox').click();await page.locator('[data-clear-troops="all"]').click();await page.locator('#ztps-tab-powers').click();
+    const before=await state();assert.equal(before.xp,0);assert.ok(before.powers[0].cooldown>0);assert.equal(before.powers[2].locked,1);
+    assert.equal(await page.locator('[data-release-power]').count(),6);
+    for(const side of ['friendly','enemy'])for(let id=0;id<3;id++)await page.locator('[data-power-side="'+side+'"] [data-release-power="'+id+'"]').click();
+    const cast=await state(),progress=await page.evaluate(()=>GameConfig.getPowerProgress(window,{includeActive:true}));
+    assert.equal(cast.ticks,before.ticks);assert.equal(cast.xp,before.xp);assert.equal(cast.cash,before.cash);assert.equal(cast.force,before.force);assert.deepEqual(cast.powers,before.powers);assert.deepEqual(cast.bases,before.bases);assert.equal(cast.customization.paused,true);
+    assert.deepEqual([troopCount(cast,0),troopCount(cast,1)],[1,2]);assert.deepEqual([zombieCount(cast,0),zombieCount(cast,1)],[1,2]);
+    assert.ok(cast.people.filter(body=>body.type<5).every(body=>body.x<0&&body.angry===1));assert.ok(cast.zombies.filter(body=>body.type<5).every(body=>body.x>1600&&body.angry===1));
+    assert.equal(progress.byPower[0].actors,6);assert.equal(progress.byPower[1].powerups,2);assert.equal(progress.byPower[2].powerups,2);
+    const vehicles=await page.evaluate(()=>{const out=[],it=ZTPGamePort.state.bb_Game.bbpowerups.bbObjectEnumerator();while(it.bbHasNext()){const p=it.bbNextObject();out.push({type:p.bbtype,x:p.bbxpos,speed:p.bbwalkspeed});}return out;});
+    for(const id of [1,2]){const pair=vehicles.filter(p=>p.type===id);assert.equal(pair.length,2);assert.ok(pair.some(p=>p.x<0&&p.speed>0));assert.ok(pair.some(p=>p.x>1600&&p.speed<0));}
+    await screenshot(artifact('13b-dual-camp-power-icons.png'));
+    await page.locator('[data-cancel-power-effects="all"]').click();const cancelled=await page.evaluate(()=>GameConfig.getPowerProgress(window,{includeActive:true}));
+    for(const p of cancelled.byPower)for(const key of ['actors','pending','powerups','projectiles'])assert.equal(p[key],0);
+    assert.deepEqual((await state()).powers,before.powers);
+    await batch(0,1,'friendly','unit');await batch(0,1,'friendly','zombie');await batch(1,1,'enemy','unit');
+    await page.evaluate(()=>{
+      const specs=[['human','friendly','unit',0],['zombie','friendly','zombie',0],['witness','enemy','unit',1]];window.__instantPowerVictims={};
+      for(const [name,side,kind,type] of specs){const body=Factions.list(window,{side,kind,type,includeBases:false})[0];body.bbxpos=800;body.bbypos=0;body.bblayer=0;window.__instantPowerVictims[name]=body;}
+    });
+    const victims=()=>page.evaluate(()=>Object.fromEntries(Object.entries(window.__instantPowerVictims).map(([name,body])=>[name,{health:body.bbhealth,x:body.bbxpos,side:Factions.getSide(window,body)}])));
+    await page.locator('[data-power-side="enemy"] [data-release-power="1"]').click();
+    await page.evaluate(()=>{const it=ZTPGamePort.state.bb_Game.bbpowerups.bbObjectEnumerator();while(it.bbHasNext()){const p=it.bbNextObject();if(p.bbtype===1)p.bbxpos=900;}});
+    evidence.syntheticFixtures.push({name:'Enemy power native attack encounter',synthetic:true,notNaturalFullStage:true,method:'Real free-release icon creates the actual enemy effect. Paused public API creates stationary high-HP witnesses; only x/y/layer and the actual vehicle x are positioned. Original attack, bomb generation, flight, impact, damage and runtime are used unchanged.'});
+    const harvestBefore=await state();await closeEditor();await step(1);const harvestAfter=await state(),harvestVictims=await victims();
+    const ticks=harvestAfter.ticks-harvestBefore.ticks;assert.ok(ticks>0);assert.equal(harvestVictims.human.health,10000-17*ticks);assert.equal(harvestVictims.zombie.health,10000-17*ticks);assert.equal(harvestVictims.witness.health,10000);assert.deepEqual(harvestAfter.bases,harvestBefore.bases);
+    await openEditor();await page.locator('#ztps-tab-powers').click();await page.getByLabel('选择技能',{exact:true}).selectOption('1');await page.locator('[data-cancel-power-effects="1"]').click();
+    await page.locator('[data-power-side="enemy"] [data-release-power="2"]').click();
+    await page.evaluate(()=>{const it=ZTPGamePort.state.bb_Game.bbpowerups.bbObjectEnumerator();while(it.bbHasNext()){const p=it.bbNextObject();if(p.bbtype===2)p.bbxpos=800;}});
+    await closeEditor();
+    for(let frame=0;frame<150;frame++){
+      const found=await page.evaluate(()=>{const bottle=ZTPGamePort.state.bb_Game.bbbottles.bbFirst();if(!bottle)return false;window.__instantRealAirBomb=bottle;for(const body of Object.values(window.__instantPowerVictims))body.bbxpos=bottle.bbxpos;return true;});
+      if(found)break;await step(1);
+    }
+    assert.equal(await page.evaluate(()=>!!window.__instantRealAirBomb),true,'The actual enemy jet must generate its own air bomb');
+    const airBefore=await victims(),airBases=(await state()).bases;
+    for(let frame=0;frame<400&&(await victims()).human.health===airBefore.human.health;frame++)await step(1);
+    const airAfter=await victims();assert.ok(airAfter.human.health<airBefore.human.health,'Enemy air bombs must damage friendly troops at their real landing');assert.equal(airAfter.witness.health,10000,'Enemy air bombs do not damage enemy witnesses');assert.deepEqual((await state()).bases,airBases);
+    await openEditor();await page.locator('#ztps-tab-powers').click();await page.locator('[data-cancel-power-effects="all"]').click();await screenshot(artifact('13c-enemy-power-real-damage.png'));
+    return {zeroXp:true,normalCooldownProtected:before.powers[0].cooldown,sixPausedCasts:true,vehicles,sourceCancellation:true,harvester:{ticks,victims:harvestVictims},airstrike:{before:airBefore,after:airAfter}};
+  });
+
   await check('NEWEST-WAVE-DISPLAY-APPEND', 'Wave rows display newest-first and a newly appended row appears immediately on page one, while runtime queue execution remains ascending and the current group is not reset.', async () => {
     await fixture('Newest wave acceptance', draft => {
       draft.config.levels[0].waves = [
@@ -515,8 +634,8 @@ module.exports = async function instantAcceptance(h) {
     await batch(4,1,'enemy','unit');await batch(3,1,'friendly','zombie');await batch(0,1,'enemy','zombie');
     await position([{name:'priest',side:'enemy',kind:'unit',type:4,x:900},{name:'victim',side:'friendly',kind:'zombie',type:3,x:700},{name:'witness',side:'enemy',kind:'zombie',type:0,x:700}]);
     const priestBefore=await actors(),priestState=await state();await togglePlayback();await freeze();
-    const countDraft=page.locator('[data-spawn-count]');await countDraft.fill('37');
-    await page.evaluate(()=>{window.__instantFocusedCount=document.querySelector('[data-spawn-count]');});
+    const countDraft=spawnForm('friendly').locator('[data-spawn-count]');await countDraft.fill('37');
+    await page.evaluate(()=>{window.__instantFocusedCount=document.querySelector('[data-spawn-form="friendly"] [data-spawn-count]');});
     const priestCountBefore=await assertLiveTroopTable();assert.equal(priestCountBefore.friendly.zombies[3],1);assert.equal(priestCountBefore.enemy.zombies[3],0);
     await advanceUntil(async()=> (await actors()).victim.side==='enemy');const priestAfter=await actors(),priestEnd=await state();
     assert.equal(priestAfter.victim.health,priestBefore.victim.health);assert.equal(priestAfter.victim.type,35);
@@ -558,6 +677,31 @@ module.exports = async function instantAcceptance(h) {
     assert.equal(noSpawn.zombies.filter(body=>body.type===32).length,0,'Unchecking while a corpse is already in flight must prevent its real landing spawn immediately');
     details.corpseCheckboxWhileInFlight={effective:false,victimHealth:500,extraZombieCount:0};
     await save('14a-cross-faction-corpse-landing');return details;
+  });
+
+  await check('UNLOCK-ALL-AND-ORIGINAL-SCORE-ISOLATION', 'The real unlock-all button beside the stage editor promotes an original match to custom, immediately removes unit/building/power locks without gifting anything or altering either score store, and enables a genuine canvas Stage 4 selection with zero Stage 3 wins.', async () => {
+    await openEditor();await page.locator('#ztps-tab-sandbox').click();
+    await Promise.all([page.waitForEvent('domcontentloaded'),page.getByRole('button',{name:'回到原版模式',exact:true}).click()]);
+    await page.waitForFunction(()=>window.gameReady&&ZTPGamePort.state.bb_Game.bbmainState===1,null,{timeout:90000});await freeze();
+    assert.equal(await page.evaluate(()=>Customization.getState().mode),'original');
+    await canvasClick(660,65);for(let frame=0;frame<220&&(await state()).mainState!==2;frame++)await step(1);
+    assert.equal((await state()).mainState,2);await openEditor();await page.locator('#ztps-tab-levels').click();
+    const scoreStorage=()=>page.evaluate(()=>Object.fromEntries(Object.entries(localStorage).filter(([key])=>key.startsWith(Customization.constants.ORIGINAL_STORAGE+'/')||key.startsWith(Customization.constants.CUSTOM_STORAGE+'/'))));
+    const before=await state(),stores=await scoreStorage();
+    const placement=await page.evaluate(()=>{const b=document.querySelector('[data-unlock-all]'),s=document.querySelector('select[aria-label="选择关卡 / 出怪"]');return {sameRow:b?.parentElement===s?.closest('.ztps-section-heading'),button:b?.getBoundingClientRect().toJSON(),picker:s?.getBoundingClientRect().toJSON()};});
+    assert.equal(await page.locator('[data-unlock-all]').isVisible(),true);assert.equal(placement.sameRow,true,'Unlock belongs beside the stage editor selector');
+    await page.locator('[data-unlock-all]').click();await settled();
+    const after=await state(),draft=await page.evaluate(()=>Customization.getDraft()),runtimeLocks=await page.evaluate(()=>{const g=ZTPGamePort.state.bb_Game;return {units:g.bbunits.slice(0,5).map(p=>p.bbdependency),buildings:g.bbbuildings.map(p=>p.bbdependency),powers:g.bbpowers.map(p=>p.bblocked)};});
+    assert.equal(after.customization.mode,'custom');assert.equal(draft.rules.unlockAllStages,true);assert.ok(draft.config.units.slice(0,5).every(x=>x.dependency===0));assert.ok(draft.config.buildings.every(x=>x.dependency===0));assert.ok(draft.config.powers.every(x=>x.unlockAfterStage===0));
+    assert.deepEqual(runtimeLocks,{units:[0,0,0,0,0],buildings:[0,0,0,0,0,0],powers:[0,0,0]});
+    for(const key of ['ticks','cash','xp','force','buildings','bases','people','zombies','converted','kills','lost'])assert.deepEqual(after[key],before[key],'Unlocking must not grant resources/buildings/wins: '+key);
+    assert.deepEqual(await scoreStorage(),stores);assert.equal(after.records[2],0,'The fourth-stage prerequisite win is genuinely absent');
+    await screenshot(artifact('15a-unlock-all-stage-editor.png'));
+    await closeEditor();await canvasClick(718,18);assert.equal((await state()).mainState,6);await canvasClick(300,412);await step(1);assert.equal((await state()).mainState,1);
+    await screenshot(artifact('15b-unlocked-canvas-menu.png'));
+    await canvasClick(660,340);for(let frame=0;frame<220&&(await state()).mainState!==2;frame++)await step(1);
+    const fourth=await state();assert.equal(fourth.mainState,2);assert.equal(fourth.difficulty,3);assert.deepEqual(await scoreStorage(),stores);assert.equal(fourth.records[2],0);
+    return {placement,unlocked:runtimeLocks,customStageFlag:true,actualCanvasStage:4,originalAndCustomScoresPreserved:true,noBuildingsOrResourcesGifted:true};
   });
 
   await check('INDEPENDENT-TIME-DIMENSION', 'The independent time panel owns pause/resume and 0.5×/2× numeric/preset controls; actual runtime elapsed time and simulation ticks scale without changing original game speed or replaying paused time.', async () => {

@@ -57,13 +57,13 @@
   }
   function defaults() {
     return {schemaVersion:1,automaticSpawning:true,zombieTypesEnabled:[true,true,true,true,true],
-      baseReinforcements:true,corpseSpawnOnImpact:true,
+      baseReinforcements:true,corpseSpawnOnImpact:true,unlockAllStages:false,
       abilities:{preacherConversion:true,fatAreaAttack:true,corpseThrowing:true,ghoulLongLeap:true,harvesterDamagePerTick:100,harvesterRange:220},
       economy:{salvagePayout:50,salvageIntervalTicks:600,populationPerTrailer:5},
       multipliers:{units:{health:1,moveSpeed:1,damage:1},zombies:{health:1,moveSpeed:1,damage:1}}};
   }
   function validate(input) {
-    record(input,'$',keys.filter(key=>key !== 'economy'),['economy','multipliers']);
+    record(input,'$',keys.filter(key=>key !== 'economy'),['economy','multipliers','unlockAllStages']);
     if (input.schemaVersion !== 1) fail('$.schemaVersion','supported version is 1');
     record(input.abilities,'$.abilities',abilityKeys,numericAbilities.concat(optionalBooleanAbilities));
     const baseline = defaults();
@@ -86,6 +86,7 @@
       }),
       baseReinforcements:bool(input.baseReinforcements,'$.baseReinforcements'),
       corpseSpawnOnImpact:bool(input.corpseSpawnOnImpact,'$.corpseSpawnOnImpact'),abilities:{},economy:{}};
+    copy.unlockAllStages = Object.prototype.hasOwnProperty.call(input,'unlockAllStages') ? bool(input.unlockAllStages,'$.unlockAllStages') : false;
     for (const key of abilityKeys) copy.abilities[key] = bool(input.abilities[key],'$.abilities.'+key);
     for (const key of optionalBooleanAbilities) copy.abilities[key] = bool(ability(key),'$.abilities.'+key);
     copy.abilities.harvesterDamagePerTick = integer(ability('harvesterDamagePerTick'),'$.abilities.harvesterDamagePerTick',0,100000000);
@@ -132,6 +133,39 @@
   }
   function hooks(target, state) {
     const port = portFor(target);
+    // Native stage locks are presentation/click gates derived from scores.
+    // In an explicitly unlocked custom session, suppress just those lock
+    // draws and retain the menu selection the original renderer calculated.
+    // Never manufacture wins, substitute records, duplicate hit testing, or
+    // alter the original menu's animation, scores, audio or random stream.
+    wrap(port.bb_Zomba.prototype,'bbRenderMenu',original => function () {
+      if (!state.rules.unlockAllStages) return original.apply(this,arguments);
+      const frame = {game:this,selection:null,transitioning:this.bbmenucount !== 0};
+      const drawImage = target.bb_mojo_graphics_DrawImage2, portDrawImage = port.bb_mojo_graphics_DrawImage2;
+      const customDrawImage = function (image) {
+        if (image === frame.game.bblock) {
+          if (frame.selection === null) frame.selection = frame.game.bbmenuitem;
+          return 0;
+        }
+        return drawImage.apply(this,arguments);
+      };
+      let result;
+      try {
+        target.bb_mojo_graphics_DrawImage2 = port.bb_mojo_graphics_DrawImage2 = customDrawImage;
+        result = original.apply(this,arguments);
+      }
+      finally {
+        target.bb_mojo_graphics_DrawImage2 = drawImage;
+        port.bb_mojo_graphics_DrawImage2 = portDrawImage;
+      }
+      // The original menu starts its normal transition after all four lock
+      // gates. Restore only a valid stage selection a gate actually consumed.
+      if (!frame.transitioning && this.bbmainState === 1 && frame.selection > 0 && frame.selection < 5) {
+        this.bbmenuitem = frame.selection;
+        if (this.bbmousehit && !this.bbmenucount) this.bbmenucount = 1;
+      }
+      return result;
+    });
     // Configuration-driven skill spawning shares the same live-body budget.
     // A bounded pending dispatch can wait instead of silently dropping orders.
     port.getEntityCapacity = () => availableEntitySlots(port.state.bb_Game);

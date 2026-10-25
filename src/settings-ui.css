@@ -121,3 +121,27 @@ body.ztps-docked main{right:var(--ztps-dock-width);height:auto}
 @media(max-width:420px){.ztps-spawn-job{flex-wrap:wrap}.ztps-spawn-job-copy{flex-basis:100%}.ztps-spawn-job .ztps-label{flex:1}}
 
 .ztps-troop-counts{margin-top:15px}.ztps-troop-counts h2{font-size:14px;margin-bottom:7px}.ztps-troop-table{min-width:0;font-size:11px;border:1px solid #334450}.ztps-troop-table th,.ztps-troop-table td{padding:4px 10px}.ztps-troop-table tbody th{min-width:0;font-size:11px}.ztps-troop-table .ztps-troop-number{text-align:right;font-variant-numeric:tabular-nums}.ztps-troop-table thead th:not(:first-child){text-align:right}.ztps-troop-table tfoot{background:#26382f;color:#e3edb8;font-weight:650}
+
+/* Both camps stay available; narrow docks stack the complete forms, never hide one. */
+.ztps-content{container-type:inline-size}
+.ztps-camp-columns{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.ztps-camp-card{min-width:0;padding:10px;border:1px solid #435967;border-radius:6px;background:#182630}
+.ztps-camp-card[data-spawn-form=friendly],.ztps-camp-card[data-power-side=friendly]{border-color:#597451}
+.ztps-camp-card[data-spawn-form=enemy],.ztps-camp-card[data-power-side=enemy]{border-color:#81524c}
+.ztps-camp-card h3{font-size:14px;margin:0 0 10px;color:#e7edda}
+.ztps-camp-card .ztps-spawn-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.ztps-camp-card .ztps-spawn{min-height:100px;padding:8px 3px;min-width:0;white-space:normal}
+.ztps-camp-card .ztps-spawn strong{font-size:11px;overflow-wrap:anywhere}
+.ztps-camp-card .ztps-spawn small{font-size:10px}
+.ztps-camp-card .ztps-zombie-icon{width:72px;max-width:100%}
+.ztps-camp-card .ztps-batch-controls{gap:7px}
+.ztps-camp-card .ztps-batch-controls .ztps-label{min-width:90px}
+.ztps-camp-card .ztps-batch-controls>.ztps-button{width:100%}
+.ztps-unit-icon,.ztps-power-icon{display:block;flex-shrink:0;width:40px;height:40px;background-image:url('/public/assets/images-canonical/Game_UI.png');background-repeat:no-repeat;background-size:800px 133px}
+.ztps-unit-0{background-position:-18px -64px}.ztps-unit-1{background-position:-68px -64px}.ztps-unit-2{background-position:-118px -64px}.ztps-unit-3{background-position:-168px -64px}.ztps-unit-4{background-position:-218px -64px}
+.ztps-power-0{background-position:-638px -64px}.ztps-power-1{background-position:-687px -64px}.ztps-power-2{background-position:-736px -64px}
+.ztps-power-release{padding-bottom:14px;margin-bottom:14px;border-bottom:1px solid #435967}
+.ztps-power-release h2{font-size:15px}
+.ztps-power-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.ztps-camp-card .ztps-power-spawn{min-height:83px;justify-content:center}
+@container(max-width:460px){.ztps-camp-columns{grid-template-columns:1fr}.ztps-camp-card .ztps-spawn-grid{grid-template-columns:repeat(5,minmax(0,1fr))}}

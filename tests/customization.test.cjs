@@ -341,12 +341,14 @@ function unchangedBattle(h) {
     buildings:g.bbbuildings.map(building=>({orders:building.bborders,busy:building.bbbusy})),
     powers:g.bbpowers.map(power=>({orders:power.bborders,busy:power.bbbusy,cooldown:power.bbcooldown})),
     queue:entries(mob.bbqueue).map(node=>({type:node.bbtype,count:node.bbcount,delay:node.bbdelay,time:node.bbtime})),mobTicks:mob.bbticks,
-    effects:['bbbottles','bbflinglist','bbdeathlist','bbbodyparts','bbexplosions','bbpowerups'].map(key=>entries(g[key])),
+    // New detached sandbox-death visuals are asserted separately; all existing
+    // effects, projectiles and pending powers must remain identical.
+    effects:['bbbottles','bbflinglist','bbdeathlist','bbbodyparts','bbexplosions','bbpowerups'].map(key=>entries(g[key]).filter(effect=>!effect.bbSandboxDeath)),
     config:h.controller.getDraft(),storage:[...h.storage]};
 }
 
 test('clear buttons require a custom active battle, including when called through the public facade',()=>{
-  const h=fixture(),actions=['clearFriendlyTroops','clearEnemyTroops'];
+  const h=fixture(),actions=['clearFriendlyTroops','clearEnemyTroops','clearAllTroops'];
   for(const action of actions)assert.throws(()=>h.controller[action](),/先开始/);
   h.game.bbPlayGame(1);const original=unchangedBattle(h),calls=h.runtimeCalls.slice();
   for(const action of actions)assert.throws(()=>h.controller[action](),/先应用/);
@@ -436,6 +438,42 @@ test('both friendly lists are preflighted before population, regular troops or c
 test('a frozen list shell with mutable linked nodes does not prevent a safe clear',()=>{
   const h=fixture({custom:true}),g=h.game;h.controller.spawnZombie(0);Object.freeze(g.bbzombies);
   assert.equal(h.controller.clearEnemyTroops().count,1);assert.deepEqual(entries(g.bbzombies),[g.bbzombiebase]);
+});
+
+test('all-camp clear preflights all three armies in one transaction and preserves bases, plans, records, RNG and pause',()=>{
+  const h=clearFixture(),g=h.game;
+  h.controller.spawnFactionUnit('enemy',{kind:'unit',type:4},2);
+  h.controller.enqueueSpawn('enemy',{kind:'zombie',type:3},1000,{rate:0.1});
+  h.controller.enqueueSpawn('friendly',{kind:'unit',type:2},1000,{rate:2});
+  const token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice(),queue=h.controller.getState().spawnQueue,before=unchangedBattle(h);
+  const actors=[...entries(g.bbpeople),...entries(g.bbpombies),...entries(g.bbzombies)].filter(body=>body!==g.bbpeoplebase && body!==g.bbzombiebase);
+  const seen=[];h.controller.subscribe(state=>seen.push(state.troopCounts));
+  const result=Customization.clearAllTroops();
+  assert.deepEqual(result,{side:'both',count:29,people:24,converted:2,zombies:3});
+  for(const body of actors) {assert.equal(body.bbhealth,0);assert.equal(body.bbmode,15);}
+  assert.deepEqual(entries(g.bbpeople),[g.bbpeoplebase]);assert.deepEqual(entries(g.bbzombies),[g.bbzombiebase]);assert.deepEqual(entries(g.bbpombies),[]);
+  assert.equal(g.bbztp.bbforce,g.bbunits.reduce((sum,unit)=>sum+unit.bborders*unit.bbpeople,0));
+  assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.controller.getState().spawnQueue.jobs,queue.jobs);assert.deepEqual(h.runtimeCalls,calls);
+  assert.equal(seen.length,1);assert.equal(seen[0].friendly.total,0);assert.equal(seen[0].enemy.total,0);
+  assert.equal(h.controller.clearAllTroops().count,0);assert.equal(h.controller.getBattleStatus().editorPaused,true);
+  h.controller.resumeFromEditor(token);
+});
+
+test('all-camp clear never partially kills the first side when any later-side actor, list or population field is readonly',()=>{
+  for(const frozen of ['enemy-actor','enemy-list','converted-actor','converted-list','population']) {
+    const h=clearFixture(),g=h.game;
+    const people=entries(g.bbpeople),converted=entries(g.bbpombies),enemies=entries(g.bbzombies),actors=[...people,...converted,...enemies];
+    if(frozen==='enemy-actor')Object.freeze(enemies.at(-1));
+    if(frozen==='enemy-list')Object.freeze(g.bbzombies.bb_head);
+    if(frozen==='converted-actor')Object.freeze(converted.at(-1));
+    if(frozen==='converted-list')Object.defineProperty(g.bbpombies.bb_head.bb_succ,'bb_pred',{writable:false});
+    if(frozen==='population')Object.defineProperty(g.bbztp,'bbforce',{writable:false});
+    const health=actors.map(body=>body.bbhealth),modes=actors.map(body=>body.bbmode),before=unchangedBattle(h),calls=h.runtimeCalls.slice(),state=h.controller.getState();
+    assert.throws(()=>h.controller.clearAllTroops(),/不可写/);
+    assert.deepEqual(entries(g.bbpeople),people);assert.deepEqual(entries(g.bbpombies),converted);assert.deepEqual(entries(g.bbzombies),enemies);
+    assert.deepEqual(actors.map(body=>body.bbhealth),health);assert.deepEqual(actors.map(body=>body.bbmode),modes);
+    assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);assert.deepEqual(h.controller.getState(),state);
+  }
 });
 
 test('clear handles duplicate list references once and never turns population negative',()=>{
@@ -981,4 +1019,115 @@ test('troop counts are zero in menus but retain real surviving armies on ended-m
   const h=fixture({custom:true}),g=h.game;h.controller.spawnFactionUnit('friendly',{kind:'zombie',type:4},2);h.controller.spawnFactionUnit('enemy',{kind:'unit',type:3},1);
   const counts=h.controller.getState().troopCounts;h.controller.setBaseHealth('enemy',0);assert.equal(g.bbmainState,3);assert.deepEqual(h.controller.getState().troopCounts,counts);
   g.bbmainState=1;assert.deepEqual(h.controller.getState().troopCounts,zero);
+});
+
+test('every camp and species receives its original detached death visuals without battle rewards, damage, RNG use or repeated population refunds',()=>{
+  const h=fixture({custom:true}),g=h.game,draft=h.controller.getDraft();draft.rules.automaticSpawning=false;draft.rules.baseReinforcements=false;h.controller.commitSettings(draft);
+  for(const side of ['friendly','enemy'])for(const kind of ['unit','zombie'])for(let type=0;type<5;type++)h.controller.spawnFactionUnit(side,{kind,type});
+  const token=h.controller.pauseForEditor(),before=unchangedBattle(h),calls=h.runtimeCalls.slice(),force=g.bbztp.bbforce;
+  assert.equal(h.controller.clearAllTroops().count,20);
+  const visuals=['bbdeathlist','bbexplosions','bbbodyparts'].map(key=>entries(g[key]).filter(effect=>effect.bbSandboxDeath));
+  assert.deepEqual(visuals.map(list=>list.length),[6,8,62]);
+  assert.ok(visuals[0].every(effect=>effect instanceof h.target.ZTPGamePort.bb_Death && effect.bbthrow===0 && effect.bbframe===1));
+  assert.ok(visuals[1].every(effect=>effect instanceof h.target.ZTPGamePort.bb_Explosion && effect.bbcloud===0));
+  assert.ok(visuals[2].every(effect=>effect instanceof h.target.ZTPGamePort.bb_BodyPart && effect.bbbounce===0));
+  assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);assert.equal(g.bbztp.bbforce,force);
+  assert.equal(h.controller.clearAllTroops().count,0);assert.deepEqual(['bbdeathlist','bbexplosions','bbbodyparts'].map(key=>entries(g[key]).length),[6,8,62]);
+  h.controller.resumeFromEditor(token);
+  for(let tick=0;tick<2020;tick++)g.bbGameTick(0);
+  assert.deepEqual(['bbdeathlist','bbexplosions','bbbodyparts'].map(key=>entries(g[key]).length),[0,0,0]);
+  assert.equal(g.bbztp.bbforce,force);assert.equal(g.bbztp.bbxp,before.xp);assert.equal(g.bbzombieskilled,before.kills);assert.equal(g.bbkinlost,before.losses);
+  assert.deepEqual([g.bbpeoplebase,g.bbzombiebase].map(body=>({health:body.bbhealth,mode:body.bbmode})),before.bases);
+  assert.equal(h.controller.getState().troopCounts.friendly.total,0);assert.equal(h.controller.getState().troopCounts.enemy.total,0);
+});
+
+test('all clear scopes create native death visuals and preflight readonly effect targets before killing, unlinking, consuming RNG or releasing population',()=>{
+  for(const action of ['clearFriendlyTroops','clearEnemyTroops','clearAllTroops'])for(const key of ['bbdeathlist','bbexplosions','bbbodyparts']) {
+    const h=fixture({custom:true}),g=h.game;
+    for(const side of ['friendly','enemy'])for(const [kind,type] of [['unit',0],['unit',3],['zombie',3]])h.controller.spawnFactionUnit(side,{kind,type});
+    const actors=Factions.list(h.target),health=actors.map(body=>body.bbhealth),mode=actors.map(body=>body.bbmode),before=unchangedBattle(h),calls=h.runtimeCalls.slice();
+    Object.freeze(g[key].bb_head);
+    assert.throws(()=>h.controller[action](),/不可写/);
+    assert.deepEqual(Factions.list(h.target),actors);assert.deepEqual(actors.map(body=>body.bbhealth),health);assert.deepEqual(actors.map(body=>body.bbmode),mode);
+    assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+  }
+  const h=fixture({custom:true}),g=h.game;h.controller.spawnFriendlyUnit(0);h.controller.spawnFriendlyUnit(1);h.controller.spawnZombie(0);h.controller.spawnZombie(1);
+  assert.equal(h.controller.clearFriendlyTroops({kind:'unit',type:1}).count,1);assert.equal(entries(g.bbdeathlist).length,1);
+  assert.equal(h.controller.clearEnemyTroops({kind:'zombie',type:1}).count,1);assert.equal(entries(g.bbbodyparts).length,g.bbghoulpartsheet.bblastframe);
+  assert.equal(h.controller.getState().troopCounts.friendly.units[0],1);assert.equal(h.controller.getState().troopCounts.enemy.zombies[0],1);
+});
+
+test('sandbox skills guard original mode and invalid selections before engine mutation or runtime transactions',()=>{
+  const original=fixture();assert.throws(()=>original.controller.releaseSandboxPower(0),/先开始/);
+  original.game.bbPlayGame(1);assert.throws(()=>Customization.releaseSandboxPower(0,'enemy'),/先应用/);
+  const h=fixture({custom:true}),before=unchangedBattle(h),calls=h.runtimeCalls.slice();
+  for(const args of [[-1,'friendly'],[3,'enemy'],[0.5,'friendly'],['0','friendly'],[0,'bad'],[0,null]])assert.throws(()=>h.controller.releaseSandboxPower(...args));
+  assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
+});
+
+test('both factions can release all three configured sandbox skills while paused without XP payment, lock, charge, cooldown or score changes',()=>{
+  for(const side of ['friendly','enemy'])for(const powerId of [0,1,2]) {
+    const h=fixture({custom:true}),g=h.game;g.bbztp.bbxp=0;
+    for(const power of g.bbpowers) {power.bblocked=1;power.bbbusy=7;power.bborders=2;power.bbcooldown=123;}
+    const token=h.controller.pauseForEditor(),before=unchangedBattle(h),calls=h.runtimeCalls.slice(),seen=[];h.controller.subscribe(state=>seen.push(state));
+    const report=Customization.releaseSandboxPower(powerId,side);
+    assert.equal(report.powerId,powerId);assert.equal(report.side,side);assert.equal(report.requested,[16,1,3][powerId]);assert.equal(report.spawned+report.pending,report.requested);
+    assert.equal(g.bbztp.bbxp,0);assert.equal(g.bbztp.bbforce,0);assert.deepEqual(plain(g.bbpowers.map(power=>[power.bblocked,power.bbbusy,power.bborders,power.bbcooldown])),[[1,7,2,123],[1,7,2,123],[1,7,2,123]]);
+    assert.deepEqual(h.runtimeCalls,calls);assert.equal(h.controller.getState().editorPaused,true);assert.equal(seen.length,1);
+    const after=unchangedBattle(h),expected={...before};delete after.seed;delete expected.seed;delete after.effects;delete expected.effects;
+    assert.deepEqual(after,expected);
+    if(powerId===0) {assert.equal(h.controller.getState().troopCounts[side].total,report.spawned);assert.equal(h.controller.getState().troopCounts[side==='friendly'?'enemy':'friendly'].total,0);}
+    else assert.equal(entries(g.bbpowerups).length,[0,1,3][powerId]);
+    h.controller.resumeFromEditor(token);
+  }
+});
+
+test('sandbox skill engine preflight failures are atomic before controller clock ownership, and native pause remains paused after release',()=>{
+  for(const key of ['bbpeople','bbpombies','bbzombies','bbpowerups']) {
+    const h=fixture({custom:true}),g=h.game;Object.freeze(g[key].bb_head);
+    const before=unchangedBattle(h),state=h.controller.getState(),calls=h.runtimeCalls.slice();
+    assert.throws(()=>h.controller.releaseSandboxPower(2,'enemy'),/writable|不可写/);
+    assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.controller.getState(),state);assert.deepEqual(h.runtimeCalls,calls);
+  }
+  const h=fixture({custom:true}),g=h.game;g.bbmainState=6;const ticks=g.bbgameticks;
+  const result=h.controller.releaseSandboxPower(2,'enemy');assert.equal(result.requested,3);assert.equal(entries(g.bbpowerups).length,3);
+  assert.equal(g.bbmainState,6);assert.equal(g.bbgameticks,ticks);assert.equal(h.controller.getBattleStatus().gamePaused,true);
+});
+
+test('unlock all immediately enables every building, troop and skill in custom rules without fabricated wins or original-score writes, and persists across edits and reloads',()=>{
+  const storage=new Map([[constants.ORIGINAL_STORAGE+'/shared/ZTPBestScores/0','54321'],[constants.CUSTOM_STORAGE+'/shared/ZTPBestScores/2','98765']]);
+  const h=fixture({storage}),g=h.game;g.bbPlayGame(1);g.bbztp.bbcash=700;g.bbztp.bbxp=0;g.bbpowers[2].bbcooldown=123;
+  const original=[...storage].filter(([key])=>key.startsWith(constants.ORIGINAL_STORAGE+'/')),customRecords=[...storage].filter(([key])=>key.startsWith(constants.CUSTOM_STORAGE+'/'));
+  const token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice(),seed=h.target.ZTPGamePort.state.bb_std_random_Seed,ticks=g.bbgameticks,counts=Array.from(g.bbztp.bbbuildingcount),seen=[];
+  h.controller.subscribe(state=>seen.push(state));const report=Customization.unlockAll();
+  assert.equal(report.promoted,true);assert.equal(report.staged,false);assert.deepEqual(report.unlocked,{units:5,buildings:6,powers:3,stages:[1,2,3,4]});
+  assert.equal(h.namespace,constants.CUSTOM_STORAGE);assert.equal(h.controller.getState().mode,'custom');assert.equal(h.controller.getState().rules.unlockAllStages,true);
+  assert.ok(g.bbunits.slice(0,5).every(unit=>unit.bbdependency===0));assert.ok(g.bbbuildings.every(building=>building.bbdependency===0));assert.ok(g.bbpowers.every(power=>power.bblocked===0));
+  assert.deepEqual(Array.from(g.bbrecords),[0,0,98765,0]);assert.equal(g.bbztp.bbcash,700);assert.equal(g.bbztp.bbxp,0);assert.equal(g.bbpowers[2].bbcooldown,123);
+  assert.deepEqual(Array.from(g.bbztp.bbbuildingcount),counts);assert.deepEqual([...storage].filter(([key])=>key.startsWith(constants.ORIGINAL_STORAGE+'/')),original);
+  assert.deepEqual([...storage].filter(([key])=>key.startsWith(constants.CUSTOM_STORAGE+'/')),customRecords);assert.equal(g.bbgameticks,ticks);assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,seed);
+  assert.deepEqual(h.runtimeCalls,calls);assert.equal(seen.length,1);assert.equal(h.controller.getState().editorPaused,true);assert.equal(h.reloads,0);
+  const draft=h.controller.getDraft();draft.config.units[0].cost=51;h.controller.commitSettings(draft);
+  assert.ok(g.bbunits.slice(0,5).every(unit=>unit.bbdependency===0));assert.ok(g.bbbuildings.every(building=>building.bbdependency===0));assert.ok(g.bbpowers.every(power=>power.bblocked===0));
+  const preset=h.controller.savePreset('全部开启',h.controller.getDraft()),loaded=h.controller.loadPreset(preset.id);assert.equal(loaded.rules.unlockAllStages,true);
+  const restored=fixture({storage});assert.equal(restored.controller.getState().rules.unlockAllStages,true);assert.ok(restored.game.bbunits.slice(0,5).every(unit=>unit.bbdependency===0));
+  restored.controller.startCustomBattle(4,restored.controller.getDraft());const stage4=fixture({storage});assert.equal(stage4.game.bbdifficulty,3);assert.ok(stage4.game.bbpowers.every(power=>power.bblocked===0));
+  h.controller.resumeFromEditor(token);
+});
+
+test('unlock all works from the menu without starting a battle and readonly promotion or unlock targets reject before all mode, data, record and storage changes',()=>{
+  const menu=fixture(),menuState=menu.game.bbmainState;const result=menu.controller.unlockAll();assert.equal(result.staged,true);assert.equal(result.promoted,true);
+  assert.equal(menu.game.bbmainState,menuState);assert.equal(menu.controller.getState().isBattle,false);assert.equal(menu.reloads,0);assert.equal(menu.controller.getState().rules.unlockAllStages,true);
+  menu.game.bbPlayGame(4);assert.equal(menu.game.bbdifficulty,3);assert.ok(menu.game.bbpowers.every(power=>power.bblocked===0));
+  for(const custom of [false,true])for(const frozen of ['unit','building','power','records']) {
+    const h=fixture({custom});if(!custom)h.game.bbPlayGame(1);const g=h.game;
+    if(frozen==='unit')Object.defineProperty(g.bbunits[4],'bbdependency',{writable:false});
+    if(frozen==='building')Object.defineProperty(g.bbbuildings[5],'bbdependency',{writable:false});
+    if(frozen==='power')Object.defineProperty(g.bbpowers[2],'bblocked',{writable:false});
+    if(frozen==='records')Object.freeze(g.bbrecords);
+    if(custom && frozen==='records')continue; // An already-custom match never writes scores to unlock content.
+    const before=unchangedBattle(h),state=h.controller.getState(),namespace=h.namespace,calls=h.runtimeCalls.slice();
+    assert.throws(()=>h.controller.unlockAll(),/writable|不可写/);
+    assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.controller.getState(),state);assert.equal(h.namespace,namespace);assert.deepEqual(h.runtimeCalls,calls);
+  }
 });

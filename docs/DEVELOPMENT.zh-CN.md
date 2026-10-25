@@ -211,6 +211,7 @@ Windows 可编辑配置位于 **`%APPDATA%\ZombieBuilders\config`**，进度与�
 - `updateLive(target, config, options)`：更新已初始化游戏，返回含变化 JSON 路径的 `{applied, deferred}`。传入完整配置，不是局部补丁。
 - `getWaveProgress(target)`：读取当前／后续组、已调度／已出数量、已完成 ID 与可信组身份。
 - `getPowerProgress(target, {includeActive:true}?)`：读取技能待分发量，可选提供各技能在场计数 `byPower`、`activeTotal`；默认返回结构不变。
+- `releaseSandboxPower(target, powerId, {side,validateOnly?})`：为 `friendly`／`enemy` 释放即时技能；先只读预检，再预算化分发，返回 `{powerId,side,requested,spawned,pending}`。
 - `applyLiveWaves(target, config)`：按身份合并当前关尚未出场队列，返回 `{applied, deferred, notes, requiresNewBattle, reason, progress}`。
 
 ### 实时生效约定
@@ -261,7 +262,10 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 | `spawnFactionUnit(side, {kind,type}, count = 1)` | 底层即时生成：`friendly`／`enemy` 任一阵营，`kind` 为 `unit`／`zombie`，`type` 为 0–4，单次 1–998，先检查共用容量 |
 | `spawnZombie(type, count = 1)` | 兼容快捷接口：敌方僵尸类型 0–4，单次 1–998 |
 | `spawnFriendlyUnit(type, count = 1)` | 兼容快捷接口：己方人类类型 0–4，单次 1–998 |
-| `clearFriendlyTroops(selection?)`、`clearEnemyTroops(selection?)` | 清全体或选定类型；保留基地、暂停、已付订单和后续队列 |
+| `clearFriendlyTroops(selection?)`、`clearEnemyTroops(selection?)` | 清单方全体或选定类型；保留基地、暂停、已付订单和后续队列 |
+| `clearAllTroops()` | 事务式一键清双方；先预检三条阵营链表再修改，保留基地、后续队列与技能效果 |
+| `releaseSandboxPower(powerId, side = "friendly")` | 自定义战局中为己方／敌方立即释放 0／1／2 技能，不扣 XP 或改正常技能冷却／蓄力 |
+| `unlockAll()` | 即时解除自定义单位／建筑前置与技能锁定，提供四关选择，不改胜利记录或赠资源 |
 | `setBaseHealth(side, currentHp)` | `friendly`／`enemy` 基地当前生命设为整数 `0..实际最大值`，0 触发正常胜负流程 |
 | `cancelPowerEffects(powerId = "all")` | 活动自定义局中取消 0／1／2 对应技能或全部，暂停时可用，不推进战斗 |
 | `applyUpcomingWaves(config)` | 兼容用波次接口：按本局进度安全同步当前关，不套用其他草稿属性 |
@@ -271,21 +275,21 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 
 上表载入／导入底层方法只返回数据，设置界面随后立即把有效结果交给 `commitSettings`。编辑器用 `commitSettings`，底层仅本局调用可用 `applyDraft`；不要把 `applyLive` 与 `applyRules` 串联：规则有误时，不应把正确的配置先应用一半。校验失败不改变模式、存储或当前配置。
 
-`spawnFactionUnit` 返回 `{side,kind,type,count,positions}`，两个兼容快捷接口仍返回 `{type,count,positions}`。这些是底层即时接口；玩家批量区域采用下述队列，五个敌方僵尸一键按钮仍即时生成。支持完整二十种阵营／类型组合，例如敌方牧师／机枪兵、己方肥胖僵尸。单位均从所属阵营自然入口（**己方 x = 0，敌方 x = 1600**）进入，采用来源物种配置／全体倍率，不加暴民愤怒加成。手动生成不消耗现金、XP，不改已付订单，也不预留招募人口；未预留人口标记保证死亡／清理不错误退还其他已付兵或订单的人口。双方共享场上 1,000 实体保护，超量整批在创建前拒绝。
+`spawnFactionUnit` 返回 `{side,kind,type,count,positions}`，两个兼容快捷接口仍返回 `{type,count,positions}`。这些是底层即时接口；玩家批量区域采用下述队列；己方人类和敌方僵尸各五个一键按钮仍即时生成。双方出兵表单常驻并列、独立保持所选类型／数量／速率，切换其他区域不丢失输入。支持完整二十种阵营／类型组合，例如敌方牧师／机枪兵、己方肥胖僵尸。单位均从所属阵营自然入口（**己方 x = 0，敌方 x = 1600**）进入，采用来源物种配置／全体倍率，不加暴民愤怒加成。手动生成不消耗现金、XP，不改已付订单，也不预留招募人口；未预留人口标记保证死亡／清理不错误退还其他已付兵或订单的人口。双方共享场上 1,000 实体保护，超量整批在创建前拒绝。
 
 `src/factions.js` 把来源物种与当前阵营分开，不是仅改一个外观标记。跨阵营单位朝向、行进和索敌面向敌对一方，按类型行为攻击该方角色／基地；转化改变阵营，按类型清场以当前阵营为准。全体倍率仍跟随物种，不是把敌方人类改用僵尸数值表或反过来。角色后来被转化，不改变此前已发射投射物的发射阵营。跨阵营牧师适配可转化敌对的可移动人类／僵尸（范围 320、基础生命预算 1,000、排除基地）；原生己方牧师保留原版僵尸可转化范围。
 
-`getBattleStatus().factions` 按当前阵营返回 `{friendly:{units,zombies},enemy:{units,zombies}}`；战斗状态和控制器状态中的 `powerProgress` 返回 `{pendingTotal,groups:[{type,count,source}]}`，反映技能等待分发量。
+`getBattleStatus().factions` 按当前阵营返回 `{friendly:{units,zombies},enemy:{units,zombies}}`；战斗状态和控制器状态中的 `powerProgress` 返回 `{pendingTotal,groups:[{type,count,source,side?}]}`，反映技能等待分发量；`side` 只出现在沙盒释放组，旧正常技能结构不变。
 
 `getState().troopCounts`／`getBattleStatus().troopCounts` 为 `{friendly:{units:[n0,n1,n2,n3,n4],zombies:[n0,n1,n2,n3,n4],total},enemy:{units:[...],zombies:[...],total}}`。沙盒选关／开局行下方的只读**“在场兵力”**表列十种单位、双方数量及合计。按当前阵营去重，只计生命大于 0 且模式非 14／15 的角色，含转化人类／僵尸；排除基地、招募／手动／技能待出量、人口上限与效果车辆。菜单显示 0，结束战局保留实际幸存者直到重置。读取不推进 tick、不抽随机数，也不修改任何状态。
 
-清场方法可在运行或暂停时调用，不推进模拟。己方包含普通幸存者、愤怒暴民召唤兵与转化僵尸；选中对象生命设为 `0`、死亡模式设为 `15`，立即从交战链表移除，排除基地。返回 `{side, count, people, converted, zombies}`，仅为普通招募幸存者释放人口，每个对象只释放一次；重复清空同一阵营返回数量 `0`。不增加 XP、击杀、损失或现金，不制造死亡特效，不删除已有尸体、投射物或技能效果，不取消已付订单、改变计时或波次／增援队列。自动出怪须另行关闭。这是即时沙盒操作，不保存为预设开关。省略参数、`null`、`all` 清全体。双方方法都接受 `{kind:"unit",type:0..4}` 或 `{kind:"zombie",type:0..4}`，匹配当前阵营中的对应物种，包含转化僵尸；旧整数含义不变（己方选人类、敌方选僵尸）；己方 `{kind:"converted",type}`／`converted-N` 保留为己方僵尸别名。返回计数中 `people` 表示任一阵营移除的人类，`converted` 表示己方僵尸（含手动和转化），`zombies` 表示敌方僵尸。先校验筛选条件，再清理，不误伤未选类型。
+清场方法可在运行或暂停时调用，不推进模拟。己方包含普通幸存者、愤怒暴民召唤兵与转化僵尸；选中对象生命设为 `0`、死亡模式设为 `15`，立即从交战链表移除，排除基地。返回 `{side, count, people, converted, zombies}`，仅为普通招募幸存者释放人口，每个对象只释放一次；重复清空同一阵营返回数量 `0`。不增加 XP、击杀、损失或现金，按原生 `bbDeath`／`bbBodyPart`／纯视觉 `bbExplosion` 生成带 `bbSandboxDeath = 1` 的脱离战斗死亡动画，暂停时冻结、正常更新回收；特效构建后恢复随机种子。不删除已有尸体、投射物或技能效果，不取消已付订单、改变计时或波次／增援队列。自动出怪须另行关闭。这是即时沙盒操作，不保存为预设开关。省略参数、`null`、`all` 清全体。双方方法都接受 `{kind:"unit",type:0..4}` 或 `{kind:"zombie",type:0..4}`，匹配当前阵营中的对应物种，包含转化僵尸；旧整数含义不变（己方选人类、敌方选僵尸）；己方 `{kind:"converted",type}`／`converted-N` 保留为己方僵尸别名。返回计数中 `people` 表示任一阵营移除的人类，`converted` 表示己方僵尸（含手动和转化），`zombies` 表示敌方僵尸。先校验筛选条件，再清理，不误伤未选类型。
 
 `getState().bases`／`getBattleStatus().bases` 提供 `{friendly:{current,maximum},enemy:{current,maximum}}`，非活动战斗为 `null`。最大生命仍是 `config.units[5].health`／`config.zombies[5].health`，即时提交遵循生命调整策略；直接设当前生命不作为下局初始血量保存，也不能复活已结束战局。
 
 ### 独立速率手动出兵队列
 
-批量区域选择阵营、类型、数量和**“本批出兵速率（只/游戏秒）”**，点**“加入出兵队列”**。数量范围 **1–2,147,483,647**；速率是有限数 **0–1,000,000 只／游戏秒**，支持小数：`0.1` 为每 10 游戏秒出 1 只，`2` 为每游戏秒出 2 只，`0` 只暂停该任务。一游戏秒为 **120 战斗 tick**，原游戏速度和运行时倍速共同改变现实出兵速率。默认 **120** 仅用于新任务，不影响已排任务。
+两方并列批量区域各自选择类型、数量和**“本批出兵速率（只/游戏秒）”**，点**“加入出兵队列”**。数量范围 **1–2,147,483,647**；速率是有限数 **0–1,000,000 只／游戏秒**，支持小数：`0.1` 为每 10 游戏秒出 1 只，`2` 为每游戏秒出 2 只，`0` 只暂停该任务。一游戏秒为 **120 战斗 tick**，原游戏速度和运行时倍速共同改变现实出兵速率。默认 **120** 仅用于新任务，不影响已排任务。
 
 各任务独立并发，不是前一个没结束后一个就不出的单一 FIFO。公平轮转共用**每模拟 tick 最多 32 只**的预算，并遵守**含基地的场上 1,000 实体**保护。满场保留待出余量，不吞请求，也不攒成之后一口气补跑的大爆发；单批暂停、改速也不追补先前时间。极高速率受共用预算约束。第一只在经过间隔（`120/rate` 战斗 tick）后出现，不在加入时立即生成；高速任务最早下一 tick 开始。
 
@@ -295,11 +299,17 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 
 启动在配置／规则、`Factions` 后、游戏初始化前安装 `SpawnQueue`。模块接口为 `install(target)`、`enqueue(target,side,descriptor,count,{rate}?)`、`updateRate(target,id,rate)`、`setDefaultRate(target,rate)`（`setRate` 别名，仅新任务）、`cancel(target,id?)`（省略为全部）、`snapshot(target)`（`getState` 别名）。
 
+### 双方技能快捷释放与一键解锁
+
+技能区双方各显示三个技能图标，调用 `releaseSandboxPower(powerId, side)`，`side` 为 `friendly`／`enemy`，返回 `{powerId,side,requested,spawned,pending}`。仅活动自定义局可用，暂停时也可释放；效果使用当前配置并归属指定阵营，愤怒暴民从该阵营自然入口出场，收割机、空袭只伤敌对小兵。此动作免费且无需正常解锁、蓄力、冷却，不修改原技能的 XP／忙碌／冷却状态；原画面技能按钮的正常流程保持不变。大量请求仍走受预算与场上容量约束的技能队列。
+
+关卡编辑右侧的一键解锁调用 `unlockAll()`：有效配置中单位／建筑 `dependency` 与技能 `unlockAfterStage` 设为 `0`，即时解除本局前置／锁定；菜单只更新模板，不自动开局。控制器先验证再将原版局转为自定义，保留原版和自定义成绩；它不赠建筑、现金、XP 或胜利，可选 `rules.unlockAllStages: true` 同时开放原 Canvas 菜单四关和自定义选关；缺省／`false` 保留正常锁定，显示及持久化成绩不替换、不伪造。解锁后的规则可保存／导出为预设，恢复默认可恢复原限制。
+
 ### 取消技能效果
 
 技能页的**“取消当前技能效果”／“取消全部技能效果”**调用 `Customization.cancelPowerEffects(0|1|2|"all")`，省略参数为全部。仅活动自定义局可用，暂停时也能操作并保留暂停状态。控制器先只读预检，再在冻结时间中取消，返回 `GameConfig.cancelPowerEffects` 的 `{pending,actors,powerups,projectiles,explosions,charging}` 计数。
 
-清理所选技能的蓄力、待出队列及已放出的对应效果：暴民来源角色（含后来被转化者）、收割机或飞机／未落地空袭炸弹，以及有空袭来源标记的爆炸视觉效果。普通小兵、手动生成单位和燃烧瓶不是要清掉的技能效果。取消所选蓄力会清除忙碌／蓄力状态，但保留剩余冷却；再次释放仍遵守正常条件。不退 XP，不重置冷却，不回滚已经造成的伤害，不改现金／人口或未来波次、招募和建筑计划。这是即时动作，不是预设开关。
+清理双方所选技能的蓄力、待出队列及已放出的对应效果：暴民来源角色（含后来被转化者）、收割机或飞机／未落地空袭炸弹，以及有空袭来源标记的爆炸视觉效果。普通小兵、手动生成单位和燃烧瓶不是要清掉的技能效果。取消所选蓄力会清除忙碌／蓄力状态，但保留剩余冷却；再次释放仍遵守正常条件。不退 XP，不重置冷却，不回滚已经造成的伤害，不改现金／人口或未来波次、招募和建筑计划。这是即时动作，不是预设开关。
 
 ### 本局波次合并
 
@@ -346,6 +356,8 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
   }
 }
 ```
+
+可选 `unlockAllStages` 为布尔值，缺省按 `false` 处理并保留旧预设原样；为 `true` 时即时解除原菜单四关锁定，不改通关记录。一键解锁会设置它，存入规则预设。
 
 | 数值规则 | 允许范围 | 实时行为 |
 | --- | --- | --- |

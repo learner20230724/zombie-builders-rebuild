@@ -288,14 +288,15 @@
     function preflightConfiguration(configuration,options,includeWaves=true) {
       preflightPromotion();
       const report=state.api.config.updateLive(target,configuration,{healthPolicy:options.healthPolicy||'ratio',preserveTimerProgress:true,
-        multipliers:options.multipliers||state.rules.multipliers,validateOnly:true});
+        multipliers:options.multipliers||state.rules.multipliers,validateOnly:true,...(options.sandboxUnlocks?{sandboxUnlocks:true}:{})});
       if (battle() && includeWaves) synchronizeWaves(configuration,report,{validateOnly:true,multipliers:options.multipliers||state.rules.multipliers});
       return report;
     }
     function applyValidatedConfiguration(validated,options) {
       if (!battle()) fail('请先开始一局游戏');
       const promoted=promote();
-      const result=state.api.config.updateLive(target,validated,{healthPolicy:options.healthPolicy||'ratio',preserveTimerProgress:true,multipliers:options.multipliers||state.rules.multipliers});
+      const result=state.api.config.updateLive(target,validated,{healthPolicy:options.healthPolicy||'ratio',preserveTimerProgress:true,
+        multipliers:options.multipliers||state.rules.multipliers,...(options.sandboxUnlocks?{sandboxUnlocks:true}:{})});
       state.config=validated;state.stage=game().bbdifficulty+1;
       return {...synchronizeWaves(validated,result),promoted};
     }
@@ -337,9 +338,49 @@
         fail('清理类型无效：请选择 0–4 的己方兵种、转化僵尸或敌方僵尸');
       return body=>body.bbunit?.bbtype===(kind==='unit'?type:type+32);
     }
+    function deathEffectPlan(value,bodies) {
+      const plan=[],partSheets=[value.bbzombiepartsheet,value.bbghoulpartsheet,value.bbfastzombiepartsheet,value.bbfatzombiepartsheet];
+      const add=(list,effect)=>{effect.bbSandboxDeath=1;plan.push([list,effect]);};
+      const explosion=(body,x,scale)=>add(value.bbexplosions,new port.bb_Explosion().bbExplosion_new(body.bblayer,
+        port.bb_Cell.bbcells(value.bbexplosionsheet),x,body.bbypos,scale));
+      const seed=port.state.bb_std_random_Seed;
+      try {
+        for (const body of bodies) {
+          const type=body.bbunit.bbtype;
+          if (![body.bbxpos,body.bbypos,body.bblayer].every(Number.isFinite)) fail('无法清场：死亡动画位置无效');
+          if (type>=0 && type<5) {
+            const sheet=[value.bbshoveldeathsheet,value.bbshotgundeathsheet,null,null,value.bbpreacherdeathsheet][type];
+            if ([0,1,4].includes(type) && (!sheet || !Number.isInteger(sheet.bblastframe) || sheet.bblastframe<1)) fail('无法清场：死亡动画素材无效');
+            if (sheet) add(value.bbdeathlist,new port.bb_Death().bbDeath_new(sheet,body.bblayer,body.bbxpos,body.bbypos));
+            else if (type===2) explosion(body,body.bbxpos,3);
+            else {explosion(body,body.bbxpos-10,2);explosion(body,body.bbxpos-5,1.5);}
+          } else if (type===36) explosion(body,body.bbxpos,4);
+          else if (type>=32 && type<36) {
+            const sheet=partSheets[type-32];
+            if (!sheet || !Number.isInteger(sheet.bblastframe) || sheet.bblastframe<1 || sheet.bblastframe>128) fail('无法清场：死亡动画素材无效');
+            for (let frame=1;frame<=sheet.bblastframe;frame++) {
+              let vx=port.bb_std_random_Rnd2(4)-2,vy=-2-port.bb_std_random_Rnd2(4);
+              if (body.bbsmackstyle===1) {vx=port.bb_std_random_Rnd2(4);vy=-2-port.bb_std_random_Rnd2(2);}
+              if (body.bbsmackstyle===2) {vx=port.bb_std_random_Rnd2(5);vy=-2-port.bb_std_random_Rnd2(3);}
+              add(value.bbbodyparts,new port.bb_BodyPart().bbBodyPart_new(body.bblayer,sheet,frame,body.bbxpos,body.bbypos,vx,vy));
+            }
+          } else fail('无法清场：死亡动画类型无效');
+        }
+      } finally {port.setRandomSeed(seed);}
+      // Effects use their original detached animation/physics and recycle in
+      // the ordinary update. Validate all append targets before any actor dies.
+      for (const list of new Set(plan.map(([list])=>list))) {
+        if (typeof list?.bbAddLast!=='function') fail('无法清场：死亡动画列表不可用');
+        const head=list.bb_head,tail=head?.bb_pred;
+        if (!head || !tail || tail.bb_succ!==head || head.bb_succ?.bb_pred!==head) fail('无法清场：死亡动画列表损坏');
+        writable(head,'bb_pred');writable(tail,'bb_succ');
+      }
+      return plan;
+    }
     function clearTroops(side,selection) {
       const value=customBattle(),matches=troopFilter(side,selection),isBase=body=>body===value.bbpeoplebase || body===value.bbzombiebase || [5,37].includes(body?.bbunit?.bbtype);
-      const groups=(side==='friendly'?[['people',value.bbpeople],['converted',value.bbpombies]]:[['zombies',value.bbzombies]])
+      const groups=(side==='both'?[['people',value.bbpeople],['converted',value.bbpombies],['zombies',value.bbzombies]]:
+        side==='friendly'?[['people',value.bbpeople],['converted',value.bbpombies]]:[['zombies',value.bbzombies]])
         .map(([kind,list])=>({kind,list,bodies:[...new Set(entries(list))].filter(body=>!isBase(body) && matches(body,kind))}));
       const result={side,count:0,people:0,converted:0,zombies:0},bodies=new Set();
       let releasedPopulation=0;
@@ -365,7 +406,7 @@
           writable(body,'bbhealth');writable(body,'bbmode');
           if (bodies.has(body)) continue;
           bodies.add(body);
-          const category=body.bbunit.bbtype>=0 && body.bbunit.bbtype<5 ? 'people' : side==='friendly' ? 'converted' : 'zombies';
+          const category=body.bbunit.bbtype>=0 && body.bbunit.bbtype<5 ? 'people' : group.kind==='zombies' ? 'zombies' : 'converted';
           result[category]++;result.count++;
           // This is the original Person removal refund, not a recalculation of
           // the whole army: paid production still reserves its population, and
@@ -380,16 +421,38 @@
         if (!Number.isFinite(value.bbztp?.bbforce)) fail('无法清场：人口状态无效');
         writable(value.bbztp,'bbforce');
       }
+      const effects=deathEffectPlan(value,bodies);
       runtimeTransaction(()=>{
         // Sandbox execution is deliberately not a damage hit or a GameTick:
         // jumping / immune actors still die immediately, even while paused,
-        // without XP, kill/loss statistics, explosions, RNG or a timer advance.
-        // Existing projectiles/corpses and future production/spawn plans stay.
+        // without XP, kill/loss statistics, damage, RNG or a timer advance.
+        // Original detached death visuals keep playing after the actor leaves
+        // battle; visual explosions never call the damaging bottle/blast APIs.
         for (const body of bodies) { body.bbhealth=0;body.bbmode=15; }
         for (const group of groups) for (const body of group.bodies) group.list.bbRemove(body);
         if (releasedPopulation) value.bbztp.bbforce=Math.max(0,value.bbztp.bbforce-releasedPopulation);
+        for (const [list,effect] of effects) list.bbAddLast(effect);
       });
       notify();return result;
+    }
+    function commitCheckedSettings(checked,options={},sandboxUnlocks=false) {
+      const staged=!battle(),liveOptions={...options,multipliers:checked.rules.multipliers,...(sandboxUnlocks?{sandboxUnlocks:true}:{})};
+      preflightRules(checked.rules);preflightConfiguration(checked.config,liveOptions);
+      const result=runtimeTransaction(()=>{
+        let report;
+        if (!staged) report=applyValidatedConfiguration(checked.config,liveOptions);
+        else {
+          // Menu edits stage the next-reset templates without starting a match.
+          report=state.api.config.updateLive(target,checked.config,{healthPolicy:options.healthPolicy||'ratio',preserveTimerProgress:true,
+            multipliers:checked.rules.multipliers,...(sandboxUnlocks?{sandboxUnlocks:true}:{})});
+          const promoted=promote();state.config=checked.config;state.stage=null;
+          state.lastWaveReport=null;state.lastWaveBattleToken=null;
+          report={...report,promoted};
+        }
+        state.api.rules.update(target,checked.rules);state.rules=checked.rules;
+        return report;
+      });
+      persist();notify();return {...result,staged,rules:plain(checked.rules),normalized:plain(checked)};
     }
     const controller={
       getState:snapshot,
@@ -471,23 +534,18 @@
         const checked=spec(state,input);
         object(options,['healthPolicy'],'commit options');
         if (!['ratio','new-only',undefined].includes(options.healthPolicy)) fail('unsupported health policy');
-        const staged=!battle();
-        preflightRules(checked.rules);preflightConfiguration(checked.config,{...options,multipliers:checked.rules.multipliers});
-        const result=runtimeTransaction(()=>{
-          let report;
-          if (!staged) report=applyValidatedConfiguration(checked.config,{...options,multipliers:checked.rules.multipliers});
-          else {
-            // Menu edits update the existing templates and the next-reset raw
-            // data in place; never reload or secretly start another match.
-            report=state.api.config.updateLive(target,checked.config,{healthPolicy:options.healthPolicy||'ratio',preserveTimerProgress:true,multipliers:checked.rules.multipliers});
-            const promoted=promote();state.config=checked.config;state.stage=null;
-            state.lastWaveReport=null;state.lastWaveBattleToken=null;
-            report={...report,promoted};
-          }
-          state.api.rules.update(target,checked.rules);state.rules=checked.rules;
-          return report;
-        });
-        persist();notify();return {...result,staged,rules:plain(checked.rules),normalized:plain(checked)};
+        return commitCheckedSettings(checked,options);
+      },
+      unlockAll() {
+        const configuration=current();
+        for (const unit of configuration.units) if (unit.id!==5) unit.dependency=0;
+        for (const building of configuration.buildings) building.dependency=0;
+        for (const power of configuration.powers) power.unlockAfterStage=0;
+        const checked=spec(state,{config:configuration,rules:{...state.rules,unlockAllStages:true}});
+        const report=commitCheckedSettings(checked,{},true);
+        // Explicit sandbox menu access never fabricates wins in either score
+        // namespace; the custom launcher can select all four stages as well.
+        return {...report,unlocked:{units:5,buildings:6,powers:3,stages:[1,2,3,4]}};
       },
       applyRules(rules) {
         customBattle(); const checked=spec(state,{config:current(),rules});
@@ -516,6 +574,15 @@
         if (typeof state.api.config.cancelPowerEffects!=='function') fail('技能取消功能不可用，请更新游戏后重试');
         state.api.config.cancelPowerEffects(target,powerId,{validateOnly:true});
         const report=runtimeTransaction(()=>state.api.config.cancelPowerEffects(target,powerId));
+        notify();return report;
+      },
+      releaseSandboxPower(powerId,side='friendly') {
+        customBattle();
+        if (!Number.isInteger(powerId) || powerId<0 || powerId>2) fail('技能编号必须为 0–2');
+        if (!['friendly','enemy'].includes(side)) fail('技能阵营必须为 friendly 或 enemy');
+        if (typeof state.api.config.releaseSandboxPower!=='function') fail('沙盒技能功能不可用，请更新游戏后重试');
+        state.api.config.releaseSandboxPower(target,powerId,{side,validateOnly:true});
+        const report=runtimeTransaction(()=>state.api.config.releaseSandboxPower(target,powerId,{side}));
         notify();return report;
       },
       spawnFactionUnit(side,selection,count=1) {
@@ -574,6 +641,7 @@
       },
       clearFriendlyTroops:selection=>clearTroops('friendly',selection),
       clearEnemyTroops:selection=>clearTroops('enemy',selection),
+      clearAllTroops:()=>clearTroops('both'),
       setBaseHealth(side,health) {
         const value=customBattle();
         if (!['friendly','enemy'].includes(side)) fail('基地阵营必须为 friendly 或 enemy');
@@ -643,7 +711,7 @@
     return active;
   }
   const api={prepare,attach,ready,constants:Object.freeze({ORIGINAL_STORAGE,CUSTOM_STORAGE,PRESETS_KEY,SESSION_KEY,MAX_PRESETS,MAX_IMPORT_BYTES:LIMIT})};
-  for (const name of ['getState','getBattleStatus','getDraft','validateDraft','listPresets','loadPreset','savePreset','deletePreset','exportPreset','importPreset','startCustomBattle','restoreOriginal','applyLive','applyDraft','commitSettings','applyRules','enqueueSpawn','setSpawnJobRate','cancelSpawnJob','cancelAllSpawnJobs','cancelPowerEffects','spawnFactionUnit','spawnFriendlyUnit','spawnZombie','clearFriendlyTroops','clearEnemyTroops','setBaseHealth','applyUpcomingWaves','pauseForEditor','resumeFromEditor','subscribe'])
+  for (const name of ['getState','getBattleStatus','getDraft','validateDraft','listPresets','loadPreset','savePreset','deletePreset','exportPreset','importPreset','startCustomBattle','restoreOriginal','applyLive','applyDraft','commitSettings','unlockAll','applyRules','enqueueSpawn','setSpawnJobRate','cancelSpawnJob','cancelAllSpawnJobs','cancelPowerEffects','releaseSandboxPower','spawnFactionUnit','spawnFriendlyUnit','spawnZombie','clearFriendlyTroops','clearEnemyTroops','clearAllTroops','setBaseHealth','applyUpcomingWaves','pauseForEditor','resumeFromEditor','subscribe'])
     api[name]=function () { if (!active) fail('game is not ready'); return active[name].apply(active,arguments); };
   return Object.freeze(api);
 });

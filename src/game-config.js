@@ -1,10 +1,11 @@
 /* Hand-written configuration boundary. Keep this separate from generated-game.js. */
 (function (root, factory) {
   'use strict';
-  const api = factory();
+  const api = factory(typeof module === 'object' && module.exports ?
+    {factions:require('./factions.js'),rules:require('./custom-rules.js')} : null);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.GameConfig = api;
-})(typeof globalThis === 'object' ? globalThis : this, function () {
+})(typeof globalThis === 'object' ? globalThis : this, function (imports) {
   'use strict';
   const KINDS = ['units', 'zombies', 'buildings', 'powers', 'levels'];
   // A zero maximum removes the gameplay cap, not the engine's numeric guard.
@@ -39,6 +40,7 @@
   // Enumerable symbol provenance survives Object.assign-based faction copies,
   // while ordinary trained/manual people never acquire a skill source tag.
   const powerProvenance = Symbol('GameConfig.powerProvenance');
+  const sandboxPowerSide = Symbol('GameConfig.sandboxPowerSide');
   const maximumHealth = Symbol('GameConfig.maximumHealth');
   function fail(path, message) { throw new Error('GameConfig ' + path + ': ' + message); }
   function object(value, path, required, optional) {
@@ -342,14 +344,31 @@
       const position = group.index % POWER_DISPATCH_BUDGET + 1;
       let body, admitted;
       if (angry) {
-        const sheet = [game.bbshovelman,game.bbshotgunman,game.bbtrucksheet,game.bbbombersheet,game.bbpreachersheet][group.type];
-        body = game.bbunits[group.type].bbInstance(target.bb_Rand(8),port.bb_Cell.bbcells(sheet));
-        body[powerProvenance] = 0;
-        body.bbxpos = -position*group.spacing + target.bb_reversebits(position,4);
-        body.bbAnger(); admitted = game.bbpeople.bbAddLast(body);
+        if (group.side) {
+          const factions = target.Factions || imports?.factions, rules = target.CustomRules || imports?.rules;
+          const spawn = () => factions.spawn(target,group.side,{kind:'unit',type:group.type},1)[0];
+          body = rules ? rules.withManualSpawn(target,spawn) : spawn();
+          admitted = !!body;
+        } else {
+          const sheet = [game.bbshovelman,game.bbshotgunman,game.bbtrucksheet,game.bbbombersheet,game.bbpreachersheet][group.type];
+          body = game.bbunits[group.type].bbInstance(target.bb_Rand(8),port.bb_Cell.bbcells(sheet));
+          admitted = game.bbpeople.bbAddLast(body);
+        }
+        if (body) {
+          body[powerProvenance] = 0;
+          const offset = -position*group.spacing + target.bb_reversebits(position,4);
+          body.bbxpos = group.side === 'enemy' ? 1600-offset : offset;
+          port.bb_Person.prototype.bbAnger.call(body);
+        }
       } else {
-        body = new port.bb_PowerUp().bbPowerUp_new(target.bb_Rand(8),2,game.bbjetsheet,null);
-        body.bbxpos -= position*128; body.bbypos += target.bb_reversebits(position,4)*10;
+        const harvester = group.source === 'harvester', type = harvester ? 1 : 2;
+        body = new port.bb_PowerUp().bbPowerUp_new(harvester ? 0 : target.bb_Rand(8),type,
+          harvester ? game.bbharvestsheet : game.bbjetsheet,harvester ? game.bbharvestbloodsheet : null);
+        if (!harvester) { body.bbxpos -= position*128; body.bbypos += target.bb_reversebits(position,4)*10; }
+        if (group.side) {
+          body[sandboxPowerSide] = group.side;
+          if (group.side === 'enemy') { body.bbxpos = 1600-body.bbxpos;body.bbwalkspeed = -body.bbwalkspeed; }
+        }
         admitted = game.bbpowerups.bbAddLast(body);
       }
       budget--;
@@ -359,6 +378,62 @@
       group.index++; group.count--;
       if (group.count === 0) state.powerSpawns.splice(cursor,1);
     }
+  }
+  function releaseSandboxPower(target,powerId,options) {
+    const port = portFor(target), state = states.get(target), game = port.state.bb_Game;
+    if (!state) throw new Error('GameConfig: install or apply configuration first');
+    integer(powerId,'$powerId',0,2);
+    object(options,'$options',['side'],['validateOnly']);
+    if (!['friendly','enemy'].includes(options.side)) fail('$options.side','expected friendly or enemy');
+    if ('validateOnly' in options && typeof options.validateOnly !== 'boolean') fail('$options.validateOnly','expected a boolean');
+    if (!game || ![2,6].includes(game.bbmainState)) throw new Error('GameConfig: sandbox skill release requires an active battle');
+    const rules = target.CustomRules || imports?.rules;
+    if (!rules || typeof rules.snapshot !== 'function') throw new Error('GameConfig: sandbox skills require CustomRules.install');
+    rules.snapshot(target);
+    const effect = (state.activeCompiled || state.compiled).config.powers[powerId].effect;
+    const groups = [], side = options.side;
+    if (powerId === 0) {
+      const factions = target.Factions || imports?.factions;
+      if (!factions || typeof factions.validateSpawn !== 'function') throw new Error('GameConfig: sandbox skills require Factions.install');
+      for (const [type,key,spacing] of [[0,'shovelCount',20],[1,'shotgunCount',50],
+        [2,'survivalistCount',100],[3,'bomberCount',50],[4,'preacherCount',50]]) {
+        if (effect[key]) {
+          factions.validateSpawn(target,side,{kind:'unit',type},effect[key]);
+          groups.push({game,powerId,side,source:'angry-mob',type,count:effect[key],index:0,spacing});
+        }
+      }
+    } else if (powerId === 1 || effect.jetCount) {
+      groups.push({game,powerId,side,source:powerId === 1 ? 'harvester' : 'airstrike',type:powerId,count:powerId === 1 ? 1 : effect.jetCount,index:0});
+    }
+    // Validate every ordinary write and linked-list insertion before allocating,
+    // drawing RNG or publishing the compact request. validateOnly is pure.
+    const writable = (owner,key) => {
+      const d = Object.getOwnPropertyDescriptor(owner,key);
+      if (d ? !('value' in d) || !d.writable : !Object.isExtensible(owner))
+        throw new Error('GameConfig: sandbox skill target is not writable: '+String(key));
+    };
+    if (!Array.isArray(state.powerSpawns) || !Object.isExtensible(state.powerSpawns)) throw new Error('GameConfig: sandbox skill queue is not writable');
+    writable(state.powerSpawns,'length');
+    // Dispatch may service older actor/effect requests before this new one.
+    // Preflight both classes, not just the lists used by the selected skill.
+    for (const key of ['bbpeople','bbpombies','bbzombies','bbpowerups']) {
+      const collection = cancellationNodes(game,key);
+      for (const node of [collection.head,...collection.nodes]) {writable(node,'bb_pred');writable(node,'bb_succ');}
+    }
+    const requested = groups.reduce((sum,group) => sum+group.count,0);
+    for (const group of state.powerSpawns) if (group.game === game && group.side && group.source === 'angry-mob')
+      (target.Factions || imports?.factions).validateSpawn(target,group.side,{kind:'unit',type:group.type},group.count);
+    if (!Number.isSafeInteger(requested+state.powerSpawns.reduce((sum,group) => sum+group.count,0)))
+      throw new Error('GameConfig: pending skill count exceeds safe integer storage');
+    const result = {powerId,side,requested,spawned:0,pending:requested};
+    if (options.validateOnly) return result;
+    state.powerSpawns.push(...groups);
+    dispatchPowerSpawns(target,state,game);
+    result.pending = groups.reduce((sum,group) => sum+group.count,0);result.spawned = requested-result.pending;
+    const audio = port.state.bb_Audio;
+    if (powerId === 0) audio.bbPlay(audio.bbangrymob);
+    if (powerId === 2) audio.bbPlay(audio.bbairstrike);
+    return result;
   }
   function cancellationPowerId(value) {
     if (value === undefined || value === 'all') return null;
@@ -481,7 +556,7 @@
     }
     const game = target.ZTPGamePort.state.bb_Game;
     const groups = state.powerSpawns.filter(group => group.game === game)
-      .map(group => ({type:group.type,count:group.count,source:group.source}));
+      .map(group => Object.assign({type:group.type,count:group.count,source:group.source},group.side ? {side:group.side} : {}));
     const result = {pendingTotal:groups.reduce((total,group) => total+group.count,0),groups};
     if (options && options.includeActive) {
       result.byPower = powerEffectSnapshot(state,game).byPower;
@@ -581,6 +656,76 @@
       }
       return result;
     });
+    wrap(port.bb_PowerUp.prototype,'bbUpdate',original => function () {
+      const side = this[sandboxPowerSide];
+      if (!side) return original.apply(this,arguments);
+      const game = port.state.bb_Game, enemy = side === 'enemy', previous = state.powerSource;
+      state.powerSource = this;
+      if (enemy) { this.bbxpos = 1600-this.bbxpos;this.bbwalkspeed = Math.abs(this.bbwalkspeed); }
+      let result;
+      try { result = original.apply(this,arguments); }
+      finally {
+        if (enemy) { this.bbxpos = 1600-this.bbxpos;this.bbwalkspeed = -Math.abs(this.bbwalkspeed); }
+        state.powerSource = previous;
+      }
+      if (this[powerProvenance] === 1) {
+        const rules = target.CustomRules || imports?.rules;
+        const frame = state.powerDispatchFrame;
+        const abilities = frame?.sandboxAbilities || (rules ? rules.snapshot(target).abilities : {harvesterRange:220,harvesterDamagePerTick:100});
+        if (frame) frame.sandboxAbilities = abilities;
+        const direction = enemy ? -1 : 1;
+        const victims = enemy ? [...listItems(game.bbpeople),...listItems(game.bbpombies)] : listItems(game.bbzombies);
+        for (const body of new Set(victims)) {
+          const type = body?.bbunit?.bbtype;
+          if (!Number.isInteger(type) || type === 5 || type === 37 || body === game.bbpeoplebase || body === game.bbzombiebase ||
+              body.bbhealth <= 0 || body.bbmode === 14 || body.bbmode === 15) continue;
+          const human = type < 32;
+          const center = body.bbxpos+(human || !enemy ? body.bbunit.bbhitoffset : -body.bbunit.bbhitoffset);
+          const edge = center-direction*body.bbunit.bbhitradius;
+          const distance = Math.trunc(direction*(edge-Math.trunc(this.bbxpos)));
+          if (distance >= 0 && distance < abilities.harvesterRange) {
+            if (human && typeof body.bbInfect === 'function') body.bbInfect(abilities.harvesterDamagePerTick);
+            else body.bbSmack(abilities.harvesterDamagePerTick,1);
+            this.bbHarvest(body);
+          }
+        }
+        // Both the recovered tick and the outer CustomRules hook otherwise
+        // target the original enemy-only list. Hide this one branch until the
+        // synchronous enclosing update has completed, exactly as CustomRules
+        // does for a non-default native harvester range/damage.
+        if (state.bottleLoopDepth) {
+          (state.sandboxHarvesters ||= new Set()).add(this);this.bbtype = -1;
+        }
+      }
+      return result;
+    });
+    wrap(port.bb_PowerUp.prototype,'bbDraw',original => function (dx) {
+      if (this[sandboxPowerSide] !== 'enemy') return original.apply(this,arguments);
+      const previous = state.powerDrawSource;state.powerDrawSource = this;
+      const x = this.bbxpos+(dx|0);
+      port.bb_mojo_graphics_PushMatrix();port.bb_mojo_graphics_Translate(2*x,0);port.bb_mojo_graphics_Scale(-1,1);
+      try { return original.apply(this,arguments); }
+      finally {port.bb_mojo_graphics_PopMatrix();state.powerDrawSource = previous;}
+    });
+    wrap(port.bb_Zomba.prototype,'bbAddBlood',original => function (x,y,vx,vy) {
+      const source = state.powerDrawSource;
+      if (source) { x = 2*source.bbxpos-x;vx = -vx; }
+      return original.call(this,x,y,vx,vy);
+    });
+    wrap(port.bb_Zomba.prototype,'bbAddSmoke',original => function (layer,x,y) {
+      if (state.powerSource?.[sandboxPowerSide] === 'enemy') x = 1600-x;
+      return original.call(this,layer,x,y);
+    });
+    wrap(port.bb_Zomba.prototype,'bbAddBottle',original => function (layer,x,y,vx,vy,kind) {
+      const source = state.powerSource;
+      if (source?.[sandboxPowerSide] === 'enemy') { x = 1600-x;vx = -vx; }
+      const result = original.call(this,layer,x,y,vx,vy,kind);
+      if (source && kind === 1) {
+        const bottle = this.bbbottles.bbLast();
+        if (bottle) bottle[sandboxPowerSide] = source[sandboxPowerSide];
+      }
+      return result;
+    });
     wrap(port.bb_Bottle.prototype, 'bbBottle_new', original => function (layer, image, x, y, vx, vy, kind) {
       const result = original.apply(this, arguments);
       // kind 0 is the bomber bottle; kind 1 is the air-strike bomb. Do not
@@ -610,6 +755,10 @@
         return result;
       }
       finally {
+        if (state.sandboxHarvesters) {
+          for (const harvester of state.sandboxHarvesters) harvester.bbtype = 1;
+          state.sandboxHarvesters.clear();
+        }
         state.bottleLoopDepth--; state.explodingBottle = null;
         state.xpAwardFrame = previousXpFrame;
         state.powerDispatchFrame = previousPowerFrame;
@@ -647,14 +796,15 @@
       const explosion = new port.bb_Explosion().bbExplosion_new(layer,port.bb_Cell.bbcells(this.bbexplosionsheet),x,y,1);
       if (hasSource && source[powerProvenance] === 2) explosion[powerProvenance] = 2;
       this.bbexplosions.bbAddLast(explosion);
-      const iterator = this.bbzombies.bbObjectEnumerator();
-      while (iterator.bbHasNext()) {
-        const zombie = iterator.bbNextObject();
+      const side = hasSource && source[sandboxPowerSide];
+      const victims = side === 'enemy' ? [...listItems(this.bbpeople),...listItems(this.bbpombies)] : listItems(this.bbzombies);
+      for (const zombie of new Set(victims)) {
         const distance = Math.abs(zombie.bbxpos-x)|0;
         // Retain the original check of REMAINING damage for air-strikes/direct
         // calls (even after a preceding target consumes some of the pool).
-        if (!(zombie.bbunit.bbtype === 37 && damage === 500 && !bomber) && distance < 100) {
-          damage = zombie.bbSmack(damage,3)|0;
+        const base = side === 'enemy' ? zombie.bbunit.bbtype === 5 : zombie.bbunit.bbtype === 37;
+        if (!(base && damage === 500 && !bomber) && distance < 100) {
+          damage = zombie.bbunit.bbtype < 32 && typeof zombie.bbInfect === 'function' ? zombie.bbInfect(damage)|0 : zombie.bbSmack(damage,3)|0;
           if (damage <= 0) break;
         }
       }
@@ -992,13 +1142,17 @@
     const game = port.state.bb_Game;
     if (!game) throw new Error('GameConfig: updateLive requires an initialized game; use apply before bb_Main');
     options = options === undefined ? {} : options;
-    object(options,'$options',[],['healthPolicy','preserveTimerProgress','multipliers','validateOnly']);
+    object(options,'$options',[],['healthPolicy','preserveTimerProgress','multipliers','validateOnly','sandboxUnlocks']);
     const policy = options.healthPolicy === undefined ? 'ratio' : options.healthPolicy;
     if (!['ratio','new-only'].includes(policy)) fail('$options.healthPolicy','expected ratio or new-only');
     if ('preserveTimerProgress' in options && typeof options.preserveTimerProgress !== 'boolean')
       fail('$options.preserveTimerProgress','expected a boolean');
     if ('validateOnly' in options && typeof options.validateOnly !== 'boolean') fail('$options.validateOnly','expected a boolean');
+    if ('sandboxUnlocks' in options && typeof options.sandboxUnlocks !== 'boolean') fail('$options.sandboxUnlocks','expected a boolean');
     const next = compile(input,{multipliers:options.multipliers === undefined ? state.compiled.multipliers : options.multipliers});
+    if (options.sandboxUnlocks && (next.config.units.some(item => item.dependency !== undefined && item.dependency !== 0) ||
+        next.config.buildings.some(item => item.dependency !== 0) || next.config.powers.some(item => item.unlockAfterStage !== 0)))
+      fail('$options.sandboxUnlocks','requires every building/unit prerequisite and skill unlock stage to be zero');
     const previousCompiled = state.activeCompiled || state.compiled, previous = previousCompiled.config;
     const oldMultipliers = previousCompiled.multipliers;
     const effective = copy(next.config), deferred = [], applied = [];
@@ -1009,7 +1163,9 @@
       const old = previous[kind][item.id-(kind === 'levels' ? 1 : 0)];
       for (const key of Object.keys(item)) {
         const path = '$.'+kind+'['+(kind === 'levels' ? item.id-1 : item.id)+'].'+key;
-        if (inBattle && (deferredFields[kind] || []).includes(key)) {
+        const unlockNow = options.sandboxUnlocks && ((['units','buildings'].includes(kind) && key === 'dependency') ||
+          (kind === 'powers' && key === 'unlockAfterStage'));
+        if (inBattle && !unlockNow && (deferredFields[kind] || []).includes(key)) {
           if (!same(old[key],item[key])) deferred.push(path);
           item[key] = copy(old[key]);
         } else changedPaths(old[key],item[key],path,applied);
@@ -1023,6 +1179,7 @@
     const active = compileValidated(effective,next.multipliers), c = active.config, multipliers = active.multipliers;
     changedPaths(oldMultipliers,multipliers,'$multipliers',applied);
     const plan = templatePlan(game,c,options.preserveTimerProgress !== false,multipliers);
+    if (options.sandboxUnlocks) for (const power of game.bbpowers) plan.push([power,'bblocked',0]);
     const oldLevel = previous.levels[game.bbdifficulty], level = c.levels[game.bbdifficulty];
     if (!level || !oldLevel) throw new Error('GameConfig: invalid runtime difficulty');
     plan.push([game,'bbZombieDamageMultiplier',level.zombieDamageMultiplier],
@@ -1061,9 +1218,10 @@
       }
     }
     for (const effect of listItems(game.bbpowerups)) {
-      if (effect.bbtype !== 1 && effect.bbtype !== 2) continue;
-      const oldSpeed = previous.powers[effect.bbtype].effect.moveSpeed;
-      const newSpeed = c.powers[effect.bbtype].effect.moveSpeed;
+      const type = effect[powerProvenance] ?? effect.bbtype;
+      if (type !== 1 && type !== 2) continue;
+      const oldSpeed = previous.powers[type].effect.moveSpeed;
+      const newSpeed = c.powers[type].effect.moveSpeed;
       plan.push([effect,'bbwalkspeed',newSpeed === oldSpeed ? effect.bbwalkspeed : (effect.bbwalkspeed/oldSpeed)*newSpeed]);
     }
     // These are our own class data properties, but check writability before
@@ -1115,6 +1273,6 @@
     return compiled;
   }
   return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive,getWaveProgress,applyLiveWaves,
-    validateMultipliers,getMaximumHealth,getPowerProgress,cancelPowerEffects,
+    validateMultipliers,getMaximumHealth,getPowerProgress,cancelPowerEffects,releaseSandboxPower,
     BUILDING_SAFETY_LIMIT,HEALTH_SAFETY_LIMIT,POWER_COUNT_LIMIT,POWER_DISPATCH_BUDGET});
 });

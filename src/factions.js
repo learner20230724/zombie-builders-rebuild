@@ -169,12 +169,17 @@
       game.bbzombies.bbRemove(body);body.bbTurn();game.bbpombies.bbAddLast(body);stateFor(target).cross=true;
     }return body;
   }
-  function spawn(target,camp,selection,count=1){
+  function validateSpawn(target,camp,selection,count=1){
     side(camp);const d=descriptor(selection);if(!Number.isInteger(count)||count<1||count>2147483647)fail('count must be an integer between 1 and 2147483647');
     const state=stateFor(target),port=portFor(target),game=port.state.bb_Game;
     if(!game||![2,6].includes(game.bbmainState))fail('an active battle is required');
     for(const group of [game.bbpeople,game.bbpombies,game.bbzombies])preflightList(group);
-    const slots=Math.max(0,LIMIT-list(target,{includeBases:true}).length),result=[];
+    return {kind:d.kind,type:d.type,capacity:Math.max(0,LIMIT-list(target,{includeBases:true}).length)};
+  }
+  function spawn(target,camp,selection,count=1){
+    const checked=validateSpawn(target,camp,selection,count),d=checked;
+    const state=stateFor(target),port=portFor(target),game=port.state.bb_Game;
+    const slots=checked.capacity,result=[];
     for(let i=0;i<Math.min(count,slots);i++){
       let body;
       if(d.kind==='unit'){
@@ -243,5 +248,5 @@
     });
     return target;
   }
-  return Object.freeze({install,spawn,list,getSide:(target,body)=>sideOf(portFor(target).state.bb_Game,body),convert,ENTITY_LIMIT:LIMIT});
+  return Object.freeze({install,spawn,validateSpawn,list,getSide:(target,body)=>sideOf(portFor(target).state.bb_Game,body),convert,ENTITY_LIMIT:LIMIT});
 });

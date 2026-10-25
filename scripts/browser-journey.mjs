@@ -149,10 +149,12 @@ try {
     else{await input.fill(String(value));if(commit==='blur')await input.blur();else await input.press('Enter');}
     await settleEditor();
   }
-  async function queuedBatch(){
-    await page.locator('[data-spawn-rate]').fill('1000000');
+  const spawnForm=side=>page.locator('[data-spawn-form="'+side+'"]');
+  async function queuedBatch(side='enemy'){
+    const form=spawnForm(side);
+    await form.locator('[data-spawn-rate]').fill('1000000');
     const before=await snapshot(),seed=await page.evaluate(()=>ZTPGamePort.state.bb_std_random_Seed);
-    await page.locator('[data-spawn-batch]').click();
+    await form.locator('[data-spawn-batch]').click();
     const job=await page.evaluate(()=>Customization.getState().spawnQueue.jobs.at(-1));assert.ok(job);assert.equal(job.spawned,0);
     const enqueued=await snapshot();for(const key of ['ticks','cash','coins','force','units','people','zombies'])assert.deepEqual(enqueued[key],before[key]);
     assert.equal(await page.evaluate(()=>ZTPGamePort.state.bb_std_random_Seed),seed);
@@ -185,12 +187,15 @@ try {
   assert.equal(await page.evaluate(()=>Customization.getState().rules.corpseSpawnOnImpact),false);
   const current=page.locator('[data-base-current="friendly"]');await current.fill('1111');await current.press('Enter');
   assert.equal((await snapshot()).peopleBase,1111);
-  await page.locator('[data-spawn-species]').selectOption('zombie-3');await page.locator('[data-spawn-count]').fill('2');const enemyJob=await queuedBatch();
+  assert.equal(await page.locator('[data-spawn-side]').count(),0);
+  for(const side of ['friendly','enemy'])assert.equal(await spawnForm(side).isVisible(),true);
+  await spawnForm('enemy').locator('[data-spawn-species]').selectOption('zombie-3');await spawnForm('enemy').locator('[data-spawn-count]').fill('2');const enemyJob=await queuedBatch('enemy');
   const spawned=await snapshot();assert.equal(spawned.zombies.filter(body=>body.type===35).length,2);assert.equal(enemyJob.firstSpawn.x,1600);
   await page.locator('[data-clear-type="enemy"]').selectOption('zombie-3');await page.locator('[data-clear-selected="enemy"]').click();
   assert.equal((await snapshot()).zombies.filter(body=>body.type===35).length,0);assert.equal((await snapshot()).people.filter(body=>body.type===0).length,1);
-  const beforeFriendly=await snapshot();await page.locator('[data-spawn-side]').selectOption('friendly');
-  await page.locator('[data-spawn-species]').selectOption('unit-2');await page.locator('[data-spawn-count]').fill('2');const friendJob=await queuedBatch();
+  const beforeFriendly=await snapshot();
+  await spawnForm('friendly').locator('[data-spawn-species]').selectOption('unit-2');await spawnForm('friendly').locator('[data-spawn-count]').fill('2');const friendJob=await queuedBatch('friendly');
+  assert.equal(await spawnForm('enemy').locator('[data-spawn-species]').inputValue(),'zombie-3');assert.equal(await spawnForm('enemy').locator('[data-spawn-count]').inputValue(),'2');
   const friendlyBatch=await snapshot();assert.equal(friendlyBatch.people.filter(body=>body.type===2).length,2);assert.equal(friendJob.firstSpawn.x,0);
   const income=Math.floor((beforeFriendly.coins+(friendlyBatch.ticks-beforeFriendly.ticks)*beforeFriendly.buildings[1])/600)*50;
   assert.equal(friendlyBatch.cash,beforeFriendly.cash+income);assert.equal(friendlyBatch.force,beforeFriendly.force);assert.deepEqual(friendlyBatch.units,beforeFriendly.units);
@@ -198,6 +203,33 @@ try {
   assert.equal((await snapshot()).people.filter(body=>body.type===2).length,0);assert.equal((await snapshot()).people.filter(body=>body.type===0).length,1);
   await page.screenshot({path:`${out}/13-instant-sandbox-controls.png`});
   check('INSTANT-LIVE-SANDBOX/UI','Real blur/Enter/checkbox edits immediately update existing HP, army multiplier, corpse rule and current base HP; both camps batch-spawn and species-clear exact actual entities without charging free friendly troops.');
+
+  const beforeQuick=await snapshot();await page.locator('[data-spawn-friendly="4"]').click();await page.locator('[data-spawn="3"]').click();
+  const quick=await snapshot();assert.equal(quick.people.filter(body=>body.type===4).length,1);assert.equal(quick.zombies.filter(body=>body.type===35).length,1);
+  assert.equal(quick.cash,beforeQuick.cash);assert.equal(quick.xp,beforeQuick.xp);assert.equal(quick.ticks,beforeQuick.ticks);
+  await page.locator('[data-clear-troops="all"]').click();const bothCleared=await snapshot();
+  assert.deepEqual(bothCleared.people.filter(body=>body.type!==5),[]);assert.deepEqual(bothCleared.zombies.filter(body=>body.type!==37),[]);
+  for(const key of ['ticks','cash','coins','xp','peopleBase','zombieBase','records','units','powers'])assert.deepEqual(bothCleared[key],quick[key]);
+  assert.ok(await page.evaluate(()=>{const g=ZTPGamePort.state.bb_Game;return ['bbdeathlist','bbbodyparts','bbexplosions'].some(key=>{const it=g[key].bbObjectEnumerator();while(it.bbHasNext())if(it.bbNextObject().bbSandboxDeath)return true;return false;});}),'Both-army clearing must retain original native death animation visuals');
+  check('PARALLEL-SPAWN-AND-BOTH-CLEAR/UI','Friendly/enemy forms remain visible with separate type/count fields; both immediate camp cards work and one button clears both armies, retaining bases, resources, records and paid orders while adding native death visuals.');
+
+  await page.locator('#ztps-tab-powers').click();assert.equal(await page.locator('[data-release-power]').count(),6);
+  const beforePowers=await snapshot();
+  for(const side of ['friendly','enemy'])for(let id=0;id<3;id++)await page.locator('[data-power-side="'+side+'"] [data-release-power="'+id+'"]').click();
+  const freePowers=await snapshot(),powerProgress=await page.evaluate(()=>GameConfig.getPowerProgress(window,{includeActive:true}));
+  assert.equal(freePowers.xp,beforePowers.xp);assert.deepEqual(freePowers.powers,beforePowers.powers);assert.equal(freePowers.ticks,beforePowers.ticks);
+  assert.equal(freePowers.people.filter(body=>body.type<5).length,16);assert.equal(freePowers.zombies.filter(body=>body.type<5).length,16);
+  assert.equal(powerProgress.byPower[1].powerups,2);assert.equal(powerProgress.byPower[2].powerups,6);
+  await page.screenshot({path:`${out}/14-dual-camp-power-icons.png`});
+  await page.locator('[data-cancel-power-effects="all"]').click();
+  const clearedPowers=await page.evaluate(()=>GameConfig.getPowerProgress(window,{includeActive:true}));assert.equal(clearedPowers.activeTotal,0);assert.equal(clearedPowers.pendingTotal,0);
+  check('DUAL-CAMP-POWER-ICONS/UI','Six real power icons release both camps immediately during the editor pause without spending XP or changing normal power timers; source cancellation removes their active effects.');
+
+  await page.locator('#ztps-tab-levels').click();const unlockBefore=await snapshot();await page.locator('[data-unlock-all]').click();await settleEditor();
+  const unlocked=await page.evaluate(()=>Customization.getDraft());assert.equal(unlocked.rules.unlockAllStages,true);
+  assert.ok(unlocked.config.units.slice(0,5).every(unit=>unit.dependency===0));assert.ok(unlocked.config.buildings.every(building=>building.dependency===0));assert.ok(unlocked.config.powers.every(power=>power.unlockAfterStage===0));
+  const unlockAfter=await snapshot();for(const key of ['cash','xp','ticks','buildings','peopleBase','zombieBase','records'])assert.deepEqual(unlockAfter[key],unlockBefore[key]);
+  check('UNLOCK-ALL/UI','The stage-editor unlock button updates custom prerequisites, power locks and stage-access rules immediately without giving buildings, resources, or win records; native acceptance separately exercises real locked Stage 4 canvas selection.');
 
   assert.equal(await page.locator('#ztps-panel #ztps-time-host [data-time-controls]').count(),1);
   assert.equal(await page.locator('body > [data-time-controls],main [data-time-controls],.ztps-entry').count(),0);

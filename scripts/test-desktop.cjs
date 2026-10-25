@@ -226,7 +226,10 @@ async function run(options) {
         bases: {friendly: entity(g.bbpeoplebase), enemy: entity(g.bbzombiebase)},
         kills: g.bbzombieskilled, lost: g.bbkinlost, randomSeed: ZTPGamePort.state.bb_std_random_Seed,
         powers: g.bbpowers.map(power => ({busy: power.bbbusy, cooldown: power.bbcooldown, enabled: power.bbenabled, locked: power.bblocked})),
-        effects: Object.fromEntries(['bbbottles', 'bbexplosions', 'bbsmokelist', 'bbflinglist', 'bbbodyparts', 'bbdeathlist', 'bbpowerups'].map(name => [name, entries(g[name]).length])),
+        // Detached native death visuals are tracked separately: clearing must
+        // preserve existing projectiles/skills, while adding cosmetic deaths.
+        effects: Object.fromEntries(['bbbottles', 'bbexplosions', 'bbsmokelist', 'bbflinglist', 'bbbodyparts', 'bbdeathlist', 'bbpowerups'].map(name => [name, entries(g[name]).filter(effect=>!effect.bbSandboxDeath).length])),
+        clearVisuals: Object.fromEntries(['bbexplosions','bbbodyparts','bbdeathlist'].map(name=>[name,entries(g[name]).filter(effect=>effect.bbSandboxDeath).length])),
         units: g.bbunits.map(unit => ({cost: unit.bbcost, health: unit.bbhealth, damage: unit.bbdamage, speed: unit.bbwalkspeed, orders: unit.bborders, busy: unit.bbbusy})),
         zombieUnits: g.bbzunits.map(unit => ({health: unit.bbhealth, damage: unit.bbdamage, speed: unit.bbwalkspeed})),
         liveBases: Customization.getState().bases, rules: Customization.getState().rules,

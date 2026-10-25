@@ -123,14 +123,14 @@ Press **F2** to open settings beside the game (below it in narrow windows). Open
 
 | Area | Controls |
 | --- | --- |
-| Sandbox / spawning | Five zombie buttons still spawn immediately. The batch form selects **friendly/enemy**, any of **ten types** (five humans + five zombies), and quantity; each camp enters from its own side with normal configured stats. A live troop table shows both camps’ counts for all ten types and totals. |
+| Sandbox / spawning | **Friendly and enemy spawn panels stay visible together**, each with its own type, quantity, and rate. Both select any of **ten types** (five humans + five zombies); five immediate human cards and five zombie cards provide quick single-unit spawns. Each camp enters from its own side with normal configured stats. A live troop table shows both camps’ counts for all ten types and totals. |
 | Spawn queues | Click **加入出兵队列** to start an independent stream at its own **units/game-second** rate; 0 pauses that job, 0.1 means one every 10 game-seconds. Add more batches without waiting, edit each rate live, or cancel pending jobs without removing already spawned troops. |
-| Clear current troops | Clear an entire side or a selected human/zombie type by its **current camp**, including converted allies. Bases and future production/waves remain. |
+| Clear current troops | Clear **both armies in one click**, an entire side, or a selected human/zombie type by its **current camp**, including converted units. Original death animations play; bases and future production/waves remain. |
 | Both bases | Quick access directly below clearing: edit maximum HP and **current HP** separately. Current HP can be set to 0 to end the battle normally. |
 | Survivors / zombies | Edit each type; shared **HP, movement, and damage multipliers** sit above the type selector. They follow species (not camp), exclude bases, and combine multiplicatively with stage settings for zombies. |
 | Buildings | Edit price, time, and limits. **Maximum 0** removes the original gameplay cap; extra Salvage Yards contribute real income. |
-| Powers | Angry Mob can summon all five survivor types: Shovel Men, Farmers, Survivalists, Bombers, and Preachers. Larger requests are queued instead of discarded at the old 1,000-request limit. Cancel the selected power’s effects or all power effects with one button. |
-| Stages / waves | Edit type, count, delay, and enabled state. **Newest rows display first**, so added groups are immediately accessible; display order does not reverse execution order. Pause/resume scripted waves independently of battle and manual spawn jobs. |
+| Powers | Angry Mob can summon all five survivor types: Shovel Men, Farmers, Survivalists, Bombers, and Preachers. Larger requests are queued instead of discarded at the old 1,000-request limit. **Friendly/enemy columns each have three one-click power icons** for free immediate sandbox releases; normal game buttons still require XP, charge, unlocks, and cooldowns. Cancel the selected power’s effects or all power effects with one button. |
+| Stages / waves | Edit type, count, delay, and enabled state. **Newest rows display first**, so added groups are immediately accessible; display order does not reverse execution order. Pause/resume scripted waves independently of battle and manual spawn jobs. **Unlock all buildings, powers, and stages** beside the stage editor; this changes custom rules and enables all four menu stages without granting buildings, resources, or win records. |
 
 **Start custom battle** starts a fresh stage with all edited rules. **Save rules** names a reusable preset; load/import/reset/undo also commit their valid values automatically. Export JSON backs up a preset. Original and custom completion records remain separate. Returning to original mode keeps your presets.
 
@@ -139,7 +139,7 @@ Press **F2** to open settings beside the game (below it in narrow windows). Open
 - HP changes can keep each living unit's health percentage (default) or affect new units only; current-base HP has its own direct control. Maximum HP accepts **1–2,147,483,647**.
 - Damage/speed/switches affect subsequent actions; active production and cooldowns keep their progress. Projectiles already in flight keep their launch damage.
 - An unfinished wave's remaining count is `max(0, new total − already scheduled)`. Finished groups never replay; add a new group for another batch. Live status shows actual spawned/remaining counts.
-- Recruitment population/prerequisites, unlocks, opening resources, reinforcements, and other stages' queues take effect when starting the corresponding new battle.
+- Ordinary recruitment population/prerequisite and unlock edits, opening resources, reinforcements, and other stages' queues take effect when starting the corresponding new battle. The dedicated **unlock-all action** removes prerequisites and power locks immediately in custom mode.
 
 More field details and technical limits are in the [configuration reference](config/README.md) and [development guide](docs/DEVELOPMENT.md).
 
