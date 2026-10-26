@@ -16,13 +16,15 @@ const json=name=>JSON.parse(read(name));
 const plain=value=>JSON.parse(JSON.stringify(value));
 function frozenSources(ref){
   const names=[...MODULES.map(name=>'src/'+name+'.js'),'src/runtime.js','src/settings-ui.js','src/time-controls.js','src/boot.js','index.html'];
-  if(ref==='current'&&fs.existsSync(path.join(ROOT,'src/death-effects.js')))names.push('src/death-effects.js');
+  const optional=['src/death-effects.js','src/effect-lists.js'];
+  const tracked=ref==='current'?null:execFileSync('git',['-c','safe.directory='+ROOT,'ls-tree','-r','--name-only',ref,'src'],{cwd:ROOT,encoding:'utf8'}).split(/\r?\n/);
+  for(const name of optional)if(ref==='current'?fs.existsSync(path.join(ROOT,name)):tracked.includes(name))names.push(name);
   return Object.fromEntries(names.map(name=>[name,
     ref==='current'?read(name):execFileSync('git',['-c','safe.directory='+ROOT,'show',ref+':'+name],{cwd:ROOT,encoding:'utf8',maxBuffer:10*1024*1024})]));
 }
 function loadModules(sources,out){
   const folder=path.join(out,'frozen-src');fs.mkdirSync(folder,{recursive:true});
-  const names=MODULES.concat(sources['src/death-effects.js']?['death-effects']:[]);
+  const names=MODULES.concat(sources['src/death-effects.js']?['death-effects']:[],sources['src/effect-lists.js']?['effect-lists']:[]);
   for(const name of names)fs.writeFileSync(path.join(folder,name+'.js'),sources['src/'+name+'.js']);
   return Object.fromEntries(names.map(name=>[name,require(path.join(folder,name+'.js'))]));
 }
@@ -53,7 +55,7 @@ function setScene(target,scene,count){
     fixture:'Synthetic evenly split armies, elevated HP; dense-cross additionally stationary and close-range. Every measured frame executes real update and render; no unit skipped.'};
 }
 function nodeFixture(modules){
-  const GC=modules['game-config'],CR=modules['custom-rules'],F=modules.factions,Q=modules['spawn-queue'],D=modules['death-effects'],manifest=json('public/assets/manifest.json');
+  const GC=modules['game-config'],CR=modules['custom-rules'],F=modules.factions,Q=modules['spawn-queue'],D=modules['death-effects'],E=modules['effect-lists'],manifest=json('public/assets/manifest.json');
   let clock=0,drawCalls=0;const noop=()=>0,draw=()=>{drawCalls++;return 0;};
   const graphics=new Proxy({Width:()=>800,Height:()=>600,LoadSurface(name){const i=manifest.images[name];if(!i)throw Error('Missing '+name);return{Width:()=>i.width,Height:()=>i.height};}},{get:(o,k)=>o[k]||draw});
   const input=new Proxy({}, {get:()=>noop}),audio={LoadSample:name=>({name}),PlaySample:noop,StopChannel:noop};
@@ -61,7 +63,7 @@ function nodeFixture(modules){
   const target=vm.createContext({console,gxtkApp:App,gxtkSurfaceListener:class{},ReadInt:noop,WriteInt:noop,FlushInts:noop,PlayMovie:noop,MovieFinished:()=>1,EndMovie:noop,ShowMochi:noop,ShowMochiScores:noop,HideMochiScores:noop,MochiState:noop,Redirect:noop,
     GameConfig:GC,CustomRules:CR,Factions:F,SpawnQueue:Q,DeathEffects:D});
   vm.runInContext(read('src/generated-game.js'),target,{filename:'src/generated-game.js'});
-  GC.install(target,baselineConfig(GC));CR.install(target,CR.defaults());F.install(target);if(D)D.install(target);Q.install(target);
+  GC.install(target,baselineConfig(GC));CR.install(target,CR.defaults());F.install(target);if(D)D.install(target);if(E)E.install(target);Q.install(target);
   target.bb_Init();target.bb_Main();const p=target.ZTPGamePort,d=p.state.bb_mojo_app_device;d.OnCreate();d.OnUpdate();p.state.bb_Game.bbPlayGame(1);
   return {target,frame(){clock+=1000/60;const a=performance.now();d.OnUpdate();const b=performance.now();d.OnRender();const c=performance.now();return{update:b-a,render:c-b,total:c-a};},get drawCalls(){return drawCalls;}};
 }
@@ -145,7 +147,10 @@ async function browserRun(sources,out,options={}){
   if(errors.length)throw Error(errors.join('; '));return results;
 }
 async function main(){
-  const args=process.argv.slice(2),ref=args.includes('--current')?'current':'v0.4.1';
+  const args=process.argv.slice(2),refIndex=args.indexOf('--ref');
+  const ref=refIndex<0?(args.includes('--current')?'current':'v0.4.1'):args[refIndex+1];
+  if(!['current','v0.4.1','v0.4.2'].includes(ref))throw Error('--ref must be current, v0.4.1 or v0.4.2');
+  if(args.includes('--current')&&ref!=='current')throw Error('--current conflicts with --ref');
   const out=fs.mkdtempSync(path.join(ROOT,'output','perf-'+(ref==='current'?'current':'baseline')+'-'));
   const sources=frozenSources(ref);fs.writeFileSync(path.join(out,'frozen-sources.json'),JSON.stringify(sources));
   const quick=args.includes('--quick');let results;

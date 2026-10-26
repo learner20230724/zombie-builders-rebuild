@@ -335,6 +335,23 @@ test('queue polling keys rows by ID and preserves focused pending rate edits whi
   const f=fixture({custom:true,battle:true});const a=f.controller.enqueueSpawn('enemy',{kind:'zombie',type:3},1000,{rate:20});f.handle.open();const row=f.doc.body.querySelector('[data-spawn-job-id="'+a.id+'"]'),rate=f.doc.body.querySelector('[data-spawn-job-rate="'+a.id+'"]');assert.ok(row);rate.focus();rate.value='0.25';f.current.spawnQueue.jobs[0].spawned=5;f.current.spawnQueue.jobs[0].remaining=995;f.current.spawnQueue.pending=f.current.spawnQueue.totalPending=995;f.tick();assert.equal(f.doc.body.querySelector('[data-spawn-job-id="'+a.id+'"]'),row);assert.equal(f.doc.body.querySelector('[data-spawn-job-rate="'+a.id+'"]'),rate);assert.equal(f.doc.activeElement,rate);assert.equal(rate.value,'0.25');assert.match(row.textContent,/995/);assert.match(f.doc.body.querySelector('[data-spawn-queue-summary]').textContent,/995/);assert.equal(f.calls.some(c=>c[0]==='spawnJobRate'),false);f.handle.destroy();
 });
 
+test('queue rows describe the real blocking reason and display occupancy including bases without calling every pause full',()=>{
+  const f=fixture({custom:true,battle:true}),job=f.controller.enqueueSpawn('enemy',{kind:'zombie',type:3},1000,{rate:20});
+  Object.assign(f.current.spawnQueue,{entityCount:302,baseCount:2,entityLimit:1000,capacity:698});f.handle.open();
+  const row=f.doc.body.querySelector('[data-spawn-job-id="'+job.id+'"]'),summary=f.doc.body.querySelector('[data-spawn-queue-summary]');
+  assert.match(summary.textContent,/场上占用 302 \/ 1000（含基地）/);
+  for(const [reason,label] of [['game-paused','游戏暂停中'],['runtime-paused','战斗暂停中'],['rate-paused','所有批次速率为 0'],['battle-ended','战斗已结束'],['no-active-battle','等待开始战局'],['unknown-future-reason','等待继续出兵']]){
+    f.current.spawnQueue.blocked=reason;f.tick();assert.ok(row.textContent.includes(label),reason);
+    assert.doesNotMatch(row.textContent,/场上已满|等待场上空位/);assert.match(summary.textContent,/302 \/ 1000/);
+  }
+  Object.assign(f.current.spawnQueue,{blocked:'entity-limit',entityCount:1000,capacity:0});f.tick();
+  assert.match(row.textContent,/场上已满，等待单位退场/);assert.match(summary.textContent,/1000 \/ 1000（含基地）/);
+  f.current.spawnQueue.jobs[0].rate=0;f.tick();assert.match(row.textContent,/该批已暂停（速率 0）/);assert.doesNotMatch(row.textContent,/场上已满/);
+  Object.assign(f.current.spawnQueue,{blocked:null,entityCount:999,capacity:1});f.current.spawnQueue.jobs[0].rate=20;f.tick();
+  assert.doesNotMatch(row.textContent,/暂停|场上已满|等待/);assert.match(summary.textContent,/999 \/ 1000/);
+  assert.equal(f.calls.some(c=>c[0]==='spawnJobRate'),false);assert.equal(f.commits().length,0);f.handle.destroy();
+});
+
 test('a completed focused batch remains as a readonly stable row until focus leaves',()=>{
   const f=fixture({custom:true,battle:true}),job=f.controller.enqueueSpawn('enemy',{kind:'zombie',type:3},1,{rate:20});f.handle.open();const row=f.doc.body.querySelector('[data-spawn-job-id="'+job.id+'"]'),rate=f.doc.body.querySelector('[data-spawn-job-rate="'+job.id+'"]');rate.focus();f.current.spawnQueue.jobs=[];f.current.spawnQueue.pending=f.current.spawnQueue.totalPending=0;f.tick();assert.equal(f.doc.body.querySelector('[data-spawn-job-id="'+job.id+'"]'),row);assert.equal(f.doc.activeElement,rate);assert.equal(rate.readOnly,true);assert.equal(rate.getAttribute('aria-readonly'),'true');assert.equal(row.querySelector('[data-cancel-spawn-job]').disabled,true);assert.match(row.textContent,/已结束/);f.canvas.focus();f.tick();assert.equal(f.doc.body.querySelector('[data-spawn-job-id="'+job.id+'"]'),null);f.handle.destroy();
 });

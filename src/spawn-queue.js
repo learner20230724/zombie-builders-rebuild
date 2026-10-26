@@ -35,6 +35,19 @@
     if(!factions||typeof factions.spawn!=='function')fail('Factions must be loaded first');
     return {factions,rules};
   }
+  function entityStatus(game){
+    let entityCount=0,baseCount=0;
+    if(!game)return {entityCount,baseCount,entityLimit:ENTITY_LIMIT,capacity:ENTITY_LIMIT};
+    for(const list of [game.bbpeople,game.bbpombies,game.bbzombies]){
+      if(!list||typeof list.bbObjectEnumerator!=='function')fail('missing actor list');
+      const iterator=list.bbObjectEnumerator();
+      while(iterator.bbHasNext()){
+        const body=iterator.bbNextObject();entityCount++;
+        if(body===game.bbpeoplebase||body===game.bbzombiebase)baseCount++;
+      }
+    }
+    return {entityCount,baseCount,entityLimit:ENTITY_LIMIT,capacity:Math.max(0,ENTITY_LIMIT-entityCount)};
+  }
   function capacity(game){
     if(!game)return ENTITY_LIMIT;
     let total=0;
@@ -45,13 +58,17 @@
     }
     return ENTITY_LIMIT-total;
   }
-  function blocked(target,state,game){
-    if(!game||![2,6].includes(game.bbmainState))return 'no-active-battle';
+  function blocked(target,state,game,available){
+    if(!game)return 'no-active-battle';
+    // Native GameOver removes both bases and switches to its score state.
+    // Pending jobs remain visible there, but must not look like a fresh menu.
+    if(game.bbmainState===3||game.bbmainState===4)return 'battle-ended';
+    if(![2,6].includes(game.bbmainState))return 'no-active-battle';
     if(game.bbpeoplebase?.bbhealth<=0||game.bbzombiebase?.bbhealth<=0)return 'battle-ended';
     if(game.bbmainState!==2)return 'game-paused';
     if(target.ZTPRuntime&&typeof target.ZTPRuntime.getStatus==='function'&&target.ZTPRuntime.getStatus().running===false)return 'runtime-paused';
     if(state.jobs.length&&state.jobs.every(job=>job.rate===0))return 'rate-paused';
-    if(capacity(game)===0)return 'entity-limit';
+    if((available===undefined?capacity(game):available)===0)return 'entity-limit';
     return null;
   }
   function cloneJob(job){
@@ -60,12 +77,14 @@
   }
   function snapshot(target){
     const state=stateFor(target),game=portFor(target).state.bb_Game;
-    const reason=blocked(target,state,game),jobs=state.jobs.map(cloneJob),recent=state.recent.map(cloneJob);
+    // One membership scan supplies both the backpressure reason and the visible
+    // occupancy. Bases occupy slots too; detached death effects do not.
+    const entities=entityStatus(game),reason=blocked(target,state,game,entities.capacity),jobs=state.jobs.map(cloneJob),recent=state.recent.map(cloneJob);
     const totalPending=jobs.reduce((sum,job)=>sum+job.remaining,0);
     return {rate:state.rate,defaultRate:state.rate,jobs,recent,pendingJobs:jobs.length,pending:totalPending,totalPending,
       totalRequested:state.totalRequested,totalSpawned:state.totalSpawned,totalCancelled:state.totalCancelled,
       paused:reason==='game-paused'||reason==='runtime-paused'||reason==='rate-paused',blocked:reason,
-      capacity:game?capacity(game):ENTITY_LIMIT,maxPerTick:MAX_PER_TICK};
+      ...entities,maxPerTick:MAX_PER_TICK};
   }
   function addTotal(value,amount){return Math.min(Number.MAX_SAFE_INTEGER,value+amount);}
   function remember(state,job){state.recent.push(cloneJob(job));if(state.recent.length>HISTORY_LIMIT)state.recent.shift();}

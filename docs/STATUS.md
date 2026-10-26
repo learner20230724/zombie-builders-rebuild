@@ -15,7 +15,9 @@
 | Troop counts / 在场兵力 | Live friendly/enemy counts for all ten species and totals, by current allegiance; living non-base actors only. / 十种单位双方数量及合计实时统计，按当前阵营，只计存活非基地角色。 |
 | Building limits / 建筑上限 | Live caps; zero removes the gameplay cap, with a separate engine safety guard. / 上限本局更新，0 取消玩法上限，另有引擎安全保护。 |
 | Sandbox / 沙盒 | Parallel persistent camp spawn panels and immediate cards; independent per-job rates for all ten species, atomic both-army or typed clearing, both-base HP, newest-first waves and independent wave pause. / 双方出兵区并列，各十种类型的独立速率队列与即时图标；双方一键／按类型清兵、基地血量、波次置顶显示与独立暂停。 |
-| Dense battles / 密集战斗 | Stable target scans, hit-event sorting, and tick-scoped camp membership reuse without changing combat or RNG. / 稳定目标扫描、命中事件排序与 tick 内阵营成员复用，不改战斗语义或随机序列。 |
+| Spawn backpressure / 出兵等待 | Visible occupancy out of 1,000 slots including bases, with distinct full/pause/zero-rate/end statuses; pending work is retained. / 显示含基地的 1,000 位占用，区分满员、暂停、零速率与战斗结束；保留待出余量。 |
+| Dense battles / 密集战斗 | One-dimensional candidate buckets for cross-camp adapted humans, original-order exact targeting, and safe linear fallbacks. / 跨阵营适配人类的一维空间桶候选筛选，原序精确索敌与安全线性回退。 |
+| Base-hit effects / 基地受击 | Independent 256-live-debris budget per base and indexed effect-list recycling; no damage reduction or death-animation suppression. / 每基地独立 256 个活跃装饰碎片预算及特效链表索引回收，不削减伤害、不吞死亡动画。 |
 | Death direction / 死亡朝向 | Native death animation and fragments follow the unit's current camp, including converted troops. / 原生死亡动画及碎块按单位当前阵营朝向，包含转化部队。 |
 | Unlock / 解锁 | One-click custom building/power/stage access without awarding resources or original wins. / 一键解锁自定义建筑、技能和关卡，不赠资源、不改原版成绩。 |
 | Packaging / 打包 | Windows x64 Electron desktop and portable web packaging tools. / Windows x64 Electron 桌面包与网页便携包的构建工具。 |

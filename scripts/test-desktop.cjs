@@ -921,6 +921,7 @@ async function run(options) {
     });
 
     await require('./acceptanceinstant.cjs')({page, app, check, state, save, screenshot, artifact, openEditor, closeEditor, field, settled, togglePlayback, importAndStart, step, freeze, canvasClick, evidence});
+    await require('./acceptance-performance-v043.cjs')({page, check, state, save, screenshot, artifact, openEditor, closeEditor, togglePlayback, importAndStart, step, freeze, evidence});
 
     await page.evaluate(() => { WriteInt('ZTPBestScores', '0', 9876); FlushInts(); });
     const externalFile = path.join(profile, 'config', 'units.json');

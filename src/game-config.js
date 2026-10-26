@@ -19,6 +19,9 @@
   const POWER_COUNT_LIMIT = 2147483647;
   const POWER_DISPATCH_BUDGET = 32;
   const ENTITY_SAFETY_LIMIT = 1000;
+  // Cosmetic base debris only. Each base owns its slots so concentrated fire
+  // on one side cannot suppress the other base's hit feedback or actor deaths.
+  const BASE_DEBRIS_LIMIT_PER_SIDE = 256;
   const HEALTH_LABELS = {
     units:['铲兵','霰弹枪兵','机枪皮卡','燃烧瓶兵','牧师','己方基地'],
     zombies:['普通僵尸','跳跃僵尸','快速僵尸','肥胖僵尸','投尸僵尸','敌方基地']
@@ -857,12 +860,55 @@
       }
       return result;
     });
-    // This recovered leaf only creates cosmetic debris; it does not change
-    // health. Huge custom damage must not allocate hundreds of millions of
-    // body parts before the actual hit clamps against the target's HP.
-    // All original ordinary hits (including 500-damage air bombs) are exact.
-    wrap(port.bb_Zomba.prototype, 'bbDamageBase', original => function (damage,x) {
-      return original.call(this,Math.min(damage|0,1024),x);
+    // The original leaf creates debris BEFORE the caller clamps actual HP
+    // damage. Its existing 1024 cosmetic-damage guard still creates ~160
+    // particles per hit; crowded continuous attacks would retain thousands.
+    // Track only admitted base debris, by node, not every death/body part.
+    // Weak ownership and head replacement make clear/reset O(1), without a
+    // per-hit scan. Calling the current Node.bbRemove also works with indexed
+    // effect-list removal installed by a later adapter.
+    const baseDebrisLedgers = new WeakMap(), baseDebrisNodes = new WeakMap();
+    const debrisLedger = list => {
+      let ledger = baseDebrisLedgers.get(list);
+      if (!ledger || ledger.head !== list.bb_head) {
+        ledger = {head:list.bb_head,counts:[0,0]};
+        baseDebrisLedgers.set(list,ledger);
+      }
+      return ledger;
+    };
+    wrap(port.bb_std_list_Node.prototype, 'bbRemove', original => function () {
+      const record = baseDebrisNodes.get(this), result = original.apply(this,arguments);
+      if (record) {
+        record.ledger.counts[record.side]--;
+        baseDebrisNodes.delete(this);
+      }
+      return result;
+    });
+    wrap(port.bb_std_list_List.prototype, 'bbClear', original => function () {
+      const result = original.apply(this,arguments);
+      if (baseDebrisLedgers.has(this))
+        baseDebrisLedgers.set(this,{head:this.bb_head,counts:[0,0]});
+      return result;
+    });
+    wrap(port.bb_Zomba.prototype, 'bbDamageBase', () => function (damage,x) {
+      damage = Math.min(damage|0,1024); x = Number(x);
+      const list = this.bbbodyparts, ledger = debrisLedger(list), side = x < 800 ? 0 : 1;
+      while (damage > 0) {
+        // Consume the SAME six original random calls, in the SAME order, even
+        // when full. Skipping visual allocation must never perturb later
+        // combat/waves. At most 256 iterations remain after the 1024 guard.
+        const vx = port.bb_std_random_Rnd2(4)-2;
+        const vy = (-4-port.bb_std_random_Rnd2(4))|0;
+        const layer = port.bb_Rand(8)|0, frame = (1+port.bb_Rand(4))|0;
+        x += port.bb_std_random_Rnd2(80);
+        if (ledger.counts[side] < BASE_DEBRIS_LIMIT_PER_SIDE) {
+          const part = new port.bb_BodyPart().bbBodyPart_new(layer,this.bbbitsheet,frame,x,-20,vx,vy);
+          const node = list.bbAddLast(part);
+          baseDebrisNodes.set(node,{ledger,side}); ledger.counts[side]++;
+        }
+        damage = (damage-((4+port.bb_std_random_Rnd2(6))|0))|0;
+      }
+      return 0;
     });
     wrap(port.bb_ZombieMob, 'bbInit', original => function () {
       const result = original.apply(this,arguments);
@@ -1274,5 +1320,5 @@
   }
   return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive,getWaveProgress,applyLiveWaves,
     validateMultipliers,getMaximumHealth,getPowerProgress,cancelPowerEffects,releaseSandboxPower,
-    BUILDING_SAFETY_LIMIT,HEALTH_SAFETY_LIMIT,POWER_COUNT_LIMIT,POWER_DISPATCH_BUDGET});
+    BUILDING_SAFETY_LIMIT,HEALTH_SAFETY_LIMIT,POWER_COUNT_LIMIT,POWER_DISPATCH_BUDGET,BASE_DEBRIS_LIMIT_PER_SIDE});
 });

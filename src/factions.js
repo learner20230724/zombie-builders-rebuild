@@ -6,6 +6,8 @@
 })(typeof globalThis==='object'?globalThis:this,function(importedRules){
   'use strict';
   const states=new WeakMap(), LIMIT=1000;
+  const BUCKET_SIZE=128, SPATIAL_MINIMUM=64, SPATIAL_RADIUS_LIMIT=4096, SPATIAL_COORDINATE_LIMIT=10000000;
+  const ACTOR_CALLBACKS=['bbUpdate','bbInfect','bbSmack','bbTurn','bbHitKey'];
   function fail(message){throw new Error('Factions: '+message);}
   function portFor(target){if(!target||!target.ZTPGamePort)fail('missing game port');return target.ZTPGamePort;}
   function stateFor(target){const state=states.get(target);if(!state)fail('install must run first');return state;}
@@ -86,19 +88,89 @@
       frame.version=state.actorVersion;frame.people=game.bbpeople;frame.converted=game.bbpombies;frame.zombies=game.bbzombies;
       frame.peopleHead=game.bbpeople.bb_head;frame.convertedHead=game.bbpombies.bb_head;frame.zombiesHead=game.bbzombies.bb_head;
       frame.friendly=frame.enemy=null;
+      frame.friendlySpatial=frame.enemySpatial=null;frame.spatialSafe=undefined;
     }
     const key=camp==='friendly'?'enemy':'friendly';
     return frame[key] || (frame[key]=list(target,{side:key,includeBases:true}));
   }
   function opponents(target,camp){return opponentBodies(target,camp).filter(alive);}
-  function nearestTarget(target,camp,x,radius) {
+  function spatialSafe(target,frame) {
+    if (frame.spatialSafe!==undefined) return frame.spatialSafe;
+    const state=stateFor(target),game=frame.game;
+    // The original tick finishes people, then zombies, then pombies. During
+    // adapted enemy queries friendly geometry is already/future-updated; during
+    // adapted friendly queries enemy geometry is finished. Native hit methods
+    // change health/mode, not position. Unknown actor callbacks may move other
+    // actors at any time, so never freeze geometry in a tick containing one.
+    // Adapted humans call Person's prototype directly, not only body methods.
+    for (const [prototype,known] of state.actorCallbacks)
+      for (const key of ACTOR_CALLBACKS) if (prototype[key]!==known[key]) return frame.spatialSafe=false;
+    for (const group of [game.bbpeople,game.bbpombies,game.bbzombies]) {
+      const iterator=group.bbObjectEnumerator();
+      while (iterator.bbHasNext()) {
+        const body=iterator.bbNextObject(),meta=state.people.get(body);
+        if (!body || !body.bbunit) return frame.spatialSafe=false;
+        const known=state.actorCallbacks[meta||body.bbunit.bbtype>=32?1:0][1];
+        for (const key of ACTOR_CALLBACKS) {
+          const expected=meta&&key==='bbUpdate'?meta.update:meta&&key==='bbTurn'?meta.turn:known[key];
+          if (body[key]!==expected) return frame.spatialSafe=false;
+        }
+      }
+    }
+    return frame.spatialSafe=true;
+  }
+  function spatialIndex(bodies,camp) {
+    const buckets=new Map();let maximumRadius=0;
+    for (let order=0;order<bodies.length;order++) {
+      const body=bodies[order],position=center(body,camp),radius=body.bbunit.bbhitradius;
+      // Huge custom geometry is valid gameplay, but not a reason to create or
+      // walk millions of cells. Keep the exact original scan as its fast path.
+      if (!Number.isFinite(position) || Math.abs(position)>SPATIAL_COORDINATE_LIMIT ||
+          !Number.isFinite(radius) || radius<0 || radius>SPATIAL_RADIUS_LIMIT) return false;
+      maximumRadius=Math.max(maximumRadius,radius);
+      const cell=Math.floor(position/BUCKET_SIZE);
+      let bucket=buckets.get(cell);if (!bucket) buckets.set(cell,bucket=[]);
+      bucket.push(order);
+    }
+    return {buckets,maximumRadius};
+  }
+  function targetCandidates(target,camp,x,radius,range) {
+    const bodies=opponentBodies(target,camp),frame=stateFor(target).actorFrame;
+    if (!frame || bodies.length<SPATIAL_MINIMUM || !Number.isFinite(x) || Math.abs(x)>SPATIAL_COORDINATE_LIMIT ||
+        !Number.isFinite(radius) || radius<0 || radius>SPATIAL_RADIUS_LIMIT || !Number.isFinite(range) || range<0 ||
+        !spatialSafe(target,frame)) return bodies;
+    // No bucket survives a query-phase transition, even in a nested/manual tick.
+    // In particular never index an adapted person's temporary mirrored x.
+    if (frame.queryCamp!==camp) {
+      frame.queryCamp=camp;frame.friendlySpatial=frame.enemySpatial=null;
+    }
+    const key=camp==='friendly'?'enemySpatial':'friendlySpatial',otherCamp=camp==='friendly'?'enemy':'friendly';
+    if (frame[key]===null) frame[key]=spatialIndex(bodies,otherCamp);
+    const index=frame[key];if (!index) return bodies;
+    const reach=radius+index.maximumRadius;
+    const first=Math.floor((x-reach-(camp==='enemy'?range:0))/BUCKET_SIZE),
+      last=Math.floor((x+reach+(camp==='friendly'?range:0))/BUCKET_SIZE);
+    if (last-first>32) return bodies;
+    const orders=[];
+    for (let cell=first;cell<=last;cell++) {
+      const bucket=index.buckets.get(cell);if (!bucket) continue;
+      // A crowded front can be cheaper to scan than to allocate/sort again.
+      // Check before copying the dense bucket, not after doing that work.
+      if ((orders.length+bucket.length)*2>=bodies.length) return bodies;
+      for (const order of bucket) orders.push(order);
+    }
+    orders.sort((a,b)=>a-b);
+    return orders.map(order=>bodies[order]);
+  }
+  function nearestTarget(target,camp,x,radius,range) {
     const dir=camp==='friendly'?1:-1,otherCamp=camp==='friendly'?'enemy':'friendly';
     let nearest=null,score=Infinity;
-    for (const body of opponentBodies(target,camp)) {
+    for (const body of targetCandidates(target,camp,x,radius,range)) {
       if (!alive(body)) continue;
       const forward=dir*(center(body,otherCamp)-x),otherRadius=body.bbunit.bbhitradius;
       if (forward < -radius-otherRadius) continue;
       const gap=forward-radius-otherRadius,next=Math.max(0,gap);
+      if (gap>=range) continue;
       // The former stable sort treats every overlapping (gap <= 0) body as
       // equal. Strict comparison preserves the original list's first tie.
       if (next<score) {nearest={body,gap};score=next;if (score===0) break;}
@@ -107,7 +179,7 @@
   }
   function rangedTargets(target,camp,x,radius,range,preacher) {
     const dir=camp==='friendly'?1:-1,otherCamp=camp==='friendly'?'enemy':'friendly',game=portFor(target).state.bb_Game,result=[];
-    for (const body of opponentBodies(target,camp)) {
+    for (const body of targetCandidates(target,camp,x,radius,range)) {
       if (!alive(body) || preacher && (body===game.bbpeoplebase || body===game.bbzombiebase)) continue;
       const forward=dir*(center(body,otherCamp)-x),otherRadius=body.bbunit.bbhitradius;
       if (forward < -radius-otherRadius) continue;
@@ -151,7 +223,7 @@
     const x=center(body,camp),radius=body.bbunit.bbhitradius,type=body.bbunit.bbtype;
     let nearest;
     if(body.bbmode===0){
-      nearest=nearestTarget(target,camp,x,radius);
+      nearest=nearestTarget(target,camp,x,radius,[16,240,140,400,320][type]);
       if(nearest){
         const gap=Math.max(0,nearest.gap);
         if(type===0&&gap<16){body.bbmode=1;body.bbswing=0;}
@@ -166,8 +238,8 @@
     // original animation hit flag. Busy non-hit animation needs no target work.
     if([1,3,4,5,6].includes(mode)&&port.bb_Person.prototype.bbHitKey.call(body)){
       const pool=Math.max(0,Math.trunc(body.bbunit.bbdamage||0));
-      if(mode===1){const victim=nearest===undefined?nearestTarget(target,camp,x,radius):nearest;if(victim&&victim.gap<40)damage(victim.body,pool,1);}
-      else if(mode===3){const victim=nearest===undefined?nearestTarget(target,camp,x,radius):nearest;if(victim&&victim.gap<300)damage(victim.body,pool,3);}
+      if(mode===1){const victim=nearest===undefined?nearestTarget(target,camp,x,radius,40):nearest;if(victim&&victim.gap<40)damage(victim.body,pool,1);}
+      else if(mode===3){const victim=nearest===undefined?nearestTarget(target,camp,x,radius,300):nearest;if(victim&&victim.gap<300)damage(victim.body,pool,3);}
       else if(mode===5){let left=pool;for(const hit of rangedTargets(target,camp,x,radius,180,false)){if(left<=0)break;left=damage(hit.body,left,2);}}
       else if(mode===4){
         const previous=state.shotSide;state.shotSide=camp;
@@ -194,12 +266,12 @@
       const view=Object.create(meta.source);
       Object.defineProperty(view,'bbhitoffset',{get:()=>meta.side==='enemy'?-meta.source.bbhitoffset:meta.source.bbhitoffset,enumerable:true});
       body.bbunit=view;body.bbscale=1;body.bbsmackstyle=0;
-      body.bbUpdate=function(){return humanUpdate(target,this);};
+      meta.update=body.bbUpdate=function(){return humanUpdate(target,this);};
       body.bbDraw=function(dx,dy){
         if(this.bbskin)this.bbskin.bbsheet[meta.side==='enemy'?'bbflipblit':'bbblit'](this.bbskin.bbframe,this.bbxpos+(dx|0),this.bbypos+(dy|0)-this.bblayer*4,1);
         return 0;
       };
-      body.bbTurn=function(){meta.side='friendly';this.bbdirection=-1;this.bbmode=0;this.bbhit=0;return 0;};
+      meta.turn=body.bbTurn=function(){meta.side='friendly';this.bbdirection=-1;this.bbmode=0;this.bbhit=0;return 0;};
     }
     meta.side=camp;body.bbdirection=camp==='enemy'?1:-1;body.bbwaszombie=1;return body;
   }
@@ -246,7 +318,12 @@
     wrap(port.bb_Zomba.prototype,'bbGameTick',original=>function(){
       const previous=state.actorFrame;
       state.actorFrame=state.cross?{game:this,version:-1}:null;state.tickDepth++;
-      try{return original.apply(this,arguments);}finally{state.actorFrame=previous;state.tickDepth--;state.impact=state.pendingImpact=state.exploding=null;}
+      try{return original.apply(this,arguments);}finally{
+        // An explicitly nested tick may move actors without changing lists.
+        // A restored outer frame may retain membership, never old geometry.
+        if (previous) {previous.friendlySpatial=previous.enemySpatial=null;previous.spatialSafe=undefined;}
+        state.actorFrame=previous;state.tickDepth--;state.impact=state.pendingImpact=state.exploding=null;
+      }
     });
     wrap(port.bb_Zombie.prototype,'bbUpdate',original=>function(){
       if(state.cross&&this.bbunit&&this.bbunit.bbtype===36&&this.bbdirection<0&&this.bbmode===11&&this.bbHitKey()){
@@ -299,6 +376,8 @@
       const type=body.bbunit.bbtype,sheet=[this.bbshoveldeathsheet,this.bbshotgundeathsheet,null,null,this.bbpreacherdeathsheet][type];
       if(sheet)this.bbAddDeath(sheet,body.bblayer,body.bbxpos,body.bbypos);else this.bbAddExplosion(body.bblayer,body.bbxpos,body.bbypos,type===2?3:2);return 0;
     });
+    state.actorCallbacks=[port.bb_Person.prototype,port.bb_Zombie.prototype]
+      .map(prototype=>[prototype,Object.fromEntries(ACTOR_CALLBACKS.map(key=>[key,prototype[key]]))]);
     return target;
   }
   return Object.freeze({install,spawn,validateSpawn,list,getSide:(target,body)=>sideOf(portFor(target).state.bb_Game,body),convert,ENTITY_LIMIT:LIMIT});

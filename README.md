@@ -14,6 +14,7 @@ A desktop and browser version of **Zombie Trailer Park (建筑工大战僵尸)**
 - Editable JSON configuration for units, zombies, buildings, powers, and levels.
 - Instant in-game editing, shared troop multipliers, custom power summons, independent spawn queues, and type-specific clearing.
 - Side-by-side settings: keep the game visible and choose whether to pause or play while editing.
+- Scoped cross-camp targeting and bounded base-hit debris preserve combat rules in large sandbox battles.
 
 ## Default game parameters
 
@@ -124,7 +125,7 @@ Press **F2** to open settings beside the game (below it in narrow windows). Open
 | Area | Controls |
 | --- | --- |
 | Sandbox / spawning | **Friendly and enemy spawn panels stay visible together**, each with its own type, quantity, and rate. Both select any of **ten types** (five humans + five zombies); five immediate human cards and five zombie cards provide quick single-unit spawns. Each camp enters from its own side with normal configured stats. A live troop table shows both camps’ counts for all ten types and totals. |
-| Spawn queues | Click **加入出兵队列** to start an independent stream at its own **units/game-second** rate; 0 pauses that job, 0.1 means one every 10 game-seconds. Add more batches without waiting, edit each rate live, or cancel pending jobs without removing already spawned troops. |
+| Spawn queues | Click **加入出兵队列** to start an independent stream at its own **units/game-second** rate; 0 pauses that job, 0.1 means one every 10 game-seconds. Add batches, edit rates live, or cancel pending jobs without removing spawned troops. Status distinguishes a full battlefield, game/runtime pause, each job’s zero rate, and an ended or missing battle. Occupancy shows **entityCount / 1,000 including bases**: normally 998 troop slots; excess requests remain pending. |
 | Clear current troops | Clear **both armies in one click**, an entire side, or a selected human/zombie type by its **current camp**, including converted units. Original death animations follow that camp's direction; bases and future production/waves remain. |
 | Both bases | Quick access directly below clearing: edit maximum HP and **current HP** separately. Current HP can be set to 0 to end the battle normally. |
 | Survivors / zombies | Edit each type; shared **HP, movement, and damage multipliers** sit above the type selector. They follow species (not camp), exclude bases, and combine multiplicatively with stage settings for zombies. |
@@ -138,6 +139,7 @@ Press **F2** to open settings beside the game (below it in narrow windows). Open
 
 - HP changes can keep each living unit's health percentage (default) or affect new units only; current-base HP has its own direct control. Maximum HP accepts **1–2,147,483,647**.
 - Damage/speed/switches affect subsequent actions; active production and cooldowns keep their progress. Projectiles already in flight keep their launch damage.
+- High-damage base hits limit only decorative debris to **256 live fragments per base (512 combined)**, not units or damage. Ordinary sparse hits and separate unit-death visuals remain intact; actual HP loss and victory handling are unchanged.
 - An unfinished wave's remaining count is `max(0, new total − already scheduled)`. Finished groups never replay; add a new group for another batch. Live status shows actual spawned/remaining counts.
 - Ordinary recruitment population/prerequisite and unlock edits, opening resources, reinforcements, and other stages' queues take effect when starting the corresponding new battle. The dedicated **unlock-all action** removes prerequisites and power locks immediately in custom mode.
 

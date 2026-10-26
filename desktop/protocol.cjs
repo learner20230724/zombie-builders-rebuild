@@ -8,7 +8,7 @@ const HOST = 'game';
 const ENTRY_URL = `${SCHEME}://${HOST}/`;
 const CONFIG_NAMES = ['units', 'zombies', 'buildings', 'powers', 'levels'];
 const SOURCE_NAMES = ['runtime.js', 'physics.js', 'generated-game.js', 'data.js', 'game-config.js',
-  'custom-rules.js', 'customization.js', 'settings-ui.js', 'settings-ui.css', 'time-controls.js', 'time-controls.css', 'factions.js', 'death-effects.js', 'spawn-queue.js', 'boot.js'];
+  'custom-rules.js', 'customization.js', 'settings-ui.js', 'settings-ui.css', 'time-controls.js', 'time-controls.css', 'factions.js', 'death-effects.js', 'effect-lists.js', 'spawn-queue.js', 'boot.js'];
 const CSP = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self'; connect-src 'self'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'";
 const MIME = {'.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8',
   '.css':'text/css; charset=utf-8', '.json':'application/json; charset=utf-8', '.png':'image/png',

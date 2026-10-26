@@ -29,6 +29,7 @@
     CustomRules.install(globalThis,prepared.rules);
     Factions.install(globalThis);
     DeathEffects.install(globalThis);
+    EffectLists.install(globalThis);
     SpawnQueue.install(globalThis);
     window.gameConfig = configuration;
     const response = await fetch('/public/assets/manifest.json');

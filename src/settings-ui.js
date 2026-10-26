@@ -341,7 +341,9 @@
     }
     function renderBattleState() {
       if (!draft) return; const s = state();
-      const battle = typeof controller.getBattleStatus === 'function' ? controller.getBattleStatus() : s.battleStatus || s;
+      // getState already contains this synchronous battle snapshot. Do not
+      // traverse every army/effect list a second time on each editor poll.
+      const battle = s.battleStatus || (typeof controller.getBattleStatus === 'function' ? controller.getBattleStatus() : s);
       const ownsPause = pauseToken !== undefined;
       const status = content.querySelector('[data-battle-status]');
       if (status) status.textContent = s.isCustom && s.isBattle ? '自定义战局 · 第 ' + s.stage + ' 关' + (ownsPause ? ' · 设置暂停中' : ' · 设置与游戏可同时操作') : s.isBattle ? '原版战局 · 修改参数后转为自定义'  : '先选择关卡，开始自定义战局。';
@@ -642,7 +644,9 @@
     function refreshSpawnQueue(queue,s) {
       const list=content.querySelector('[data-spawn-queue-list]');if(!list)return;
       const jobs=queue&&Array.isArray(queue.jobs)?queue.jobs:[],currentIds=new Set(jobs.map(job=>String(job.id))),eligible=s.isCustom&&s.isBattle;
-      const summary=content.querySelector('[data-spawn-queue-summary]');summary.textContent=jobs.length+' 批 · 待生成 '+(queue&&queue.totalPending||0)+' · 已生成 '+(queue&&queue.totalSpawned||0);
+      const occupancy=queue&&Number.isInteger(queue.entityCount)&&Number.isInteger(queue.entityLimit)?' · 场上占用 '+queue.entityCount+' / '+queue.entityLimit+'（含基地）':'';
+      const summary=content.querySelector('[data-spawn-queue-summary]');summary.textContent=jobs.length+' 批 · 待生成 '+(queue&&queue.totalPending||0)+' · 已生成 '+(queue&&queue.totalSpawned||0)+occupancy;
+      const blockedLabels={'entity-limit':'场上已满，等待单位退场','game-paused':'游戏暂停中','runtime-paused':'战斗暂停中','rate-paused':'所有批次速率为 0','battle-ended':'战斗已结束','no-active-battle':'等待开始战局'};
       const cancelAll=content.querySelector('[data-cancel-spawn-all]');cancelAll.disabled=!eligible||!jobs.length||cancelingAllSpawnJobs||typeof controller.cancelSpawnJob!=='function';
       for(const [id,record] of spawnJobNodes)if(!currentIds.has(id)){
         record.active=false;record.summary.textContent='已结束';record.cancel.disabled=true;record.rate.readOnly=true;record.rate.setAttribute('aria-readonly','true');
@@ -670,7 +674,8 @@
         record.active=true;const descriptor=job.descriptor||job,names=descriptor.kind==='unit'?NAMES.units:ZOMBIES;
         record.rate.readOnly=false;record.rate.removeAttribute('aria-readonly');
         record.title.textContent=(job.side==='friendly'?'己方 · ':'敌方 · ')+(names[descriptor.type]||'未知单位');
-        record.summary.textContent='剩余 '+job.remaining+' / '+job.count+' · 已生成 '+job.spawned+(job.rate===0?' · 已暂停':queue&&queue.blocked?' · 等待场上空位':'');
+        const waiting=job.rate===0?'该批已暂停（速率 0）':queue&&queue.blocked?(blockedLabels[queue.blocked]||'等待继续出兵'):'';
+        record.summary.textContent='剩余 '+job.remaining+' / '+job.count+' · 已生成 '+job.spawned+(waiting?' · '+waiting:'');
         if(doc.activeElement!==record.rate&&record.rate.dataset.pending!=='true'){record.rate.value=String(job.rate);record.rate.dataset.committedValue=record.rate.value;}
         record.rate.disabled=!eligible||cancelingAllSpawnJobs||cancelingSpawnJobs.has(id)||typeof controller.setSpawnJobRate!=='function';
         record.cancel.disabled=!eligible||cancelingAllSpawnJobs||cancelingSpawnJobs.has(id)||typeof controller.cancelSpawnJob!=='function';

@@ -1,6 +1,6 @@
 {
   "name": "zombie-builders-rebuild",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "private": true,
   "description": "建筑工大战僵尸 / Zombie Trailer Park — configurable JavaScript game with Canvas 2D and Web Audio.",
   "license": "UNLICENSED",

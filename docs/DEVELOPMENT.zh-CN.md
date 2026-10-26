@@ -193,6 +193,7 @@ Windows 可编辑配置位于 **`%APPDATA%\ZombieBuilders\config`**，进度与�
 | `src/custom-rules.js` | 在生成代码之外校验和应用出怪、能力开关 |
 | `src/factions.js` | 物种与阵营解耦，跨阵营索敌／战斗及绘制适配 |
 | `src/death-effects.js` | 按当前阵营适配脱离战斗的死亡动画与碎块朝向 |
+| `src/effect-lists.js` | 特效／投射物链表的反向节点索引，加速回收，不改变更新与绘制顺序 |
 | `src/spawn-queue.js` | 紧凑的独立速率手动任务、公平分发与队列快照 |
 | `src/customization.js` | 命名预设、完整校验的即时提交、沙盒动作与自定义成绩隔离 |
 | `src/settings-ui.js` / `.css` | 非模态并列设置、字段编辑、波次控制与沙盒按钮 |
@@ -282,11 +283,19 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 
 `src/factions.js` 把来源物种与当前阵营分开，不是仅改一个外观标记。跨阵营单位朝向、行进和索敌面向敌对一方，按类型行为攻击该方角色／基地；转化改变阵营，按类型清场以当前阵营为准。全体倍率仍跟随物种，不是把敌方人类改用僵尸数值表或反过来。角色后来被转化，不改变此前已发射投射物的发射阵营。跨阵营牧师适配可转化敌对的可移动人类／僵尸（范围 320、基础生命预算 1,000、排除基地）；原生己方牧师保留原版僵尸可转化范围。
 
-密集跨阵营索敌不再为每个人类每 tick 都建立并排序完整目标数组：空闲索敌用稳定的线性最近目标扫描，忙碌且非命中动画帧不查询目标；只在真实机枪／牧师命中事件中，按原优先级与平局顺序排序符合范围的子集。tick 内缓存的是阵营成员引用，不缓存陈旧的位置／生命／模式，判断时仍读当前值。角色链表修改或列表／表头替换会使缓存失效，tick 结束或异常时退出缓存作用域；目标顺序、余伤分配、转化、动画命中时机、固定更新频率和 RNG 保持不变。
+跨阵营**适配人类**索敌采用 **128 像素宽的一维空间桶**：根据实际索敌／命中范围保守筛出候选，恢复其原链表序号，再执行原精确距离判断、目标优先级和同距离平局规则。空闲索敌找最近候选，忙碌且非命中动画帧不查询目标；只在真实机枪／牧师命中事件中排序符合范围的子集，不按桶顺序改写攻击顺序。
+
+空间桶仅在同一 tick 的安全查询阶段内复用，按原 `people → zombies → pombies` 更新次序使用已经完成／尚未开始移动的对手几何；不索引人类更新期间的临时镜像坐标。血量与模式仍读实时对象。链表成员变化、列表／表头替换、查询阵营阶段切换或嵌套 tick 使空间索引失效，tick 结束或异常时清除作用域。含未知战斗回调的 tick 整体回退线性查询：检查对象及 Person／Zombie 原型的 `bbUpdate`、`bbInfect`、`bbSmack`、`bbTurn`、`bbHitKey`，包含已知适配人类的更新／转向方法。普通数据设置不会触发该回退；二开 JavaScript 在自定义受伤回调中移动目标时，仍使用线性路径保证查询正确。
+
+少于 **64** 个对手、候选达到对手的一半、命中半径大于 **4,096**、坐标绝对值大于 **10,000,000**、非有限几何值或查询桶序号跨度大于 **32** 时也回退原扫描，避免为密集前线或巨大自定义数值额外建表／排序。安全阶段首次建桶约 **O(E)**，局部查询约为访问桶数加 **O(k log k)** 的原序恢复及精确筛选；E 为对手总数，k 为局部候选数。原生 `bbGameTick` 的成对遍历仍保留，不能把此优化称为全引擎线性复杂度。目标顺序、余伤分配、转化、动画命中时机、固定更新频率和 RNG 保持不变。
 
 **死亡视觉方向。**`DeathEffects.install(target)` 在 `Factions.install(target)` 后、游戏初始化前安装；适配原有脱离战斗的死亡特效，不改交战角色的受伤／死亡状态。`DeathEffects.tag(target, effect, body)` 让沙盒生成的死亡视觉采用与自然战斗死亡相同的方向处理。
 
 方向取**死亡瞬间的当前阵营**，不是来源物种：敌方人类将原本向左倒的死亡素材镜像为向右倒；己方僵尸镜像原生碎块素材及其初始水平速度。被转化的角色以新阵营为准。原生己方人类、敌方僵尸保持原画面；相对来源角色的纯视觉爆炸偏移也随之镜像。死亡视觉不能攻击，仍随正常暂停／更新／回收，不改变 XP、人口、命中时机、伤害预算或随机数抽取。这不是平衡参数，也不是预设字段。
+
+**基地受击碎片与特效回收。**`GameConfig.BASE_DEBRIS_LIMIT_PER_SIDE` 为 **256**，两座基地分别拥有活跃建筑装饰碎片预算，合计最多 **512**。这是纯视觉对象预算，不是伤害或在场小兵限制。稀疏普通命中保留原碎片序列；预算已满时仍按原顺序完成每轮六次随机调用，仅跳过新增装饰对象，因此实际基地扣血、余伤、胜败与后续游戏 RNG 不变。单位死亡动画、死亡碎块及爆炸不占此预算。碎片节点移除、清空与重开释放预算，无需每次受击遍历全部碎块。
+
+`EffectLists.install(target)` 在 `DeathEffects` 后、`SpawnQueue` 前安装。它仅为当前游戏的 `bbbodyparts`、`bbdeathlist`、`bbexplosions`、`bbsmokelist`、`bbbottles`、`bbflinglist`、`bbpowerups` 建立对象到链表节点的反向索引：首次建表 **O(P)**，此后按对象删除为 **O(该对象节点数)**，避免同批 P 个效果过期时反复全表查找的平方成本。原链表、重复对象节点与活动枚举器顺序保留，增删和清空同步维护索引，未知对象／自定义比较等情况回退原实现。不缩短特效生命周期，不跳过投射物伤害；`diagnostics(target)` 只读返回索引统计。
 
 `getBattleStatus().factions` 按当前阵营返回 `{friendly:{units,zombies},enemy:{units,zombies}}`；战斗状态和控制器状态中的 `powerProgress` 返回 `{pendingTotal,groups:[{type,count,source,side?}]}`，反映技能等待分发量；`side` 只出现在沙盒释放组，旧正常技能结构不变。
 
@@ -302,11 +311,13 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 
 各任务独立并发，不是前一个没结束后一个就不出的单一 FIFO。公平轮转共用**每模拟 tick 最多 32 只**的预算，并遵守**含基地的场上 1,000 实体**保护。满场保留待出余量，不吞请求，也不攒成之后一口气补跑的大爆发；单批暂停、改速也不追补先前时间。极高速率受共用预算约束。第一只在经过间隔（`120/rate` 战斗 tick）后出现，不在加入时立即生成；高速任务最早下一 tick 开始。
 
-`enqueueSpawn`、`setSpawnJobRate` 返回任务快照。`getState().spawnQueue`／`getBattleStatus().spawnQueue` 包含 `defaultRate`（`rate` 别名）、`jobs`、`recent`（最近 32 个完成／取消任务）、`pendingJobs`、`totalPending`（`pending` 别名）、`totalRequested`、`totalSpawned`、`totalCancelled`、`paused`、`blocked`、`capacity`、`maxPerTick`。单项任务含 `id`、`side`、`descriptor:{kind,type}`、`kind`、`type`、`count`、`rate`、`spawned`、`remaining`、`status`、`createdTick`、`completedTick`、`cancelledCount`、`firstSpawn:{x,y,side,kind,type}|null`。
+队列汇总显示**场上占用 N / 1000（含基地）**，通常两个基地占两位，最多容纳 998 个小兵；脱离战斗的死亡视觉不占位。只有 `entity-limit` 显示“场上已满，等待单位退场”；`game-paused`、`runtime-paused`、`rate-paused`、`battle-ended`、`no-active-battle` 分别提示游戏暂停、战斗暂停、全部批次速率为 0、战斗结束或等待开局。单项任务速率为 0 时优先显示该批暂停。
+
+`enqueueSpawn`、`setSpawnJobRate` 返回任务快照。`getState().spawnQueue`／`getBattleStatus().spawnQueue` 包含 `defaultRate`（`rate` 别名）、`jobs`、`recent`（最近 32 个完成／取消任务）、`pendingJobs`、`totalPending`（`pending` 别名）、`totalRequested`、`totalSpawned`、`totalCancelled`、`paused`、`blocked`、`entityCount`、`baseCount`、`entityLimit`、`capacity`、`maxPerTick`。`entityCount` 为交战链表当前占用，`baseCount` 为其中基地数，`entityLimit` 当前为 1,000，`capacity = max(0, entityLimit − entityCount)`；一次成员扫描同时提供容量与阻塞状态。此占用不同于 `troopCounts` 的存活非基地角色数。单项任务含 `id`、`side`、`descriptor:{kind,type}`、`kind`、`type`、`count`、`rate`、`spawned`、`remaining`、`status`、`createdTick`、`completedTick`、`cancelledCount`、`firstSpawn:{x,y,side,kind,type}|null`。
 
 任务速率输入即时只改该任务，可不等前批结束就连续添加新批次。取消一项／全部只删除待出请求，与清场或取消技能不同，不清已经生成的单位。队列仅属当前战局，重置战场时清除，不作为预设规则保存。
 
-启动在配置／规则、`Factions` 后、游戏初始化前安装 `SpawnQueue`。模块接口为 `install(target)`、`enqueue(target,side,descriptor,count,{rate}?)`、`updateRate(target,id,rate)`、`setDefaultRate(target,rate)`（`setRate` 别名，仅新任务）、`cancel(target,id?)`（省略为全部）、`snapshot(target)`（`getState` 别名）。
+启动在配置／规则、`Factions`、`DeathEffects`、`EffectLists` 后、游戏初始化前安装 `SpawnQueue`。模块接口为 `install(target)`、`enqueue(target,side,descriptor,count,{rate}?)`、`updateRate(target,id,rate)`、`setDefaultRate(target,rate)`（`setRate` 别名，仅新任务）、`cancel(target,id?)`（省略为全部）、`snapshot(target)`（`getState` 别名）。设置面板轮询复用 `getState().battleStatus`，不再次调用完整战局统计。
 
 ### 双方技能快捷释放与一键解锁
 
@@ -397,7 +408,7 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 
 ## 密集战斗性能测量
 
-用 `scripts/profile-performance.cjs` 做受控源码对照：基线取已保存的 `v0.4.1` 标签，`--current` 测量当前源码。先启动本地游戏服务器，再指向该服务运行：
+用 `scripts/profile-performance.cjs` 做受控源码对照：默认基线取已保存的 `v0.4.1` 标签，`--current` 测量当前源码；可加 `--ref v0.4.2` 选择较新的已发布基线与当前版对照（`--ref current` 等同于 `--current`）。先启动本地游戏服务器，再指向该服务运行：
 
 ```powershell
 $env:GAME_URL = 'http://127.0.0.1:8318'
@@ -408,6 +419,23 @@ node scripts/profile-performance.cjs --browser --quick --current
 `--quick` 使用 400 个角色；完整矩阵覆盖 250／400／800 个角色、原阵营行走／原阵营混合／跨阵营人类／跨阵营密集交战四种场景，以及关闭／打开设置。合成夹具提高生命来稳定单位数量；密集场景还固定位置与移速，但每个角色仍执行完整游戏更新与绘制。报告、冻结源码及 CPU profile 保留在唯一的 `output/perf-*` 目录。
 
 浏览器报告分开记录更新／绘制／完整帧的 CPU 提交耗时分布，不能直接称为实际 RAF 帧率或 GPU 完成耗时；不加 `--browser` 的 Node VM 虽运行真实玩法，但绘制为空实现，不能冒充桌面绘制性能。对照应使用相同夹具、单位数、预热与帧数；保留目标顺序、余伤分配、命中时机、转化与 RNG，而不是丢单位或少跑模拟来换速度。具体前后数据与验收口径写进版本记录，不承诺所有机器或所有组合都能在某个兵数下保持固定帧率。
+
+### 基地高伤害对照
+
+`scripts/profile-base-damage.cjs` 自行启动隔离的随机端口本地服务与真实 Edge／Chromium Canvas，不需要另开游戏服务器。逐个运行相同夹具作对照，不要并行压测：
+
+```powershell
+node scripts/profile-base-damage.cjs --ref v0.4.2 --case direct-high --frames 120 --panel both
+node scripts/profile-base-damage.cjs --ref current --case direct-high --frames 120 --panel both
+```
+
+`--case` 接受逗号分隔的 `direct-low`、`direct-high`、`native-base`、`cross-base`、`native-base-high`、`cross-base-high`、`kill-friendly`、`kill-enemy`，或 `all`。`--panel` 为 `closed`／`open`／`both`；`--hits` 是**每座基地**的直接命中次数，最高 60；`--count` 是自然攻击夹具的总兵数。默认非击杀用例预热 20 帧、测量 120 个完整更新＋绘制帧，高伤害自然攻击默认仅 **20** 个角色。若检查 100 个高伤害角色，明确缩短采样，例如：
+
+```powershell
+node scripts/profile-base-damage.cjs --ref current --case cross-base-high --count 100 --frames 30
+```
+
+同一 A/B 对照必须保持 `--count`、`--hits`、`--frames`、`--warmup` 和 `--panel` 一致。报告保留冻结源码哈希、实际基地扣血／余伤、随机种子、特效数和完整帧 CPU 耗时；关闭波次／增援、高血量与固定摆位均属合成压力夹具，不替代自然通关测试。`--snapshot-only` 仅冻结、解析源码，不启动浏览器或压测；`--help` 查看全部参数。
 
 ## 检查与打包
 

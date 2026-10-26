@@ -189,7 +189,8 @@ module.exports = async function instantAcceptance(h) {
     assert.equal(cleared.force,1,'Only the live paid recruit releases population; its paid queued replacement remains reserved');
     const removed=before.people.length+before.converted.length+before.zombies.length-2;
     assert.equal(queueAfter.capacity,queueBefore.capacity+removed,'Clearing frees shared live actor capacity');
-    assert.deepEqual({...queueAfter,capacity:queueBefore.capacity},queueBefore);assert.equal(cleared.customization.paused,true);
+    assert.equal(queueAfter.entityCount,queueBefore.entityCount-removed,'Visible shared occupancy releases exactly the removed troops');
+    assert.deepEqual({...queueAfter,capacity:queueBefore.capacity,entityCount:queueBefore.entityCount},queueBefore);assert.equal(cleared.customization.paused,true);
     const deathVisuals=Object.values(cleared.clearVisuals).reduce((sum,count)=>sum+count,0);assert.ok(deathVisuals>0,'Clearing both camps must create original detached death animations');
     const counts=await assertLiveTroopTable();assert.equal(counts.friendly.total,0);assert.equal(counts.enemy.total,0);
     await page.locator('[data-clear-troops="all"]').click();assert.deepEqual(await state(),cleared);

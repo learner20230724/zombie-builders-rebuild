@@ -193,6 +193,7 @@ Custom-session auto-start follows the normal gameplay cadence: after `EndMovie()
 | `src/custom-rules.js` | Validated spawning and ability switches outside generated code |
 | `src/factions.js` | Species-independent allegiance, cross-camp targeting/combat, and rendering adapter |
 | `src/death-effects.js` | Current-camp orientation for detached death sprites and fragments |
+| `src/effect-lists.js` | Reverse node indices for cosmetic/projectile list recycling |
 | `src/spawn-queue.js` | Compact independent-rate manual jobs, fair dispatch, and job snapshots |
 | `src/customization.js` | Named presets, validated immediate commits, sandbox actions, and separate custom records |
 | `src/settings-ui.js` / `.css` | Non-modal settings dock, field editors, wave controls, and sandbox buttons |
@@ -282,11 +283,17 @@ Preset load/import methods above return data only; the settings UI immediately f
 
 `src/factions.js` separates source species from current allegiance rather than treating a camp switch as a cosmetic flag. Cross-camp units face/move toward the opposing side and target its actors/base with their type's combat behavior. Conversion changes allegiance, and typed clearing uses current camp. Numeric group modifiers still follow species, not allegiance; this is not a way to make enemy humans use zombie tables or vice versa. Projectiles retain their launch allegiance if their shooter is later converted. The cross-camp Preacher adapter can convert opposing mobile humans/zombies (range 320, base-HP budget 1,000, bases excluded); the native friendly Preacher retains its original zombie eligibility.
 
-Dense cross-camp targeting avoids building/sorting a full target array for every human on every tick. Idle acquisition uses a stable linear nearest-target scan; busy non-hit animation frames do not query targets. Only actual machine-gun/Preacher hit events sort the eligible subset using the original priority and tie order. A tick-scoped cache holds raw camp-member references, not stale positions/HP/modes; live values are read for each decision. Actor-list mutations or list/head replacement invalidate the cache, and tick exit/exception restores its scope. These changes retain target order, damage sharing, conversions, animation hit timing, fixed update frequency, and RNG.
+Cross-camp adapted-human acquisition and hit queries use **128-pixel 1D buckets** to gather conservative interval candidates, restore their original list ordinal, then apply the original precise predicates, target priority, and tie order. Busy non-hit animation frames do not query targets; only actual machine-gun/Preacher hit events sort the eligible subset. This optimization is limited to those `Factions` queries: the original native `bbGameTick` still performs pair scans, so it is not a globally linear battle update or an FPS guarantee. Target order, damage sharing, conversions, animation hit timing, fixed update frequency, and RNG are retained.
+
+Membership references are cached only for the synchronous tick; bucket geometry is cached only within a safe query phase. Actor-list membership changes, list/head replacement, phase changes, and nested ticks invalidate the relevant caches; no index survives the tick. Unknown combat callbacks disable buckets for that tick: the guard checks `bbUpdate`, `bbInfect`, `bbSmack`, `bbTurn`, and `bbHitKey` on actors and the Person/Zombie prototypes, including known adapted-human update/turn methods. Ordinary data edits do not trigger this fallback; JavaScript extensions that move targets during custom damage callbacks retain the linear query path. Queries also use the original linear scan for fewer than **64** opponents, a candidate set reaching **half** the opponent list, radii above **4,096**, absolute coordinates above **10,000,000**, or a bucket span with `lastBucket - firstBucket > 32` (as well as invalid/nonfinite geometry). Live health, modes, and precise geometry are still checked for every decision.
 
 **Death visual direction.** `DeathEffects.install(target)` runs after `Factions.install(target)` and before game initialization. It adapts the original detached death effects rather than changing a combat actor's damage/death state. `DeathEffects.tag(target, effect, body)` gives sandbox-created death visuals the same orientation handling as normal combat deaths.
 
 Direction is captured from the actor's current allegiance at death, not its original species: enemy humans mirror the native left-falling human sprite to fall right; friendly zombies mirror their native zombie fragment sprites and initial horizontal fragment velocity. Converted actors use their new allegiance. Native friendly humans and native enemy zombies retain their original visuals. Source-relative cosmetic blast offsets are mirrored with the source as well. Death visuals remain non-attacking, follow normal pause/update/recycle behavior, and do not change XP, population, hit timing, damage budgets, or RNG draws. This is not a balance setting or a saved preset field.
+
+**Base-hit debris and recycling.** The high-damage base-hit bottleneck was decorative debris, not damage calculation. `GameConfig` admits at most **256 live base-hit fragments per base (512 combined)**. This is neither a unit limit nor a damage cap; unit-death fragments and death animations have separate lifecycles. Sparse ordinary hits retain their exact visuals. Once a base’s debris slots are full, each original debris-loop iteration still consumes the same **six RNG calls in the same order**, but skips visual allocation. Actual HP loss, leftover damage, and win handling are unchanged.
+
+`EffectLists.install(target)` runs **after `DeathEffects` and before `SpawnQueue`**, before game initialization. It adds an object-to-node reverse index only to `bbbodyparts`, `bbdeathlist`, `bbexplosions`, `bbsmokelist`, `bbbottles`, `bbflinglist`, and `bbpowerups`. A list with P entries is indexed lazily in **O(P)**; subsequent known-object removals cost **O(multiplicity)** instead of repeatedly scanning the list, avoiding quadratic bulk recycling. Duplicate references, original list order, and active enumerator deletion behavior are preserved. Unknown or unsupported cases fall back to the original removal path. These adapters leave `src/generated-game.js` unchanged.
 
 `getBattleStatus().factions` reports `{friendly:{units,zombies},enemy:{units,zombies}}` from current allegiance. `powerProgress` in both battle status and controller state reports `{pendingTotal,groups:[{type,count,source,side?}]}` for queued skill dispatch. `side` appears only on sandbox groups; normal skill snapshots retain their previous shape.
 
@@ -300,13 +307,15 @@ Both bases are exposed by `getState().bases` / `getBattleStatus().bases` as `{fr
 
 Each persistent camp form selects species, count, and **本批出兵速率（只/游戏秒）**, then calls **加入出兵队列**. Counts accept **1–2,147,483,647**. Rates accept finite **0–1,000,000 actors per game-second**, including fractional values: `0.1` produces one actor per 10 game-seconds, `2` produces two per game-second, and `0` pauses only that job. A game-second is **120 battle ticks**; original game speed and runtime time scale change wall-clock delivery speed together. The default rate **120** applies only when creating a job, not to existing jobs.
 
-Jobs are independent concurrent streams, not a single blocking FIFO. Shared fair round-robin dispatch admits at most **32 actors per simulation tick**, respecting the **1,000 active entities including bases** capacity guard. Full capacity retains pending counts; it does not discard requests or accumulate an eventual giant catch-up burst. Rate changes and per-job pauses also do not backfill paused time. Very high requested rates are limited by this shared budget. The first actor is due after its interval (`120/rate` battle ticks), not at enqueue time; high-rate work starts no earlier than the next tick.
+Jobs are independent concurrent streams, not a single blocking FIFO. Shared fair round-robin dispatch admits at most **32 actors per simulation tick**, respecting the **1,000 active entities including bases** capacity guard: normally two bases leave **998 troop slots**. Full capacity retains pending counts; it does not discard requests or accumulate an eventual giant catch-up burst. Rate changes and per-job pauses also do not backfill paused time. Very high requested rates are limited by this shared budget. The first actor is due after its interval (`120/rate` battle ticks), not at enqueue time; high-rate work starts no earlier than the next tick.
 
-`enqueueSpawn` and `setSpawnJobRate` return job snapshots. `getState().spawnQueue` / `getBattleStatus().spawnQueue` contains `defaultRate` (`rate` alias), `jobs`, `recent` (last 32 completed/cancelled jobs), `pendingJobs`, `totalPending` (`pending` alias), `totalRequested`, `totalSpawned`, `totalCancelled`, `paused`, `blocked`, `capacity`, and `maxPerTick`. Each job includes `id`, `side`, `descriptor:{kind,type}`, `kind`, `type`, `count`, `rate`, `spawned`, `remaining`, `status`, `createdTick`, `completedTick`, `cancelledCount`, and `firstSpawn:{x,y,side,kind,type}|null`.
+`enqueueSpawn` and `setSpawnJobRate` return job snapshots. `getState().spawnQueue` / `getBattleStatus().spawnQueue` contains `defaultRate` (`rate` alias), `jobs`, `recent` (last 32 completed/cancelled jobs), `pendingJobs`, `totalPending` (`pending` alias), `totalRequested`, `totalSpawned`, `totalCancelled`, `paused`, `blocked`, `entityCount`, `baseCount`, `entityLimit`, `capacity`, and `maxPerTick`. `entityCount` counts combat-list membership including bases; `baseCount` identifies the base slots, `entityLimit` is 1,000, and `capacity` is the remaining space. This differs from the unique living-mobile-actor counts in `troopCounts`. Each job includes `id`, `side`, `descriptor:{kind,type}`, `kind`, `type`, `count`, `rate`, `spawned`, `remaining`, `status`, `createdTick`, `completedTick`, `cancelledCount`, and `firstSpawn:{x,y,side,kind,type}|null`.
+
+The queue UI shows **entityCount / 1,000 (including bases)** and distinguishes `entity-limit`, `game-paused`, `runtime-paused`, `battle-ended`, and `no-active-battle`. Global `rate-paused` means all pending jobs have rate 0; each zero-rate job also has its own label. A snapshot obtains occupancy and capacity blocking from one combat-list scan. Settings polling reuses `getState().battleStatus` instead of requesting and scanning the same battle status again.
 
 A job's live rate input changes only that job; users can add another batch without waiting for previous jobs. Cancelling one/all jobs removes only outstanding requests, unlike troop clearing or power-effect cancellation. Already spawned actors remain. Jobs are session-only and are cleared when the battlefield resets; they are not saved preset rule fields.
 
-Boot installs `SpawnQueue` **after `Factions`** (and configuration/rules) before game initialization. The module API is `install(target)`, `enqueue(target,side,descriptor,count,{rate}?)`, `updateRate(target,id,rate)`, `setDefaultRate(target,rate)` (`setRate` alias; new jobs only), `cancel(target,id?)` (omitted means all), and `snapshot(target)` (`getState` alias).
+Boot installs `SpawnQueue` **after `Factions`, `DeathEffects`, and `EffectLists`** (and configuration/rules) before game initialization. The module API is `install(target)`, `enqueue(target,side,descriptor,count,{rate}?)`, `updateRate(target,id,rate)`, `setDefaultRate(target,rate)` (`setRate` alias; new jobs only), `cancel(target,id?)` (omitted means all), and `snapshot(target)` (`getState` alias).
 
 ### Dual-camp power releases and unlock all
 
@@ -397,7 +406,27 @@ Keep handwritten configuration behavior in `src/game-config.js`. Regenerating `s
 
 ## Dense-battle profiling
 
-Use `scripts/profile-performance.cjs` for controlled source comparisons. Its baseline is the stored `v0.4.1` tag; `--current` measures the working source. Run the local game server first and point the profiler at that server:
+### Base damage and effect pressure
+
+After `npm install`, use `scripts/profile-base-damage.cjs` for controlled browser comparisons of the working source (`--ref current`) and published `v0.4.2` baseline. It starts its own random-port loopback server and isolated browser contexts, then closes only its owned resources; no external game server is needed. Run comparisons serially with identical options:
+
+```powershell
+node scripts/profile-base-damage.cjs --ref v0.4.2 --case direct-high --frames 120 --panel both --hits 60
+node scripts/profile-base-damage.cjs --ref current --case direct-high --frames 120 --panel both --hits 60
+```
+
+`--case` accepts `direct-low`, `direct-high`, `native-base`, `cross-base`, `native-base-high`, `cross-base-high`, `kill-friendly`, and `kill-enemy`, as a comma-separated list or `all`. `--panel` accepts `closed`, `open`, or `both`; `--frames` defaults to 120, `--count` overrides the total natural-army count, and `--hits` sets direct hits **per base** (maximum 60). High-damage natural-army cases default to **20 actors**. For an optional heavier case, explicitly bound the frame count on both refs:
+
+```powershell
+node scripts/profile-base-damage.cjs --ref v0.4.2 --case cross-base-high --count 100 --frames 30 --panel closed
+node scripts/profile-base-damage.cjs --ref current --case cross-base-high --count 100 --frames 30 --panel closed
+```
+
+The fixtures use high-HP, stationary, placed armies with waves/reinforcements disabled; they retain native damage, animations, complete updates, and Canvas rendering. Reports and frozen-source hashes are saved under unique `output/playwright/perf-v043-*` directories. Timings measure CPU update/render submission, not guaranteed FPS. Use `--help` for all options or `--snapshot-only` to freeze and parse sources without starting browser pressure.
+
+### General dense scenes
+
+Use `scripts/profile-performance.cjs` for controlled source comparisons. Its default baseline is the stored `v0.4.1` tag; `--current` measures the working source. `--ref v0.4.2` selects the newer published baseline for comparison with the current source (`--ref current` is equivalent to `--current`). Run the local game server first and point the profiler at that server:
 
 ```powershell
 $env:GAME_URL = 'http://127.0.0.1:8318'

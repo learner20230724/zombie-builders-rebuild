@@ -10,7 +10,7 @@ const ROOT = path.resolve(__dirname, '..');
 const UINT32_MAX = 0xffffffff;
 const FIXED_DOS_DATE = 0x21; // 1980-01-01, independent of source mtimes/time zone.
 const SOURCE_FILES = ['boot.js', 'data.js', 'game-config.js', 'generated-game.js', 'physics.js', 'runtime.js'];
-const CUSTOM_SOURCE_FILES = ['custom-rules.js', 'customization.js', 'settings-ui.js', 'settings-ui.css', 'time-controls.js', 'time-controls.css', 'factions.js', 'death-effects.js', 'spawn-queue.js'];
+const CUSTOM_SOURCE_FILES = ['custom-rules.js', 'customization.js', 'settings-ui.js', 'settings-ui.css', 'time-controls.js', 'time-controls.css', 'factions.js', 'death-effects.js', 'effect-lists.js', 'spawn-queue.js'];
 const CONFIG_FILES = ['units.json', 'zombies.json', 'buildings.json', 'powers.json', 'levels.json'];
 const ASSET_DIRECTORIES = ['images', 'images-canonical', 'images-native-jpeg', 'sounds', 'sounds-pcm', 'splash'];
 const CRC_TABLE = Array.from({length: 256}, (_, value) => {
