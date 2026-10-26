@@ -1,5 +1,7 @@
 # v0.4.3 — 基地受击与密集战斗 / Base hits and dense battles
 
+状态：**源码已同步，桌面快捷方式已更新，v0.4.3 已公开发布并匿名核对为 latest。**
+
 ## Changes / 更新
 
 - 出兵队列分别显示场上已满、游戏／战斗暂停、单批速率为 0、战斗结束；汇总展示场上占用与 1,000 实体上限（含两个基地，通常可容纳 998 个小兵）。满场只等待，不丢弃剩余请求。
@@ -64,5 +66,7 @@ The queue now distinguishes capacity from pauses and ended battles. Adapted cros
 | `zombie-builders-web-v0.4.3.zip` | 43,488,448 | 339 | `59cd39f7430417f805509cec113a1063ea61b429e03b3f7c318f5f09b456351b` |
 
 下载入口：[v0.4.3 Release](https://github.com/learner20230724/zombie-builders-rebuild/releases/tag/v0.4.3)。Windows 使用桌面 ZIP，完整解压后运行 `ZombieBuilders.exe`；不要只复制 EXE。
+
+版本标签对应 `51320ae`。桌面 ZIP、Web ZIP 和 `SHA256SUMS.txt` 三个公开资产均已上传；匿名验证 release／latest、全部资产字节数和 GitHub 服务端 SHA-256 与本地一致，公开清单完整下载后逐字节一致。没有再次全量下载大型公开 ZIP；本地完整 CRC、逐文件哈希和实际完整 ZIP 搬移验收已分别完成。证据：`output/releases/v0.4.3/published.json`、`public-download-verification.json`。本文档不在运行包集合中，补充公开交付记录不改变已冻结程序。
 
 English: Full regression 532/532, source Electron 43/43, packaged EXE with complete archive relocation 45/45, browser startup and 20/20 journey passed. Repeated controlled real-Canvas comparisons retain full combat updates, actors, HP damage and RNG; only decorative base fragments are bounded. Specified 100-actor high-damage base cases fall from about 30–35 ms to 1.6–1.9 ms mean CPU time per full frame. These synthetic results are not universal FPS claims. Local full ZIP/source/license checks passed; the desktop shortcut targets the verified v0.4.3 installation.
