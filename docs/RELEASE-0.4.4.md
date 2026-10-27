@@ -1,5 +1,7 @@
 # v0.4.4 — 一万在场容量 / 10,000 live-entity capacity
 
+状态：**源码已同步，桌面快捷方式已更新，v0.4.4 已公开发布并匿名验证为 latest。验收范围区分源码完整套件与实际 EXE 容量专项，见下文。**
+
 ## Scope / 更新范围
 
 - 双方共享的战场在场实体上限由 **1,000** 提高到 **10,000**，包含双方基地和转化单位；通常两个基地占两位，可容纳 **9,998** 个小兵。
@@ -36,5 +38,7 @@ Both camps share a **10,000 active-entity capacity including bases**, normally l
 完整浏览器启动 smoke 与 **20/20 journey** 通过，错误／失败资源／外部请求均为空；新证据在 `output/playwright/v044-browser-final/`，前版证据另行保留。`output/acceptance-v044-process-cleanup.json` 确认七个精确自有 QA profile 无残留，自有应用、浏览器与 loopback 服务均已关闭；未操作玩家正在运行的游戏。
 
 下载入口：[v0.4.4 Release](https://github.com/learner20230724/zombie-builders-rebuild/releases/tag/v0.4.4)。使用桌面 ZIP 时完整解压，再运行 `ZombieBuilders.exe`，不要仅复制 EXE。
+
+版本标签对应 `8ebff75`。三个公开资产的字节数及 GitHub 服务端 SHA-256 与本地一致，公开校验清单完整下载后逐字节相同；未再次全量下载大型公开 ZIP，其本地完整 CRC／源码哈希及完整 ZIP 搬移测试另已完成。公开交付证据：`output/releases/v0.4.4/published.json`、`public-download-verification.json`。本记录不在运行包集合中，补记不改变已冻结程序或标签。
 
 English: Full regression 535/535 and source Electron 43/43 passed. The packaged full window suite encountered unstable native client-area restoration before its resize assertion, so no full 45-check pass is claimed. A separate actual-EXE capacity/restart/full-ZIP-relocation suite passed 8/8 with real 9,998 troops plus two bases, retained queues and recovery, unchanged independent visual budgets, atomic capacity rejection, persisted rules, and matching runtime hashes. No 10,000-actor FPS guarantee is made.
