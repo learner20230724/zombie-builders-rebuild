@@ -263,9 +263,9 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 | `enqueueSpawn(side, {kind,type}, count, {rate}?)` | 创建紧凑的手动出兵任务，数量 1–2,147,483,647，速率 0–1,000,000 只／游戏秒 |
 | `setSpawnJobRate(id, rate)` | 立即仅修改该任务速率，返回任务快照 |
 | `cancelSpawnJob(id = "all")`、`cancelAllSpawnJobs()` | 取消一项／全部待出请求，返回被取消任务快照数组，不清已经出兵 |
-| `spawnFactionUnit(side, {kind,type}, count = 1)` | 底层即时生成：`friendly`／`enemy` 任一阵营，`kind` 为 `unit`／`zombie`，`type` 为 0–4，单次 1–998，先检查共用容量 |
-| `spawnZombie(type, count = 1)` | 兼容快捷接口：敌方僵尸类型 0–4，单次 1–998 |
-| `spawnFriendlyUnit(type, count = 1)` | 兼容快捷接口：己方人类类型 0–4，单次 1–998 |
+| `spawnFactionUnit(side, {kind,type}, count = 1)` | 底层即时生成：`friendly`／`enemy` 任一阵营，`kind` 为 `unit`／`zombie`，`type` 为 0–4，单次 1–9,998，先检查共用容量 |
+| `spawnZombie(type, count = 1)` | 兼容快捷接口：敌方僵尸类型 0–4，单次 1–9,998 |
+| `spawnFriendlyUnit(type, count = 1)` | 兼容快捷接口：己方人类类型 0–4，单次 1–9,998 |
 | `clearFriendlyTroops(selection?)`、`clearEnemyTroops(selection?)` | 清单方全体或选定类型；保留基地、暂停、已付订单和后续队列 |
 | `clearAllTroops()` | 事务式一键清双方；先预检三条阵营链表再修改，保留基地、后续队列与技能效果 |
 | `releaseSandboxPower(powerId, side = "friendly")` | 自定义战局中为己方／敌方立即释放 0／1／2 技能，不扣 XP 或改正常技能冷却／蓄力 |
@@ -279,7 +279,7 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 
 上表载入／导入底层方法只返回数据，设置界面随后立即把有效结果交给 `commitSettings`。编辑器用 `commitSettings`，底层仅本局调用可用 `applyDraft`；不要把 `applyLive` 与 `applyRules` 串联：规则有误时，不应把正确的配置先应用一半。校验失败不改变模式、存储或当前配置。
 
-`spawnFactionUnit` 返回 `{side,kind,type,count,positions}`，两个兼容快捷接口仍返回 `{type,count,positions}`。这些是底层即时接口；玩家批量区域采用下述队列；己方人类和敌方僵尸各五个一键按钮仍即时生成。双方出兵表单常驻并列、独立保持所选类型／数量／速率，切换其他区域不丢失输入。支持完整二十种阵营／类型组合，例如敌方牧师／机枪兵、己方肥胖僵尸。单位均从所属阵营自然入口（**己方 x = 0，敌方 x = 1600**）进入，采用来源物种配置／全体倍率，不加暴民愤怒加成。手动生成不消耗现金、XP，不改已付订单，也不预留招募人口；未预留人口标记保证死亡／清理不错误退还其他已付兵或订单的人口。双方共享场上 1,000 实体保护，超量整批在创建前拒绝。
+`spawnFactionUnit` 返回 `{side,kind,type,count,positions}`，两个兼容快捷接口仍返回 `{type,count,positions}`。这些是底层即时接口；玩家批量区域采用下述队列；己方人类和敌方僵尸各五个一键按钮仍即时生成。双方出兵表单常驻并列、独立保持所选类型／数量／速率，切换其他区域不丢失输入。支持完整二十种阵营／类型组合，例如敌方牧师／机枪兵、己方肥胖僵尸。单位均从所属阵营自然入口（**己方 x = 0，敌方 x = 1600**）进入，采用来源物种配置／全体倍率，不加暴民愤怒加成。手动生成不消耗现金、XP，不改已付订单，也不预留招募人口；未预留人口标记保证死亡／清理不错误退还其他已付兵或订单的人口。双方共享场上 10,000 实体保护，超量整批在创建前拒绝。
 
 `src/factions.js` 把来源物种与当前阵营分开，不是仅改一个外观标记。跨阵营单位朝向、行进和索敌面向敌对一方，按类型行为攻击该方角色／基地；转化改变阵营，按类型清场以当前阵营为准。全体倍率仍跟随物种，不是把敌方人类改用僵尸数值表或反过来。角色后来被转化，不改变此前已发射投射物的发射阵营。跨阵营牧师适配可转化敌对的可移动人类／僵尸（范围 320、基础生命预算 1,000、排除基地）；原生己方牧师保留原版僵尸可转化范围。
 
@@ -309,11 +309,11 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 
 两方并列批量区域各自选择类型、数量和**“本批出兵速率（只/游戏秒）”**，点**“加入出兵队列”**。数量范围 **1–2,147,483,647**；速率是有限数 **0–1,000,000 只／游戏秒**，支持小数：`0.1` 为每 10 游戏秒出 1 只，`2` 为每游戏秒出 2 只，`0` 只暂停该任务。一游戏秒为 **120 战斗 tick**，原游戏速度和运行时倍速共同改变现实出兵速率。默认 **120** 仅用于新任务，不影响已排任务。
 
-各任务独立并发，不是前一个没结束后一个就不出的单一 FIFO。公平轮转共用**每模拟 tick 最多 32 只**的预算，并遵守**含基地的场上 1,000 实体**保护。满场保留待出余量，不吞请求，也不攒成之后一口气补跑的大爆发；单批暂停、改速也不追补先前时间。极高速率受共用预算约束。第一只在经过间隔（`120/rate` 战斗 tick）后出现，不在加入时立即生成；高速任务最早下一 tick 开始。
+各任务独立并发，不是前一个没结束后一个就不出的单一 FIFO。公平轮转共用**每模拟 tick 最多 32 只**的预算，并遵守**含基地的场上 10,000 实体**保护。满场保留待出余量，不吞请求，也不攒成之后一口气补跑的大爆发；单批暂停、改速也不追补先前时间。极高速率受共用预算约束。第一只在经过间隔（`120/rate` 战斗 tick）后出现，不在加入时立即生成；高速任务最早下一 tick 开始。
 
-队列汇总显示**场上占用 N / 1000（含基地）**，通常两个基地占两位，最多容纳 998 个小兵；脱离战斗的死亡视觉不占位。只有 `entity-limit` 显示“场上已满，等待单位退场”；`game-paused`、`runtime-paused`、`rate-paused`、`battle-ended`、`no-active-battle` 分别提示游戏暂停、战斗暂停、全部批次速率为 0、战斗结束或等待开局。单项任务速率为 0 时优先显示该批暂停。
+队列汇总显示**场上占用 N / 10000（含基地）**，通常两个基地占两位，最多容纳 9,998 个小兵；脱离战斗的死亡视觉不占位。只有 `entity-limit` 显示“场上已满，等待单位退场”；`game-paused`、`runtime-paused`、`rate-paused`、`battle-ended`、`no-active-battle` 分别提示游戏暂停、战斗暂停、全部批次速率为 0、战斗结束或等待开局。单项任务速率为 0 时优先显示该批暂停。在场容量提高到 10,000 不等于承诺一万个角色同时战斗时的帧率。
 
-`enqueueSpawn`、`setSpawnJobRate` 返回任务快照。`getState().spawnQueue`／`getBattleStatus().spawnQueue` 包含 `defaultRate`（`rate` 别名）、`jobs`、`recent`（最近 32 个完成／取消任务）、`pendingJobs`、`totalPending`（`pending` 别名）、`totalRequested`、`totalSpawned`、`totalCancelled`、`paused`、`blocked`、`entityCount`、`baseCount`、`entityLimit`、`capacity`、`maxPerTick`。`entityCount` 为交战链表当前占用，`baseCount` 为其中基地数，`entityLimit` 当前为 1,000，`capacity = max(0, entityLimit − entityCount)`；一次成员扫描同时提供容量与阻塞状态。此占用不同于 `troopCounts` 的存活非基地角色数。单项任务含 `id`、`side`、`descriptor:{kind,type}`、`kind`、`type`、`count`、`rate`、`spawned`、`remaining`、`status`、`createdTick`、`completedTick`、`cancelledCount`、`firstSpawn:{x,y,side,kind,type}|null`。
+`enqueueSpawn`、`setSpawnJobRate` 返回任务快照。`getState().spawnQueue`／`getBattleStatus().spawnQueue` 包含 `defaultRate`（`rate` 别名）、`jobs`、`recent`（最近 32 个完成／取消任务）、`pendingJobs`、`totalPending`（`pending` 别名）、`totalRequested`、`totalSpawned`、`totalCancelled`、`paused`、`blocked`、`entityCount`、`baseCount`、`entityLimit`、`capacity`、`maxPerTick`。`entityCount` 为交战链表当前占用，`baseCount` 为其中基地数，`entityLimit` 当前为 10,000，`capacity = max(0, entityLimit − entityCount)`；一次成员扫描同时提供容量与阻塞状态。此占用不同于 `troopCounts` 的存活非基地角色数。单项任务含 `id`、`side`、`descriptor:{kind,type}`、`kind`、`type`、`count`、`rate`、`spawned`、`remaining`、`status`、`createdTick`、`completedTick`、`cancelledCount`、`firstSpawn:{x,y,side,kind,type}|null`。
 
 任务速率输入即时只改该任务，可不等前批结束就连续添加新批次。取消一项／全部只删除待出请求，与清场或取消技能不同，不清已经生成的单位。队列仅属当前战局，重置战场时清除，不作为预设规则保存。
 
@@ -394,7 +394,7 @@ F2 是自定义入口，全局开关面板；关闭后游戏画面没有额外�
 - 近战伤害组合基础／全体／关卡倍率后按原流程截整数；尸弹仍不乘关卡近战倍率。燃烧瓶和尸弹在发射时使用所属类型全体伤害倍率，已飞出的不变。牧师转化不是直接伤害值。
 - 移速是类型移速乘全体倍率，愤怒暴民还乘自身愤怒移速；实时更新保留方向与临时状态，并遵循所选生命策略。
 
-手动生成有意绕过自动出怪筛选，不改变自动波次及顺序。`CustomRules.ENTITY_LIMIT` 为战场合计 **1,000** 个交战单位，含基地、我方、敌方与转化友军，不含投射物、技能特效和粒子。已付费训练订单在满员时保留为剩余 1 tick，等待空位，保留已付资金与预留人口，不吞订单、不重复扣款；愤怒暴民和空袭使用紧凑计数队列，每个配置数量最高 **2,147,483,647**，每个模拟更新最多分发 **32 个角色／效果**，并遵守各自的在场容量保护；多余请求等待而非丢弃。修改数量只影响后续释放，不改已经在等待分发的技能；重置战局清除其旧等待请求。`automaticSpawning: false` 冻结脚本波次调度和数量，不停止战斗或手动出兵任务；关闭增援生成期间跨过的基地生命阈值会被消费，重新开启不补发。类型开关筛选队列出怪，`corpseSpawnOnImpact` 单独控制尸弹落地额外生成的普通僵尸。
+手动生成有意绕过自动出怪筛选，不改变自动波次及顺序。`CustomRules.ENTITY_LIMIT` 为战场合计 **10,000** 个交战单位，含基地、我方、敌方与转化友军，不含投射物、技能特效和粒子。已付费训练订单在满员时保留为剩余 1 tick，等待空位，保留已付资金与预留人口，不吞订单、不重复扣款；愤怒暴民和空袭使用紧凑计数队列，每个配置数量最高 **2,147,483,647**，每个模拟更新最多分发 **32 个角色／效果**，并遵守各自的在场容量保护；多余请求等待而非丢弃。修改数量只影响后续释放，不改已经在等待分发的技能；重置战局清除其旧等待请求。`automaticSpawning: false` 冻结脚本波次调度和数量，不停止战斗或手动出兵任务；关闭增援生成期间跨过的基地生命阈值会被消费，重新开启不补发。类型开关筛选队列出怪，`corpseSpawnOnImpact` 单独控制尸弹落地额外生成的普通僵尸。
 
 `ghoulLongLeap: false` 关闭食尸鬼远距长跃，保留近距离跳咬；半空关闭时，下个战斗 tick 将该次长跃还原到地面高度并继续行走。其他三个能力布尔开关关闭对应命中／转化／投射物，不取消动作耗时，也不替换成别的攻击。本版没有数值化调整攻击频率、通用攻击距离、长跃距离／速度、肥胖范围半径、牧师转化预算／距离或空袭炸弹伤害／半径。新增实体与机制仍需代码实现。
 

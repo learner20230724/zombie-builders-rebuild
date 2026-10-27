@@ -385,10 +385,38 @@ async function run(options) {
         assert.equal(box.backingWidth, 800); assert.equal(box.backingHeight, 600);
         assert.ok(Math.abs(box.width - Math.min(box.viewportWidth, box.viewportHeight * 4 / 3)) <= 2, 'Canvas fills available viewport');
       }
-      await app.evaluate(({BrowserWindow}) => { const win = BrowserWindow.getAllWindows()[0]; win.unmaximize(); win.setBounds({width: 720, height: 600}); });
-      await page.waitForTimeout(250); const small = await layout(); valid(small);
+      // Windows applies restore/maximize asynchronously. Do not race a native
+      // unmaximize with setBounds, or treat a fixed 300 ms sleep as its proof.
+      const restoredContent=await app.evaluate(async ({BrowserWindow}) => {
+        const win = BrowserWindow.getAllWindows()[0];win.restore();win.showInactive();
+        const deadline=Date.now()+15000;
+        while((win.isMaximized()||win.isMinimized()||win.getContentBounds().width<=0)&&Date.now()<deadline)
+          await new Promise(resolve=>setTimeout(resolve,50));
+        if(win.isMaximized()||win.isMinimized()||win.getContentBounds().width<=0)throw new Error('The owned QA window did not finish restoring');
+        win.setBounds({width:720,height:600});
+        while((win.getBounds().width>740||win.getBounds().height>620)&&Date.now()<deadline)
+          await new Promise(resolve=>setTimeout(resolve,50));
+        return win.getContentBounds();
+      });
+      await page.waitForFunction(content=>Math.abs(innerWidth-content.width)<=2&&Math.abs(innerHeight-content.height)<=2,
+        restoredContent,{timeout:15000});
+      const small = await layout(); valid(small);
+      evidence.windowScaleSnapshots={small,nativeSmall:await app.evaluate(({BrowserWindow})=>{
+        const win=BrowserWindow.getAllWindows()[0];return{bounds:win.getBounds(),content:win.getContentBounds(),maximized:win.isMaximized(),minimized:win.isMinimized(),visible:win.isVisible()};
+      })};
       await app.evaluate(({BrowserWindow}) => BrowserWindow.getAllWindows()[0].maximize());
-      await page.waitForTimeout(300); const large = await layout(); valid(large);
+      try {
+        await page.waitForFunction(small=>{
+          const box=document.getElementById('game').getBoundingClientRect();
+          return box.width>small.width||box.height>small.height;
+        },small,{timeout:15000});
+      } finally {
+        evidence.windowScaleSnapshots.large=await layout();
+        evidence.windowScaleSnapshots.nativeLarge=await app.evaluate(({BrowserWindow})=>{
+          const win=BrowserWindow.getAllWindows()[0];return{bounds:win.getBounds(),content:win.getContentBounds(),maximized:win.isMaximized(),minimized:win.isMinimized(),visible:win.isVisible()};
+        });
+      }
+      const large = evidence.windowScaleSnapshots.large; valid(large);
       assert.ok(large.width > small.width || large.height > small.height, 'Maximize actually enlarges the game canvas');
       // Electron handles F11 in main's before-input-event, not the renderer.
       // CDP keyboard injection bypasses that native event on current Electron;

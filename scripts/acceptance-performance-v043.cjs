@@ -5,10 +5,12 @@
 // not an FPS benchmark or a simulation that skips attacks/rendering.
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const {ENTITY_LIMIT} = require('../src/custom-rules.js');
 const INT_MAX = 2147483647;
 
 function validateQueueOccupancy(queue, expected) {
-  assert.equal(queue.entityLimit,1000);
+  assert.equal(ENTITY_LIMIT,10000);
+  assert.equal(queue.entityLimit,ENTITY_LIMIT);
   assert.equal(queue.baseCount,2);
   assert.equal(queue.entityCount,expected);
   assert.equal(queue.capacity,Math.max(0,queue.entityLimit-expected));
@@ -31,7 +33,7 @@ async function acceptance(h) {
   // Read the actual ztp:// source bytes, not this harness's checkout: packaged
   // acceptance must identify exactly the runtime files inside its own EXE.
   const runtimeSourceBytes=await page.evaluate(async()=>{
-    const names=['game-config.js','factions.js','effect-lists.js','spawn-queue.js','settings-ui.js','generated-game.js'];
+    const names=['game-config.js','custom-rules.js','customization.js','factions.js','effect-lists.js','spawn-queue.js','settings-ui.js','generated-game.js'];
     return Promise.all(names.map(async name=>{
       const response=await fetch('/src/'+name,{cache:'no-store'});
       if(!response.ok)throw new Error('QA runtime hash HTTP '+response.status+': '+name);
@@ -74,20 +76,20 @@ async function acceptance(h) {
     return summary(id).textContent();
   }
 
-  await check('SPAWN-QUEUE-BACKPRESSURE-REASONS','The real F2 queue distinguishes a stopped battle, a zero-rate batch and actual 1000-object capacity; both bases count, queued requests are retained, and clearing troops lets the existing live-rate job resume.',async()=>{
+  await check('SPAWN-QUEUE-BACKPRESSURE-REASONS','The real F2 queue distinguishes a stopped battle, a zero-rate batch and actual 10000-object capacity; both bases count, queued requests are retained, and clearing troops lets the existing live-rate job resume.',async()=>{
     await fixture('Queue occupancy and pause reasons');
     const stopped=await enqueue('friendly',2,0),active=await enqueue('enemy',3,120);
     assert.ok(stopped&&active);validateQueueOccupancy(await queue(),2);
     const pausedText=await label(active.id,'战斗暂停中'),zeroText=await label(stopped.id,'该批已暂停（速率 0）');
     assert.ok(!pausedText.includes('场上已满'));assert.ok(!pausedText.includes('等待场上空位'));
-    await page.waitForFunction(()=>document.querySelector('[data-spawn-queue-summary]')?.textContent.includes('场上占用 2 / 1000（含基地）'));
-    const filled=await page.evaluate(()=>Customization.spawnFactionUnit('friendly',{kind:'unit',type:0},998));
-    assert.equal(filled.count,998);validateQueueOccupancy(await queue(),1000);
+    await page.waitForFunction(limit=>document.querySelector('[data-spawn-queue-summary]')?.textContent.includes('场上占用 2 / '+limit+'（含基地）'),ENTITY_LIMIT);
+    const filled=await page.evaluate(count=>Customization.spawnFactionUnit('friendly',{kind:'unit',type:0},count),ENTITY_LIMIT-2);
+    assert.equal(filled.count,ENTITY_LIMIT-2);validateQueueOccupancy(await queue(),ENTITY_LIMIT);
     evidence.syntheticFixtures.push({name:'Exact shared live-capacity boundary',synthetic:true,notNaturalRecruitment:true,
-      method:'The public paused immediate API adds 998 stationary harmless ordinary humans to the two real bases; real queued UI batches remain pending and real clock controls demonstrate backpressure and recovery.',actors:998});
+      method:'The public paused immediate API adds 9998 stationary harmless ordinary humans to the two real bases; real queued UI batches remain pending and real clock controls demonstrate backpressure and recovery. This is a capacity-function check, not a 10000-actor combat FPS claim.',actors:ENTITY_LIMIT-2});
     await togglePlayback();await page.evaluate(()=>{ZTPRuntime.useRealtime();ZTPRuntime.start();});
     const fullText=await label(active.id,'场上已满，等待单位退场');
-    let full=await queue();validateQueueOccupancy(full,1000);
+    let full=await queue();validateQueueOccupancy(full,ENTITY_LIMIT);
     assert.equal(full.blocked,'entity-limit');assert.equal(full.jobs.find(job=>job.id===active.id).remaining,3);
     assert.equal(full.jobs.find(job=>job.id===stopped.id).remaining,2);
     await summary(active.id).scrollIntoViewIfNeeded();
@@ -107,7 +109,7 @@ async function acceptance(h) {
     await label(stopped.id,'该批已暂停（速率 0）');
     await page.locator('[data-cancel-spawn-all]').click();assert.equal((await queue()).pendingJobs,0);
     await save('18a-queue-resumed-after-clear');
-    return {pausedText,zeroText,fullText,capacityIncludesBases:true,initialOccupancy:2,fullOccupancy:1000,
+    return {pausedText,zeroText,fullText,capacityIncludesBases:true,initialOccupancy:2,fullOccupancy:ENTITY_LIMIT,
       pendingAtFull:5,activeBatchResumed:3,zeroRateBatchRetained:2,afterResumeOccupancy:5};
   });
 

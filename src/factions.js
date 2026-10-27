@@ -5,7 +5,7 @@
   if(typeof module==='object'&&module.exports)module.exports=api;else root.Factions=api;
 })(typeof globalThis==='object'?globalThis:this,function(importedRules){
   'use strict';
-  const states=new WeakMap(), LIMIT=1000;
+  const states=new WeakMap(), LIMIT=10000;
   const BUCKET_SIZE=128, SPATIAL_MINIMUM=64, SPATIAL_RADIUS_LIMIT=4096, SPATIAL_COORDINATE_LIMIT=10000000;
   const ACTOR_CALLBACKS=['bbUpdate','bbInfect','bbSmack','bbTurn','bbHitKey'];
   function fail(message){throw new Error('Factions: '+message);}

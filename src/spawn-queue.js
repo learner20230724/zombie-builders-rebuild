@@ -7,7 +7,7 @@
 })(typeof globalThis==='object'?globalThis:this,function(importedFactions,importedRules){
   'use strict';
   const states=new WeakMap(),TICKS_PER_SECOND=120,DEFAULT_RATE=120,MAX_RATE=1000000;
-  const MAX_COUNT=2147483647,MAX_JOBS=10000,MAX_PER_TICK=32,HISTORY_LIMIT=32,ENTITY_LIMIT=1000;
+  const MAX_COUNT=2147483647,MAX_JOBS=10000,MAX_PER_TICK=32,HISTORY_LIMIT=32,ENTITY_LIMIT=10000;
   function fail(message){throw new Error('SpawnQueue: '+message);}
   function portFor(target){if(!target||!target.ZTPGamePort)fail('missing game port');return target.ZTPGamePort;}
   function stateFor(target){const state=states.get(target);if(!state)fail('install must run first');return state;}

@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const GameConfig=require('../src/game-config.js'),CustomRules=require('../src/custom-rules.js'),Factions=require('../src/factions.js');
+const TROOP_SLOTS=CustomRules.ENTITY_LIMIT-2;
 const root=path.resolve(__dirname,'..'),read=name=>fs.readFileSync(path.join(root,name),'utf8'),json=name=>JSON.parse(read(name));
 function config(){return GameConfig.fromDocuments(Object.fromEntries(['units','zombies','buildings','powers','levels'].map(kind=>[kind,json('config/'+kind+'.json')])));}
 function entries(list){const a=[],it=list.bbObjectEnumerator();while(it.bbHasNext())a.push(it.bbNextObject());return a;}
@@ -36,7 +37,15 @@ test('installing adapter alone keeps native battles and random stream exactly un
 test('batch capacity includes every camp/species, bases and converted actors; invalid input is atomic',()=>{
  const h=fixture(),seed=h.port.state.bb_std_random_Seed;
  for(const request of [['bad',{kind:'unit',type:0},1],['friendly',{kind:'unit',type:5},1],['enemy',{kind:'zombie',type:1},0],['enemy',{kind:'unit',type:0},Infinity]])assert.throws(()=>Factions.spawn(h.target,...request),/Factions/);
- assert.equal(h.port.state.bb_std_random_Seed,seed);assert.equal(h.spawn('enemy','unit',0,2147483647).length,998);assert.equal(h.spawn('friendly','zombie',3,1).length,0);assert.equal(CustomRules.getEntityCapacity(h.target),0);
+ assert.equal(h.port.state.bb_std_random_Seed,seed);
+ // Unique inert native bodies exercise the exact 10,000 membership boundary
+ // without creating 9,998 animated adapters just to test a three-slot clamp.
+ for(let i=0;i<TROOP_SLOTS-3;i++){
+  const body=new h.port.bb_Zombie().bbZombie_new(0,h.game.bbzunits[0],null);body.bbmode=16;h.game.bbzombies.bbAddLast(body);
+ }
+ assert.equal(Factions.validateSpawn(h.target,'enemy',{kind:'unit',type:0},2147483647).capacity,3);
+ assert.equal(h.spawn('enemy','unit',0,2147483647).length,3);assert.equal(h.spawn('friendly','zombie',3,1).length,0);assert.equal(CustomRules.getEntityCapacity(h.target),0);
+ assert.equal(Factions.list(h.target,{includeBases:true}).length,10000);
 });
 
 test('native paused battle permits cross-side spawning without unpausing',()=>{const h=fixture();h.game.bbmainState=6;assert.equal(h.spawn('enemy','unit',2).length,1);assert.equal(h.spawn('friendly','zombie',4).length,1);assert.equal(h.game.bbmainState,6);});

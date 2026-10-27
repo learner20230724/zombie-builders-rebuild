@@ -1,6 +1,7 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const GameConfig=require('../src/game-config.js'),CustomRules=require('../src/custom-rules.js'),Factions=require('../src/factions.js'),SpawnQueue=require('../src/spawn-queue.js');
+const ENTITY_LIMIT=SpawnQueue.ENTITY_LIMIT,TROOP_SLOTS=ENTITY_LIMIT-2;
 const root=path.resolve(__dirname,'..'),read=name=>fs.readFileSync(path.join(root,name),'utf8'),json=name=>JSON.parse(read(name));
 function config(){return GameConfig.fromDocuments(Object.fromEntries(['units','zombies','buildings','powers','levels'].map(kind=>[kind,json('config/'+kind+'.json')])));}
 function entries(list){const a=[],it=list.bbObjectEnumerator();while(it.bbHasNext())a.push(it.bbNextObject());return a;}
@@ -19,6 +20,25 @@ function fixture(queued=true,edit){
 }
 function view(h){const g=h.game;return {seed:h.port.state.bb_std_random_Seed,ticks:g.bbgameticks,cash:g.bbztp.bbcash,xp:g.bbztp.bbxp,
   people:entries(g.bbpeople).map(b=>[b.bbunit.bbtype,b.bbhealth,b.bbxpos,b.bbmode]),zombies:entries(g.bbzombies).map(b=>[b.bbunit.bbtype,b.bbhealth,b.bbxpos,b.bbmode])};}
+// Capacity fixtures need real, distinct native bodies, not thousands of
+// attacking sprites. Mode 16 is inert in the recovered update state machine;
+// these still execute its real update/list logic when a queue tick is tested.
+function fillIdleEnemySlots(h,count){
+  const bodies=[];
+  for(let i=0;i<count;i++){
+    const body=new h.port.bb_Zombie().bbZombie_new(0,h.game.bbzunits[0],null);
+    body.bbmode=16;body.bbwalkspeed=0;h.game.bbzombies.bbAddLast(body);bodies.push(body);
+  }
+  return bodies;
+}
+
+test('all actor admission paths share ten-thousand slots and the old thousand boundary no longer blocks queued work',()=>{
+  assert.equal(ENTITY_LIMIT,10000);assert.equal(Factions.ENTITY_LIMIT,ENTITY_LIMIT);assert.equal(CustomRules.ENTITY_LIMIT,ENTITY_LIMIT);
+  const h=fixture();fillIdleEnemySlots(h,998);const job=h.enqueue('enemy','zombie',1,3,1000000);
+  h.ticks();assert.equal(h.state().recent.find(item=>item.id===job.id).spawned,3);
+  assert.equal(h.state().entityCount,1003);assert.equal(h.state().capacity,ENTITY_LIMIT-1003);
+  assert.equal(h.state().blocked,null);assert.equal(CustomRules.getEntityCapacity(h.target),ENTITY_LIMIT-1003);
+});
 
 test('optional queue adapter preserves ordinary deterministic battles without pending jobs',()=>{
   const a=fixture(false),b=fixture();for(const h of [a,b]){h.game.bbAddPerson(h.game.bbunits[0]);h.game.bbAddZombie(h.game.bbzunits[0]);h.ticks(1200);}assert.deepEqual(view(b),view(a));
@@ -73,9 +93,9 @@ test('brief scheduler contention retains bounded due actors so many low-rate str
 });
 
 test('live cap retains remainder, accepts later batches, and resumes without catch-up bursts',()=>{
-  const h=fixture();h.spawn('enemy','zombie',0,998);const a=h.enqueue('enemy','zombie',1,1000,1000000),b=h.enqueue('friendly','unit',2,10,120);
+  const h=fixture(),old=fillIdleEnemySlots(h,TROOP_SLOTS);const a=h.enqueue('enemy','zombie',1,1000,1000000),b=h.enqueue('friendly','unit',2,10,120);
   h.ticks(5);assert.equal(h.state().totalSpawned,0);assert.equal(h.state().totalPending,1010);assert.equal(h.state().blocked,'entity-limit');
-  const old=Factions.list(h.target,{side:'enemy',kind:'zombie',type:0});h.game.bbzombies.bbRemove(old[0]);h.ticks();
+  h.game.bbzombies.bbRemove(old[0]);h.ticks();
   assert.equal(h.state().totalSpawned,1);assert.equal(h.state().jobs.find(j=>j.id===a.id).spawned,1);assert.equal(h.state().jobs.find(j=>j.id===b.id).spawned,0);
   h.game.bbzombies.bbRemove(old[1]);h.ticks();assert.equal(h.state().jobs.find(j=>j.id===b.id).spawned,1);assert.equal(h.state().capacity,0);
 });
@@ -87,17 +107,17 @@ test('queue snapshots expose exact shared occupancy including bases and scan mem
     const original=list.bbObjectEnumerator;list.bbObjectEnumerator=function(){scans++;return original.apply(this,arguments);};
   }
   const empty=h.state();assert.equal(scans,3);assert.equal(empty.entityCount,2);assert.equal(empty.baseCount,2);
-  assert.equal(empty.entityLimit,1000);assert.equal(empty.capacity,998);assert.equal(empty.blocked,null);
-  h.spawn('enemy','zombie',0,998);scans=0;
-  const full=h.state();assert.equal(scans,3);assert.equal(full.entityCount,1000);assert.equal(full.baseCount,2);
+  assert.equal(empty.entityLimit,ENTITY_LIMIT);assert.equal(empty.capacity,TROOP_SLOTS);assert.equal(empty.blocked,null);
+  const bodies=fillIdleEnemySlots(h,TROOP_SLOTS);scans=0;
+  const full=h.state();assert.equal(scans,3);assert.equal(full.entityCount,ENTITY_LIMIT);assert.equal(full.baseCount,2);
   assert.equal(full.capacity,0);assert.equal(full.blocked,'entity-limit');assert.equal(full.totalPending,1000);
-  const body=Factions.list(h.target,{side:'enemy',kind:'zombie',type:0})[0];h.game.bbzombies.bbRemove(body);scans=0;
-  const freed=h.state();assert.equal(scans,3);assert.equal(freed.entityCount,999);assert.equal(freed.capacity,1);assert.equal(freed.blocked,null);
+  h.game.bbzombies.bbRemove(bodies[0]);scans=0;
+  const freed=h.state();assert.equal(scans,3);assert.equal(freed.entityCount,ENTITY_LIMIT-1);assert.equal(freed.capacity,1);assert.equal(freed.blocked,null);
 });
 
 test('queue backpressure distinguishes native pause, runtime pause, rate pause, ended and absent battles from full capacity',()=>{
   const h=fixture(),job=h.enqueue('enemy','zombie',0,10,120);
-  const expect=reason=>{const value=h.state();assert.equal(value.blocked,reason);assert.equal(value.entityCount,2);assert.equal(value.capacity,998);};
+  const expect=reason=>{const value=h.state();assert.equal(value.blocked,reason);assert.equal(value.entityCount,2);assert.equal(value.capacity,TROOP_SLOTS);};
   expect(null);h.game.bbmainState=6;expect('game-paused');h.game.bbmainState=2;
   h.target.ZTPRuntime={getStatus:()=>({running:false})};expect('runtime-paused');h.target.ZTPRuntime={getStatus:()=>({running:true})};
   SpawnQueue.updateRate(h.target,job.id,0);expect('rate-paused');SpawnQueue.updateRate(h.target,job.id,120);
@@ -118,13 +138,13 @@ test('actual native victory and defeat keep pending jobs marked battle-ended aft
     const h=fixture(),job=h.enqueue('enemy','zombie',0,10,120);h.game.bbGameOver(won);
     assert.equal(h.game.bbmainState,won?3:4);
     const ended=h.state();assert.equal(ended.blocked,'battle-ended');assert.equal(ended.baseCount,0);assert.equal(ended.entityCount,0);
-    assert.equal(ended.capacity,1000);assert.equal(ended.paused,false);assert.equal(ended.jobs[0].id,job.id);assert.equal(ended.totalPending,10);
+    assert.equal(ended.capacity,ENTITY_LIMIT);assert.equal(ended.paused,false);assert.equal(ended.jobs[0].id,job.id);assert.equal(ended.totalPending,10);
     h.ticks(2);assert.equal(h.state().blocked,'battle-ended');assert.equal(h.state().totalSpawned,0);assert.equal(h.state().totalPending,10);
   }
 });
 
 test('paid native training completes before manual queue can claim the last entity slot',()=>{
-  const h=fixture();h.spawn('enemy','zombie',0,997);h.enqueue('enemy','zombie',3,1000,1000000);
+  const h=fixture();fillIdleEnemySlots(h,TROOP_SLOTS-1);h.enqueue('enemy','zombie',3,1000,1000000);
   const unit=h.game.bbunits[0];unit.bborders=1;unit.bbbusy=1;h.game.bbztp.bbforce=1;h.ticks();
   assert.equal(unit.bborders,0);assert.equal(Factions.list(h.target,{side:'friendly',kind:'unit',type:0}).length,1);assert.equal(h.state().totalSpawned,0);assert.equal(h.state().capacity,0);
 });

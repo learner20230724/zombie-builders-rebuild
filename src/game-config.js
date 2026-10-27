@@ -18,7 +18,10 @@
   // the per-frame budget is deliberately independent of the requested count.
   const POWER_COUNT_LIMIT = 2147483647;
   const POWER_DISPATCH_BUDGET = 32;
-  const ENTITY_SAFETY_LIMIT = 1000;
+  const ENTITY_SAFETY_LIMIT = 10000;
+  // Power vehicles are effects, not army slots; raising the shared troop cap
+  // must not multiply the independent aircraft/effect allocation guard.
+  const POWER_EFFECT_SAFETY_LIMIT = 1000;
   // Cosmetic base debris only. Each base owns its slots so concentrated fire
   // on one side cannot suppress the other base's hit feedback or actor deaths.
   const BASE_DEBRIS_LIMIT_PER_SIDE = 256;
@@ -326,8 +329,8 @@
   }
   function effectCapacity(game) {
     let count = 0, iterator = game.bbpowerups.bbObjectEnumerator();
-    while (iterator.bbHasNext()) { iterator.bbNextObject(); if (++count >= ENTITY_SAFETY_LIMIT) return 0; }
-    return ENTITY_SAFETY_LIMIT-count;
+    while (iterator.bbHasNext()) { iterator.bbNextObject(); if (++count >= POWER_EFFECT_SAFETY_LIMIT) return 0; }
+    return POWER_EFFECT_SAFETY_LIMIT-count;
   }
   function dispatchPowerSpawns(target,state,game) {
     const port = portFor(target), frame = state.powerDispatchFrame;
@@ -1320,5 +1323,6 @@
   }
   return Object.freeze({fromDocuments,validate,compile,apply,install,getCurrent,updateLive,getWaveProgress,applyLiveWaves,
     validateMultipliers,getMaximumHealth,getPowerProgress,cancelPowerEffects,releaseSandboxPower,
-    BUILDING_SAFETY_LIMIT,HEALTH_SAFETY_LIMIT,POWER_COUNT_LIMIT,POWER_DISPATCH_BUDGET,BASE_DEBRIS_LIMIT_PER_SIDE});
+    BUILDING_SAFETY_LIMIT,HEALTH_SAFETY_LIMIT,POWER_COUNT_LIMIT,POWER_DISPATCH_BUDGET,BASE_DEBRIS_LIMIT_PER_SIDE,
+    ENTITY_SAFETY_LIMIT,POWER_EFFECT_SAFETY_LIMIT});
 });

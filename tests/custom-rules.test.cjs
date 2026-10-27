@@ -45,9 +45,11 @@ function view(h) {
 function change(h, edit) { const rules=CustomRules.snapshot(h.target);edit(rules);CustomRules.update(h.target,rules); }
 function readyWave(h,type=1,count=1) { const mob=h.port.bb_ZombieMob;mob.bbInit([type,count,0]);mob.bbticks=60; }
 function fillEntityBudget(h) {
-  // Large skill requests dispatch bounded batches rather than freezing one
-  // event handler. Let the actual game ticks fill all available live slots.
-  for(let i=0;i<100 && CustomRules.getEntityCapacity(h.target)>0;i++)h.ticks();
+  // This is a capacity-guard fixture, not a 10,000-actor combat benchmark.
+  // Keep the genuinely summoned actors and fill the remaining list slots with
+  // the real inert base reference, as the other ceiling tests do below.
+  const count=CustomRules.getEntityCapacity(h.target);
+  for(let i=0;i<count;i++)h.game.bbpeople.bbAddLast(h.game.bbpeoplebase);
   assert.equal(CustomRules.getEntityCapacity(h.target),0);
 }
 function flingAtImpact(h,x=500) {
@@ -111,7 +113,7 @@ test('live entity capacity is shared with bounded configuration-driven spawns',(
   assert.equal(CustomRules.getEntityCapacity(h.target),CustomRules.ENTITY_LIMIT-3);
   h.game.bbzombies.bbRemove(zombie);
   assert.equal(h.port.getEntityCapacity(),CustomRules.ENTITY_LIMIT-2);
-  const filler={};for(let i=0;i<998;i++)h.game.bbpeople.bbAddLast(i===0?filler:{});
+  const filler={};for(let i=0;i<CustomRules.ENTITY_LIMIT-2;i++)h.game.bbpeople.bbAddLast(i===0?filler:{});
   assert.equal(h.port.getEntityCapacity(),0);
   h.game.bbpeople.bbRemove(filler);
   assert.equal(h.port.getEntityCapacity(),1);
@@ -388,14 +390,14 @@ test('enabled ghoul final leap displacement remains identical to the original',(
 test('large automatic wave and corpse impact respect entity safety ceiling without a null crash',()=>{
   const h=fixture();change(h,r=>r.automaticSpawning=false);
   const person=h.game.bbpeoplebase;
-  for(let i=0;i<998;i++)h.game.bbpeople.bbAddLast(person);
-  assert.equal(entries(h.game.bbpeople).length+entries(h.game.bbzombies).length,1000);
+  for(let i=0;i<CustomRules.ENTITY_LIMIT-2;i++)h.game.bbpeople.bbAddLast(person);
+  assert.equal(entries(h.game.bbpeople).length+entries(h.game.bbzombies).length,CustomRules.ENTITY_LIMIT);
   assert.equal(h.game.bbAddZombie(h.game.bbzunits[3]),null);
   flingAtImpact(h,900);h.ticks();assert.equal(entries(h.game.bbzombies).length,1);assert.equal(entries(h.game.bbflinglist).length,0);
 });
 
 test('entity list ceiling also covers oversized mob skills without touching effect or wave lists',()=>{
-  const c=config();c.powers[0].effect.shovelCount=1000;c.powers[0].effect.shotgunCount=1000;
+  const c=config();c.powers[0].effect.shovelCount=CustomRules.ENTITY_LIMIT;c.powers[0].effect.shotgunCount=CustomRules.ENTITY_LIMIT;
   const h=fixture(undefined,true,c);h.game.bbAddPower(h.game.bbpowers[0]);fillEntityBudget(h);
   assert.equal(entries(h.game.bbpeople).length+entries(h.game.bbzombies).length+entries(h.game.bbpombies).length,CustomRules.ENTITY_LIMIT);
   const other=new h.port.bb_std_list_List().bbList_new();
@@ -406,7 +408,7 @@ test('entity list ceiling also covers oversized mob skills without touching effe
 test('entity list ceiling covers training completion and still permits converted transfers',()=>{
   const h=fixture();change(h,r=>r.automaticSpawning=false);
   const person=h.game.bbpeoplebase;
-  for(let i=0;i<998;i++)h.game.bbpeople.bbAddLast(person);
+  for(let i=0;i<CustomRules.ENTITY_LIMIT-2;i++)h.game.bbpeople.bbAddLast(person);
   h.game.bbunits[0].bbbusy=1;h.game.bbunits[0].bborders=1;h.ticks();
   assert.equal(h.game.bbunits[0].bborders,1);assert.equal(h.game.bbunits[0].bbbusy,1);
   assert.equal(entries(h.game.bbpeople).length+entries(h.game.bbzombies).length,CustomRules.ENTITY_LIMIT);
@@ -418,7 +420,7 @@ test('entity list ceiling covers training completion and still permits converted
 });
 
 test('a real purchased training order waits at the ceiling and finishes when a slot opens',()=>{
-  const c=config();c.powers[0].effect.shovelCount=1000;c.powers[0].effect.shotgunCount=0;
+  const c=config();c.powers[0].effect.shovelCount=CustomRules.ENTITY_LIMIT;c.powers[0].effect.shotgunCount=0;
   const h=fixture(undefined,true,c);change(h,r=>r.automaticSpawning=false);h.game.bbAddPower(h.game.bbpowers[0]);fillEntityBudget(h);
   const unit=h.game.bbunits[0];h.game.bbBuyUnit(unit);const cash=h.game.bbztp.bbcash,force=h.game.bbztp.bbforce;
   assert.equal(unit.bborders,1);unit.bbbusy=1;

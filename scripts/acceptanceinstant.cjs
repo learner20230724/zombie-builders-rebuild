@@ -416,7 +416,7 @@ module.exports = async function instantAcceptance(h) {
     return {before, multiplied, unrelatedEditDoesNotCompound: true};
   });
 
-  await check('POWER-FIVE-KINDS-AND-LARGE-PLAN', 'All five angry-mob count fields instantly configure the next real skill; actual UI activation spawns exact five-kind totals, accepts 1001, and retains overflow as a bounded pending plan instead of truncating the requested army.', async () => {
+  await check('POWER-FIVE-KINDS-AND-LARGE-PLAN', 'All five angry-mob count fields instantly configure the next real skill; actual UI activation spawns exact five-kind totals and completes 1001 summons beyond the old 1000-entity guard without truncation.', async () => {
     await fixture('Five kind power acceptance', draft => {
       draft.config.levels[0].startingXp = 10000;
       Object.assign(draft.config.powers[0], {xp: 1, buildTicks: 1, cooldownTicks: 1});
@@ -437,12 +437,13 @@ module.exports = async function instantAcceptance(h) {
     await closeEditor(); await canvasClick(650, 90); await step(100);
     const full = await state(), pending = await page.evaluate(() => GameConfig.getPowerProgress(window));
     assert.equal(troopCount(full, 0) + pending.pendingTotal, 1001, 'All 1001 requested reinforcements are either live or retained, not silently dropped');
-    assert.ok(troopCount(full, 0) <= 998 && pending.pendingTotal > 0, 'A large plan keeps bounded simultaneous entities and pending work');
+    assert.equal(troopCount(full, 0),1001,'The higher live capacity admits the complete 1001-summon plan beyond the old limit');
+    assert.equal(pending.pendingTotal,0,'The complete 1001-summon request has drained within the unchanged per-tick dispatch budget');
     await openEditor(); await page.locator('#ztps-tab-sandbox').click(); await page.locator('[data-clear-troops="friendly"]').click();
     await closeEditor(); await step(10); const drained = await state(), remaining = await page.evaluate(() => GameConfig.getPowerProgress(window));
-    assert.equal(troopCount(drained, 0), pending.pendingTotal); assert.equal(remaining.pendingTotal, 0, 'Freed capacity dispatches the retained remainder');
+    assert.equal(troopCount(drained, 0),0); assert.equal(remaining.pendingTotal, 0, 'Clearing the completed plan leaves no hidden remainder to replay');
     await save('13-five-kind-power-and-large-plan');
-    return {fiveKindCounts: [1,2,3,4,5], requested: 1001, liveAtCapacity: troopCount(full, 0), pendingAtCapacity: pending.pendingTotal, remainderAfterClear: troopCount(drained, 0)};
+    return {fiveKindCounts: [1,2,3,4,5], requested: 1001, liveAfterDispatch: troopCount(full, 0), pendingAfterDispatch: pending.pendingTotal, remainderAfterClear: troopCount(drained, 0)};
   });
 
   await check('CANCEL-SKILL-EFFECTS-BY-SOURCE', 'Selected-skill and all-skill buttons remove real active/pending angry-mob troops, harvesters, jets and air bombs by provenance while preserving free manual troops, an ordinary bottle, paid recruitment, cooldowns, bases and wave plans.', async () => {
@@ -455,11 +456,14 @@ module.exports = async function instantAcceptance(h) {
     });
     const progress=()=>page.evaluate(()=>GameConfig.getPowerProgress(window,{includeActive:true}));
     await canvasClick(40,90);await openEditor();await page.locator('#ztps-tab-sandbox').click();await batch(0,2,'friendly','unit');
-    await closeEditor();await canvasClick(650,90);await step(100);await openEditor();await page.locator('#ztps-tab-powers').click();
+    // Inspect shortly after the real activation while the unchanged 32/tick
+    // dispatcher still has pending work. The larger live cap should not be
+    // impersonated by an artificial 1000-actor ceiling in this cancellation test.
+    await closeEditor();await canvasClick(650,90);await step(2);await openEditor();await page.locator('#ztps-tab-powers').click();
     await page.getByLabel('选择技能',{exact:true}).selectOption('0');
     const angryBefore=await state(),angryProgress=await progress();
     assert.equal(angryProgress.byPower[0].actors+angryProgress.byPower[0].pending,1001);
-    assert.ok(angryProgress.byPower[0].pending>0);assert.equal(angryBefore.units[0].orders,1);
+    assert.ok(angryProgress.byPower[0].actors>0);assert.ok(angryProgress.byPower[0].pending>0);assert.equal(angryBefore.units[0].orders,1);
     await page.locator('[data-cancel-power-effects="0"]').click();const angryAfter=await state(),angryCancelled=await progress();
     assert.equal(angryCancelled.byPower[0].actors,0);assert.equal(angryCancelled.byPower[0].pending,0);
     assert.equal(troopCount(angryAfter,0),2);assert.ok(angryAfter.people.filter(body=>body.type===0).every(body=>!body.angry));

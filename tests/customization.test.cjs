@@ -14,6 +14,7 @@ const read=file=>fs.readFileSync(path.join(root,file),'utf8');
 const plain=value=>JSON.parse(JSON.stringify(value));
 const baseline=()=>GameConfig.fromDocuments(Object.fromEntries(['units','zombies','buildings','powers','levels'].map(kind=>[kind,JSON.parse(read('config/'+kind+'.json'))])));
 const constants=Customization.constants;
+const ENTITY_LIMIT=CustomRules.ENTITY_LIMIT,MAX_TROOPS=ENTITY_LIMIT-2;
 function noWaveIds(config) {const copy=plain(config);for(const level of copy.levels)for(const wave of level.waves)delete wave.id;return copy;}
 function oldSourceFingerprint(config) {
   const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
@@ -344,11 +345,11 @@ test('manual buttons create all five real types while automatic spawning is disa
 test('manual spawning cannot alter original mode or exceed batch/entity safety limits',()=>{
   const h=fixture();h.game.bbPlayGame(1);assert.throws(()=>h.controller.spawnZombie(3),/先应用/);
   h.controller.applyLive(h.controller.getDraft().config);
-  for(const args of [[-1,1],[5,1],[3,0],[3,999],[3,1.5]])assert.throws(()=>h.controller.spawnZombie(...args),/0–4/);
+  for(const args of [[-1,1],[5,1],[3,0],[3,MAX_TROOPS+1],[3,1.5]])assert.throws(()=>h.controller.spawnZombie(...args),/0–4/);
   const originalAdd=h.game.bbzombies.bbAddLast;
-  // Use harmless shared entities to reach the cap without 1000 sprite constructors.
-  for(let i=0;i<998;i++)originalAdd.call(h.game.bbzombies,{bbunit:{bbtype:32}});
-  assert.throws(()=>h.controller.spawnZombie(3),/1000/);
+  // This is capacity preflight only, not a many-actor combat benchmark.
+  for(let i=0;i<MAX_TROOPS;i++)originalAdd.call(h.game.bbzombies,{bbunit:{bbtype:32}});
+  assert.throws(()=>h.controller.spawnZombie(3),new RegExp(String(ENTITY_LIMIT)));
 });
 
 function clearFixture() {
@@ -685,9 +686,9 @@ test('batch manual spawns use the original far-right origin and preflight capaci
   assert.equal(result.count,100);assert.equal(result.positions.length,100);assert.ok(result.positions.every(p=>p.x===1600 && p.x>g.bbzombiebase.bbxpos));
   assert.equal(entries(g.bbzombies).filter(body=>body.bbunit.bbtype===35).length,100);
   const before=entries(g.bbzombies),seed=h.target.ZTPGamePort.state.bb_std_random_Seed;
-  assert.throws(()=>h.controller.spawnZombie(0,899),/1000/);assert.deepEqual(entries(g.bbzombies),before);assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,seed);
-  h.controller.clearEnemyTroops();assert.equal(h.controller.spawnZombie(0,998).count,998);
-  assert.equal(h.controller.getBattleStatus().entities.total,1000);assert.throws(()=>h.controller.spawnZombie(0),/1000/);
+  assert.throws(()=>h.controller.spawnZombie(0,MAX_TROOPS-99),new RegExp(String(ENTITY_LIMIT)));assert.deepEqual(entries(g.bbzombies),before);assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,seed);
+  h.controller.clearEnemyTroops();assert.equal(h.controller.spawnZombie(0,MAX_TROOPS).count,MAX_TROOPS);
+  assert.equal(h.controller.getBattleStatus().entities.total,ENTITY_LIMIT);assert.throws(()=>h.controller.spawnZombie(0),new RegExp(String(ENTITY_LIMIT)));
 });
 
 test('typed friendly clear kills only the selected human type and releases only its actual reserved population',()=>{
@@ -872,13 +873,16 @@ test('free friendly actors never refund paid reserved population on typed clear 
 test('friendly batch guards original mode, invalid types/counts and total capacity before creating actors or consuming RNG, and preserves pause',()=>{
   const original=fixture();original.game.bbPlayGame(1);assert.throws(()=>original.controller.spawnFriendlyUnit(0),/先应用/);
   const h=fixture({custom:true}),g=h.game,before=h.controller.getState(),seed=h.target.ZTPGamePort.state.bb_std_random_Seed;
-  for(const args of [[-1,1],[5,1],[0,0],[0,999],[0,1.5]])assert.throws(()=>h.controller.spawnFriendlyUnit(...args),/0–4/);
+  for(const args of [[-1,1],[5,1],[0,0],[0,MAX_TROOPS+1],[0,1.5]])assert.throws(()=>h.controller.spawnFriendlyUnit(...args),/0–4/);
   assert.deepEqual(h.controller.getState(),before);assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,seed);
-  const token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice();assert.equal(h.controller.spawnFriendlyUnit(4,998).count,998);
-  assert.equal(h.controller.getBattleStatus().entities.total,1000);const fullSeed=h.target.ZTPGamePort.state.bb_std_random_Seed;
-  assert.throws(()=>h.controller.spawnFriendlyUnit(2),/1000/);assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,fullSeed);
+  // Exercise a real batch above the old ceiling; the other slots are protected
+  // base references so this guard test does not construct/render 10k sprites.
+  const batch=1002;for(let i=batch;i<MAX_TROOPS;i++)g.bbzombies.bbAddLast(g.bbzombiebase);
+  const token=h.controller.pauseForEditor(),calls=h.runtimeCalls.slice();assert.equal(h.controller.spawnFriendlyUnit(4,batch).count,batch);
+  assert.equal(h.controller.getBattleStatus().entities.total,ENTITY_LIMIT);const fullSeed=h.target.ZTPGamePort.state.bb_std_random_Seed;
+  assert.throws(()=>h.controller.spawnFriendlyUnit(2),new RegExp(String(ENTITY_LIMIT)));assert.equal(h.target.ZTPGamePort.state.bb_std_random_Seed,fullSeed);
   assert.deepEqual(h.runtimeCalls,calls);assert.equal(h.controller.getBattleStatus().editorPaused,true);
-  assert.equal(h.controller.clearFriendlyTroops(4).count,998);assert.equal(g.bbztp.bbforce,0);h.controller.resumeFromEditor(token);
+  assert.equal(h.controller.clearFriendlyTroops(4).count,batch);assert.equal(g.bbztp.bbforce,0);h.controller.resumeFromEditor(token);
 });
 
 test('free friendly troop speed stays non-angry through subsequent global multiplier hot edits',()=>{
@@ -923,13 +927,16 @@ test('generic faction spawn guards all inputs and live capacity before any list,
   const h=fixture({custom:true}),before=unchangedBattle(h),calls=h.runtimeCalls.slice();
   for(const [side,selection,count] of [
     ['invalid',{kind:'unit',type:0},1],['friendly',{kind:'base',type:0},1],['enemy',{kind:'unit',type:5},1],
-    ['enemy',{kind:'zombie',type:0,unknown:1},1],['friendly',{kind:'unit',type:1},0],['enemy',{kind:'unit',type:1},999],
+    ['enemy',{kind:'zombie',type:0,unknown:1},1],['friendly',{kind:'unit',type:1},0],['enemy',{kind:'unit',type:1},MAX_TROOPS+1],
     ['friendly',{kind:'zombie',type:1},1.5]
   ])assert.throws(()=>h.controller.spawnFactionUnit(side,selection,count));
   assert.deepEqual(unchangedBattle(h),before);assert.deepEqual(h.runtimeCalls,calls);
-  h.controller.spawnFactionUnit('enemy',{kind:'unit',type:2},998);assert.equal(h.controller.getBattleStatus().entities.total,1000);
-  const full=unchangedBattle(h);assert.throws(()=>h.controller.spawnFactionUnit('friendly',{kind:'zombie',type:4},1),/1000/);assert.deepEqual(unchangedBattle(h),full);
-  assert.equal(h.controller.clearEnemyTroops({kind:'unit',type:2}).count,998);assert.equal(h.controller.getBattleStatus().entities.total,2);
+  const batch=1002;for(let i=batch;i<MAX_TROOPS;i++)h.game.bbpeople.bbAddLast(h.game.bbpeoplebase);
+  h.controller.spawnFactionUnit('enemy',{kind:'unit',type:2},batch);assert.equal(h.controller.getBattleStatus().entities.total,ENTITY_LIMIT);
+  const full=unchangedBattle(h);assert.throws(()=>h.controller.spawnFactionUnit('friendly',{kind:'zombie',type:4},1),new RegExp(String(ENTITY_LIMIT)));assert.deepEqual(unchangedBattle(h),full);
+  assert.equal(h.controller.clearEnemyTroops({kind:'unit',type:2}).count,batch);
+  h.game.bbpeople.bbRemove(h.game.bbpeoplebase);h.game.bbpeople.bbAddLast(h.game.bbpeoplebase);
+  assert.equal(h.controller.getBattleStatus().entities.total,2);
 });
 
 
@@ -1040,6 +1047,9 @@ test('real-time troop counts report all twenty live camp/species combinations an
 test('troop counts exclude dead-but-not-unlinked actors immediately and ignore bases, recruitment, queued sandbox batches and pending or vehicle skills',()=>{
   const h=fixture({custom:true}),g=h.game,draft=h.controller.getDraft();draft.config.powers[0].effect.shovelCount=2000;h.controller.commitSettings(draft);
   h.controller.spawnFriendlyUnit(0,998);g.bbztp.bbcash=100000;g.bbBuyUnit(g.bbunits[0]);
+  // The statistics fixture keeps its original 998 real soldiers; inert base
+  // references fill the enlarged guard and must never appear as mobile troops.
+  for(let i=998;i<MAX_TROOPS;i++)g.bbzombies.bbAddLast(g.bbzombiebase);
   h.controller.enqueueSpawn('enemy',{kind:'zombie',type:3},1000,{rate:0});for(const power of g.bbpowers)g.bbAddPower(power);
   assert.ok(h.controller.getState().powerProgress.pendingTotal>=2000);assert.equal(h.controller.getState().spawnQueue.totalPending,1000);
   let counts=h.controller.getBattleStatus().troopCounts;assert.deepEqual(counts,{friendly:{units:[998,0,0,0,0],zombies:[0,0,0,0,0],total:998},enemy:{units:[0,0,0,0,0],zombies:[0,0,0,0,0],total:0}});

@@ -593,9 +593,10 @@
         object(selection,['kind','type'],'spawn selection');
         if (!['unit','zombie'].includes(selection.kind) || !Number.isInteger(selection.type) || selection.type<0 || selection.type>4)
           fail('生成类型必须为 unit 或 zombie，类型编号为 0–4');
-        if (!Number.isInteger(count) || count<1 || count>998) fail('单次数量为 1–998（并受场上安全容量约束）');
+        const limit=state.api.rules.ENTITY_LIMIT;
+        if (!Number.isInteger(count) || count<1 || count>limit-2) fail(`单次数量为 1–${limit-2}（并受场上安全容量约束）`);
         const total=entries(value.bbzombies).length+entries(value.bbpeople).length+entries(value.bbpombies).length;
-        if (total+count>1000) fail('场上实体达到安全上限 1000，请先减少单位');
+        if (total+count>limit) fail(`场上实体达到安全上限 ${limit}，请先减少单位`);
         if (typeof state.api.factions?.spawn!=='function') fail('阵营战斗适配器不可用，请更新游戏后重试');
         const actors=state.api.rules.withManualSpawn(target,()=>state.api.factions.spawn(target,side,selection,count));
         if (!Array.isArray(actors) || actors.length!==count) fail('未能生成全部单位');
@@ -604,9 +605,10 @@
       },
       spawnFriendlyUnit(type,count=1) {
         const value=customBattle();
-        if (!Number.isInteger(type) || type<0 || type>4 || !Number.isInteger(count) || count<1 || count>998) fail('己方兵种为 0–4，单次数量为 1–998（并受场上安全容量约束）');
+        const limit=state.api.rules.ENTITY_LIMIT;
+        if (!Number.isInteger(type) || type<0 || type>4 || !Number.isInteger(count) || count<1 || count>limit-2) fail(`己方兵种为 0–4，单次数量为 1–${limit-2}（并受场上安全容量约束）`);
         const total=entries(value.bbzombies).length+entries(value.bbpeople).length+entries(value.bbpombies).length;
-        if (total+count>1000) fail('场上实体达到安全上限 1000，请先减少单位');
+        if (total+count>limit) fail(`场上实体达到安全上限 ${limit}，请先减少单位`);
         const positions=[];
         state.api.rules.withManualSpawn(target,()=>{
           for (let index=0;index<count;index++) {
@@ -623,9 +625,10 @@
       },
       spawnZombie(type,count=1) {
         const value=customBattle();
-        if (!Number.isInteger(type) || type<0 || type>4 || !Number.isInteger(count) || count<1 || count>998) fail('僵尸类型为 0–4，单次数量为 1–998（并受场上安全容量约束）');
+        const limit=state.api.rules.ENTITY_LIMIT;
+        if (!Number.isInteger(type) || type<0 || type>4 || !Number.isInteger(count) || count<1 || count>limit-2) fail(`僵尸类型为 0–4，单次数量为 1–${limit-2}（并受场上安全容量约束）`);
         const total=entries(value.bbzombies).length+entries(value.bbpeople).length+entries(value.bbpombies).length;
-        if (total+count>1000) fail('场上实体达到安全上限 1000，请先减少单位');
+        if (total+count>limit) fail(`场上实体达到安全上限 ${limit}，请先减少单位`);
         const positions=[];
         const spawn=()=>{
           for (let i=0;i<count;i++) {

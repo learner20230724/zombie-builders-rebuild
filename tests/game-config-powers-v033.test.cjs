@@ -49,6 +49,16 @@ function soldiers(h){return entries(h.game.bbpeople).filter(p=>p!==h.game.bbpeop
 function configWithCounts(...counts){const c=defaults();COUNT_KEYS.forEach((key,i)=>c.powers[0].effect[key]=counts[i]||0);return c;}
 function progress(h){return GameConfig.getPowerProgress(h.target);}
 function castMob(h){h.game.bbAddPower(h.game.bbpowers[0]);}
+function fillActorCapacity(h) {
+  // Capacity accounting counts list slots. Keep seven independent original
+  // actors for the subsequent slot-release test, then use a native inactive
+  // actor reference for the remaining slots. No attack/update is stubbed and
+  // this does not pretend to benchmark 9,998 independently fighting troops.
+  const g=h.game;
+  for(let i=0;i<8;i++){const body=g.bbAddPerson(g.bbunits[0]);assert.ok(body);body.bbmode=16;}
+  const filler=entries(g.bbpeople).at(-1),count=CustomRules.getEntityCapacity(h.target);
+  for(let i=0;i<count;i++)g.bbpeople.bbAddLast(filler);
+}
 
 test('v0.3.3 Angry Mob accepts five int32 counts and legacy absent extras mean zero',()=>{
   const legacy=defaults();for(const key of COUNT_KEYS.slice(2))delete legacy.powers[0].effect[key];
@@ -163,11 +173,11 @@ test('v0.3.3 a full effect field retains airstrike requests and does not consume
 
 test('v0.3.3 full field retains summoned units without RNG loss and drains after capacity is freed',()=>{
   const h=fixture(configWithCounts(80)),g=h.game;
-  while(CustomRules.getEntityCapacity(h.target)>0)assert.ok(g.bbAddPerson(g.bbunits[0]));
+  fillActorCapacity(h);
   assert.equal(CustomRules.getEntityCapacity(h.target),0);
   h.port.setRandomSeed(123);const before=h.port.state.bb_std_random_Seed;castMob(h);
   assert.equal(h.port.state.bb_std_random_Seed,before,'no random draw for a summon that cannot be created yet');
-  assert.equal(progress(h).pendingTotal,80);assert.equal(soldiers(h).length,998);
+  assert.equal(progress(h).pendingTotal,80);assert.equal(soldiers(h).length,CustomRules.ENTITY_LIMIT-2);
   h.ticks();assert.equal(progress(h).pendingTotal,80,'a capped tick must not discard requested summons');
   for(const person of soldiers(h).slice(0,7))g.bbpeople.bbRemove(person);
   assert.equal(CustomRules.getEntityCapacity(h.target),7);
@@ -177,12 +187,12 @@ test('v0.3.3 full field retains summoned units without RNG loss and drains after
 
 test('v0.3.3 a blocked huge mob must not starve an airstrike with available effect capacity',()=>{
   const c=configWithCounts(COUNT_LIMIT),h=fixture(c),g=h.game;
-  while(CustomRules.getEntityCapacity(h.target)>0)assert.ok(g.bbAddPerson(g.bbunits[0]));
+  fillActorCapacity(h);
   const control=fixture(c);control.port.setRandomSeed(4321);control.game.bbAddPower(control.game.bbpowers[2]);
   h.port.setRandomSeed(4321);const before=h.port.state.bb_std_random_Seed;castMob(h);
   assert.equal(progress(h).pendingTotal,COUNT_LIMIT);assert.equal(h.port.state.bb_std_random_Seed,before);
   g.bbAddPower(g.bbpowers[2]);
-  assert.equal(soldiers(h).length,998);assert.equal(entries(g.bbpowerups).length,3);
+  assert.equal(soldiers(h).length,CustomRules.ENTITY_LIMIT-2);assert.equal(entries(g.bbpowerups).length,3);
   assert.deepEqual(plain(progress(h)),{pendingTotal:COUNT_LIMIT,groups:[{type:0,count:COUNT_LIMIT,source:'angry-mob'}]});
   assert.equal(h.port.state.bb_std_random_Seed,control.port.state.bb_std_random_Seed,
     'blocked mob consumes no RNG; only the three admitted jets do');

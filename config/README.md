@@ -125,6 +125,8 @@ Spawning/ability switches, income rules, Trailer capacity, Harvester damage/rang
 - **Unlock all buildings, powers, and stages** removes custom unit/building prerequisites and power locks immediately. It does not grant completed buildings, cash, XP, or wins; `rules.unlockAllStages: true` enables stages 1–4 in the original canvas menu as well as the custom-battle selector. Missing/false preserves normal stage locks. These unlocked rules can be saved/exported as a preset, and original records stay separate.
 - The time controls at the top of the F2 settings panel change runtime speed **0–20× in 0.1 steps**; `0` pauses. It does not change JSON or persist after restart, and multiplies the original in-game speed selection.
 
-Large summon requests are queued, not created in a single unbounded loop. The battlefield retains its separate active-entity safety limit; requested quantity and simultaneous actors are different controls.
+Large summon requests are queued, not created in a single unbounded loop. The battlefield has a separate **10,000 active-entity limit shared by both camps, including both bases** (normally 9,998 troops); requested quantity and simultaneous actors are different controls. This capacity is not a guarantee of smooth combat with 10,000 actors.
 
 中文：F2 内勾选、下拉立即生效，数值回车或失焦生效，不再点“应用本局”；载入／导入、恢复默认和撤销也自动提交。当前关未完成波次按 ID 更新，已完成组只读，新增组显示在最上方但仍按执行序号出怪。全体生命／移速／伤害倍率放在预设 `rules.multipliers`，不乘基地，并与关卡倍率相乘。沙盒两方出兵区常驻并列、独立保持类型／数量／速率；支持双方一键清兵、按类型清兵、双方阵营各十类单位（共二十种组合）的独立速率队列生成、双方基地最大／当前生命；当前生命 0 正常结束战斗。技能页可对任一阵营免费立即释放三技能，原技能按钮仍遵守正常条件；一键解锁修改自定义前置／技能锁定，不伪造通关。F2 面板内时间控制为 0–20 倍（步长 0.1），不写入预设；大量技能召兵排队分发，不再按旧的 1,000 请求上限截断。
+
+中文：双方共用的在场实体上限为 **10,000（含基地）**，通常容纳 **9,998 个小兵**；满员保留队列，空位出现后继续。请求总数与同时在场数量分开计算，提高容量不代表一万个单位同时交战也能流畅运行。

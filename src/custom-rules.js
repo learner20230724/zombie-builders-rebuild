@@ -7,7 +7,7 @@
 })(typeof globalThis === 'object' ? globalThis : this, function () {
   'use strict';
   const states = new WeakMap();
-  const ENTITY_LIMIT = 1000;
+  const ENTITY_LIMIT = 10000;
   const MULTIPLIER_LIMIT = 2147483647;
   const multiplierKeys = ['health','moveSpeed','damage'];
   const keys = ['schemaVersion','automaticSpawning','zombieTypesEnabled','baseReinforcements','corpseSpawnOnImpact','abilities','economy'];

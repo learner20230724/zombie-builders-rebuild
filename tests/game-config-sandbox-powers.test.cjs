@@ -39,7 +39,7 @@ test('validateOnly and Factions.validateSpawn are pure, including native pause s
   for(const side of ['friendly','enemy'])for(let id=0;id<3;id++){
     const report=cast(h,id,side,{validateOnly:true});assert.equal(report.spawned,0);assert.equal(report.pending,report.requested);assert.equal(report.side,side);assert.deepEqual(snapshot(h),before);
   }
-  assert.equal(Factions.validateSpawn(h.target,'enemy',{kind:'unit',type:4},2147483647).capacity,998);assert.deepEqual(snapshot(h),before);
+  assert.equal(Factions.validateSpawn(h.target,'enemy',{kind:'unit',type:4},2147483647).capacity,CustomRules.ENTITY_LIMIT-2);assert.deepEqual(snapshot(h),before);
   const report=cast(h,1,'enemy');assert.equal(report.spawned,1);assert.equal(h.game.bbmainState,6);
 });
 
@@ -114,7 +114,12 @@ test('huge both-camp skill requests remain compact and retain independent actor/
   const h=fixture(c=>{c.powers[0].effect.shovelCount=2147483647;c.powers[0].effect.shotgunCount=0;c.powers[2].effect.jetCount=2147483647;});
   const mob=cast(h,0,'enemy');assert.equal(mob.spawned,32);assert.equal(mob.pending,2147483615);assert.equal(GameConfig.getPowerProgress(h.target).groups[0].side,'enemy');
   const jet=cast(h,2,'friendly');assert.equal(jet.spawned,0,'older actor group owns the immediate 32 allocation budget');
-  h.spawn('friendly','zombie',0,2147483647);assert.equal(CustomRules.getEntityCapacity(h.target),0);h.ticks();
+  h.spawn('friendly','zombie',0,1);
+  // Exercise full actor-list accounting without constructing or fighting an
+  // unrelated 10,000-actor army in this skill/effect-capacity guard test.
+  const remaining=CustomRules.getEntityCapacity(h.target);
+  for(let i=0;i<remaining;i++)h.game.bbpeople.bbAddLast(h.game.bbpeoplebase);
+  assert.equal(CustomRules.getEntityCapacity(h.target),0);h.ticks();
   assert.equal(entries(h.game.bbpowerups).length,32,'full actors must not block a jet request');assert.ok(GameConfig.getPowerProgress(h.target).pendingTotal>2147483647);
   const report=GameConfig.cancelPowerEffects(h.target,'all');assert.ok(report.pending>2147483647);assert.equal(GameConfig.getPowerProgress(h.target).pendingTotal,0);
 });

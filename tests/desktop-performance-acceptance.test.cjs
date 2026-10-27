@@ -5,10 +5,11 @@ const good=()=>({limitPerSide:256,leftovers:[0,0],healthAfterHits:[2107483647,21
   actualSeed:123,expectedSeed:123,firstSideParticles:256,secondSideParticles:256,baseParticles:512,deathVisuals:7});
 
 test('native queue occupancy acceptance includes bases and the precise remaining capacity',()=>{
-  validateQueueOccupancy({entityLimit:1000,entityCount:2,baseCount:2,capacity:998},2);
-  validateQueueOccupancy({entityLimit:1000,entityCount:1000,baseCount:2,capacity:0},1000);
-  assert.throws(()=>validateQueueOccupancy({entityLimit:1000,entityCount:998,baseCount:2,capacity:0},1000));
-  assert.throws(()=>validateQueueOccupancy({entityLimit:1000,entityCount:2,baseCount:2,capacity:1000},2));
+  validateQueueOccupancy({entityLimit:10000,entityCount:2,baseCount:2,capacity:9998},2);
+  validateQueueOccupancy({entityLimit:10000,entityCount:10000,baseCount:2,capacity:0},10000);
+  assert.throws(()=>validateQueueOccupancy({entityLimit:10000,entityCount:9998,baseCount:2,capacity:0},10000));
+  assert.throws(()=>validateQueueOccupancy({entityLimit:10000,entityCount:2,baseCount:2,capacity:10000},2));
+  assert.throws(()=>validateQueueOccupancy({entityLimit:1000,entityCount:2,baseCount:2,capacity:998},2),'the previous 1000-object boundary must not pass current native acceptance');
 });
 
 test('native high-damage acceptance refuses capped actual damage, shared RNG drift and absent deaths',()=>{

@@ -337,18 +337,18 @@ test('queue polling keys rows by ID and preserves focused pending rate edits whi
 
 test('queue rows describe the real blocking reason and display occupancy including bases without calling every pause full',()=>{
   const f=fixture({custom:true,battle:true}),job=f.controller.enqueueSpawn('enemy',{kind:'zombie',type:3},1000,{rate:20});
-  Object.assign(f.current.spawnQueue,{entityCount:302,baseCount:2,entityLimit:1000,capacity:698});f.handle.open();
+  Object.assign(f.current.spawnQueue,{entityCount:302,baseCount:2,entityLimit:10000,capacity:9698});f.handle.open();
   const row=f.doc.body.querySelector('[data-spawn-job-id="'+job.id+'"]'),summary=f.doc.body.querySelector('[data-spawn-queue-summary]');
-  assert.match(summary.textContent,/场上占用 302 \/ 1000（含基地）/);
+  assert.match(summary.textContent,/场上占用 302 \/ 10000（含基地）/);
   for(const [reason,label] of [['game-paused','游戏暂停中'],['runtime-paused','战斗暂停中'],['rate-paused','所有批次速率为 0'],['battle-ended','战斗已结束'],['no-active-battle','等待开始战局'],['unknown-future-reason','等待继续出兵']]){
     f.current.spawnQueue.blocked=reason;f.tick();assert.ok(row.textContent.includes(label),reason);
-    assert.doesNotMatch(row.textContent,/场上已满|等待场上空位/);assert.match(summary.textContent,/302 \/ 1000/);
+    assert.doesNotMatch(row.textContent,/场上已满|等待场上空位/);assert.match(summary.textContent,/302 \/ 10000/);
   }
-  Object.assign(f.current.spawnQueue,{blocked:'entity-limit',entityCount:1000,capacity:0});f.tick();
-  assert.match(row.textContent,/场上已满，等待单位退场/);assert.match(summary.textContent,/1000 \/ 1000（含基地）/);
+  Object.assign(f.current.spawnQueue,{blocked:'entity-limit',entityCount:10000,capacity:0});f.tick();
+  assert.match(row.textContent,/场上已满，等待单位退场/);assert.match(summary.textContent,/10000 \/ 10000（含基地）/);
   f.current.spawnQueue.jobs[0].rate=0;f.tick();assert.match(row.textContent,/该批已暂停（速率 0）/);assert.doesNotMatch(row.textContent,/场上已满/);
-  Object.assign(f.current.spawnQueue,{blocked:null,entityCount:999,capacity:1});f.current.spawnQueue.jobs[0].rate=20;f.tick();
-  assert.doesNotMatch(row.textContent,/暂停|场上已满|等待/);assert.match(summary.textContent,/999 \/ 1000/);
+  Object.assign(f.current.spawnQueue,{blocked:null,entityCount:9999,capacity:1});f.current.spawnQueue.jobs[0].rate=20;f.tick();
+  assert.doesNotMatch(row.textContent,/暂停|场上已满|等待/);assert.match(summary.textContent,/9999 \/ 10000/);
   assert.equal(f.calls.some(c=>c[0]==='spawnJobRate'),false);assert.equal(f.commits().length,0);f.handle.destroy();
 });
 
